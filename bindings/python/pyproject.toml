@@ -1,0 +1,14 @@
+# Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
+
+[build-system]
+requires = ["setuptools>=45"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "triepack"
+version = "0.1.0"
+description = "Native Python implementation of the Triepack .trp binary format"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+test = ["pytest"]

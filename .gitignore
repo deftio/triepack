@@ -1,0 +1,60 @@
+# Build directories
+build/
+cmake-build-*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.lib
+
+# Coverage
+*.gcno
+*.gcda
+*.gcov
+coverage/
+lcov.info
+
+# Generated
+include/triepack/triepack_version.h
+compile_commands.json
+
+# Doxygen
+docs/html/
+docs/latex/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+coverage/
+
+# Rust
+bindings/rust/target/
+bindings/rust/Cargo.lock
+
+# Go
+bindings/go/triepack
+
+# Swift
+bindings/swift/.build/
+bindings/swift/.swiftpm/

@@ -1,0 +1,13 @@
+{
+  "name": "triepack",
+  "version": "0.1.0",
+  "description": "Native JavaScript implementation of the Triepack .trp binary format",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "license": "BSD-2-Clause"
+}
