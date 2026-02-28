@@ -7,14 +7,14 @@ extern "C" {
 #include "triepack/triepack_bitstream.h"
 }
 
-namespace triepack {
+namespace triepack
+{
 
 // ---------------------------------------------------------------------------
 // BitstreamReader
 // ---------------------------------------------------------------------------
 
-BitstreamReader::BitstreamReader(const uint8_t* data, size_t size)
-    : handle_(nullptr)
+BitstreamReader::BitstreamReader(const uint8_t *data, size_t size) : handle_(nullptr)
 {
     tp_bs_reader_create(&handle_, data, (uint64_t)size * 8);
 }
@@ -24,15 +24,14 @@ BitstreamReader::~BitstreamReader()
     tp_bs_reader_destroy(&handle_);
 }
 
-BitstreamReader::BitstreamReader(BitstreamReader&& other) noexcept
-    : handle_(nullptr)
+BitstreamReader::BitstreamReader(BitstreamReader &&other) noexcept : handle_(nullptr)
 {
     auto *tmp = other.handle_;
     other.handle_ = nullptr;
     handle_ = tmp;
 }
 
-BitstreamReader& BitstreamReader::operator=(BitstreamReader&& other) noexcept
+BitstreamReader &BitstreamReader::operator=(BitstreamReader &&other) noexcept
 {
     if (this != &other) {
         tp_bs_reader_destroy(&handle_);
@@ -55,7 +54,7 @@ size_t BitstreamReader::position() const
     return (size_t)tp_bs_reader_position(handle_);
 }
 
-tp_bitstream_reader* BitstreamReader::handle() const
+tp_bitstream_reader *BitstreamReader::handle() const
 {
     return handle_;
 }
@@ -64,8 +63,7 @@ tp_bitstream_reader* BitstreamReader::handle() const
 // BitstreamWriter
 // ---------------------------------------------------------------------------
 
-BitstreamWriter::BitstreamWriter(size_t initial_capacity)
-    : handle_(nullptr)
+BitstreamWriter::BitstreamWriter(size_t initial_capacity) : handle_(nullptr)
 {
     tp_bs_writer_create(&handle_, initial_capacity, 0);
 }
@@ -75,15 +73,14 @@ BitstreamWriter::~BitstreamWriter()
     tp_bs_writer_destroy(&handle_);
 }
 
-BitstreamWriter::BitstreamWriter(BitstreamWriter&& other) noexcept
-    : handle_(nullptr)
+BitstreamWriter::BitstreamWriter(BitstreamWriter &&other) noexcept : handle_(nullptr)
 {
     auto *tmp = other.handle_;
     other.handle_ = nullptr;
     handle_ = tmp;
 }
 
-BitstreamWriter& BitstreamWriter::operator=(BitstreamWriter&& other) noexcept
+BitstreamWriter &BitstreamWriter::operator=(BitstreamWriter &&other) noexcept
 {
     if (this != &other) {
         tp_bs_writer_destroy(&handle_);
@@ -104,7 +101,7 @@ size_t BitstreamWriter::position() const
     return (size_t)tp_bs_writer_position(handle_);
 }
 
-const uint8_t* BitstreamWriter::data() const
+const uint8_t *BitstreamWriter::data() const
 {
     const uint8_t *buf = nullptr;
     uint64_t bit_len = 0;
@@ -120,7 +117,7 @@ size_t BitstreamWriter::size() const
     return (size_t)((bit_len + 7) / 8);
 }
 
-tp_bitstream_writer* BitstreamWriter::handle() const
+tp_bitstream_writer *BitstreamWriter::handle() const
 {
     return handle_;
 }

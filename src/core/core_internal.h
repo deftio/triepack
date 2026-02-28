@@ -20,22 +20,22 @@
 
 struct tp_encoder {
     tp_encoder_options opts;
-    uint32_t           count;
+    uint32_t count;
     /* TODO: key/value storage during accumulation phase */
 };
 
 struct tp_dict {
     const uint8_t *buf;
-    size_t         len;
-    tp_dict_info   info;
+    size_t len;
+    tp_dict_info info;
     /* TODO: parsed header, trie root offset, etc. */
 };
 
 struct tp_iterator {
     const tp_dict *dict;
-    uint64_t       pos;
-    uint8_t        distance; /* for fuzzy search results */
-    bool           done;
+    uint64_t pos;
+    uint8_t distance; /* for fuzzy search results */
+    bool done;
     /* TODO: traversal state */
 };
 

@@ -8,8 +8,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <cstdio>
 #include "triepack/triepack.hpp"
+
+#include <cstdio>
 
 int main()
 {

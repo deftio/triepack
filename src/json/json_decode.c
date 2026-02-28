@@ -13,10 +13,10 @@
 
 /* ── One-shot decode ─────────────────────────────────────────────────── */
 
-tp_result tp_json_decode(const uint8_t *buf, size_t buf_len,
-                         char **json_str, size_t *json_len)
+tp_result tp_json_decode(const uint8_t *buf, size_t buf_len, char **json_str, size_t *json_len)
 {
-    if (!buf || !json_str || !json_len) return TP_ERR_INVALID_PARAM;
+    if (!buf || !json_str || !json_len)
+        return TP_ERR_INVALID_PARAM;
     (void)buf_len;
 
     /* TODO: walk trie, reconstruct JSON text */
@@ -25,11 +25,11 @@ tp_result tp_json_decode(const uint8_t *buf, size_t buf_len,
 
 /* ── Pretty-printed decode ───────────────────────────────────────────── */
 
-tp_result tp_json_decode_pretty(const uint8_t *buf, size_t buf_len,
-                                const char *indent,
+tp_result tp_json_decode_pretty(const uint8_t *buf, size_t buf_len, const char *indent,
                                 char **json_str, size_t *json_len)
 {
-    if (!buf || !indent || !json_str || !json_len) return TP_ERR_INVALID_PARAM;
+    if (!buf || !indent || !json_str || !json_len)
+        return TP_ERR_INVALID_PARAM;
     (void)buf_len;
 
     /* TODO: walk trie, reconstruct pretty-printed JSON text */

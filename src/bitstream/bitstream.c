@@ -13,23 +13,40 @@
 const char *tp_result_str(tp_result result)
 {
     switch (result) {
-    case TP_OK:                   return "OK";
-    case TP_ERR_EOF:              return "read past end of stream";
-    case TP_ERR_ALLOC:            return "memory allocation failed";
-    case TP_ERR_INVALID_PARAM:    return "invalid parameter";
-    case TP_ERR_INVALID_POSITION: return "seek beyond bounds";
-    case TP_ERR_NOT_ALIGNED:      return "not byte-aligned";
-    case TP_ERR_OVERFLOW:         return "varint overflow";
-    case TP_ERR_INVALID_UTF8:     return "invalid UTF-8";
-    case TP_ERR_BAD_MAGIC:        return "bad magic bytes";
-    case TP_ERR_VERSION:          return "unsupported version";
-    case TP_ERR_CORRUPT:          return "data corrupt";
-    case TP_ERR_NOT_FOUND:        return "key not found";
-    case TP_ERR_TRUNCATED:        return "data truncated";
-    case TP_ERR_JSON_SYNTAX:      return "JSON syntax error";
-    case TP_ERR_JSON_DEPTH:       return "JSON nesting too deep";
-    case TP_ERR_JSON_TYPE:        return "JSON type mismatch";
-    default:                      return "unknown error";
+    case TP_OK:
+        return "OK";
+    case TP_ERR_EOF:
+        return "read past end of stream";
+    case TP_ERR_ALLOC:
+        return "memory allocation failed";
+    case TP_ERR_INVALID_PARAM:
+        return "invalid parameter";
+    case TP_ERR_INVALID_POSITION:
+        return "seek beyond bounds";
+    case TP_ERR_NOT_ALIGNED:
+        return "not byte-aligned";
+    case TP_ERR_OVERFLOW:
+        return "varint overflow";
+    case TP_ERR_INVALID_UTF8:
+        return "invalid UTF-8";
+    case TP_ERR_BAD_MAGIC:
+        return "bad magic bytes";
+    case TP_ERR_VERSION:
+        return "unsupported version";
+    case TP_ERR_CORRUPT:
+        return "data corrupt";
+    case TP_ERR_NOT_FOUND:
+        return "key not found";
+    case TP_ERR_TRUNCATED:
+        return "data truncated";
+    case TP_ERR_JSON_SYNTAX:
+        return "JSON syntax error";
+    case TP_ERR_JSON_DEPTH:
+        return "JSON nesting too deep";
+    case TP_ERR_JSON_TYPE:
+        return "JSON type mismatch";
+    default:
+        return "unknown error";
     }
 }
 
@@ -122,8 +139,7 @@ tp_value tp_value_blob(const uint8_t *data, size_t len)
 
 static const size_t DEFAULT_WRITER_CAP = 256;
 
-tp_result tp_bs_reader_create(tp_bitstream_reader **out,
-                              const uint8_t *buf, uint64_t bit_len)
+tp_result tp_bs_reader_create(tp_bitstream_reader **out, const uint8_t *buf, uint64_t bit_len)
 {
     if (!out)
         return TP_ERR_INVALID_PARAM;
@@ -132,17 +148,16 @@ tp_result tp_bs_reader_create(tp_bitstream_reader **out,
     if (!r)
         return TP_ERR_ALLOC;
 
-    r->buf      = buf;
-    r->bit_len  = bit_len;
-    r->pos      = 0;
-    r->order    = TP_BIT_ORDER_MSB_FIRST;
+    r->buf = buf;
+    r->bit_len = bit_len;
+    r->pos = 0;
+    r->order = TP_BIT_ORDER_MSB_FIRST;
     r->owns_buf = false;
     *out = r;
     return TP_OK;
 }
 
-tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out,
-                                   const uint8_t *buf, uint64_t bit_len)
+tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out, const uint8_t *buf, uint64_t bit_len)
 {
     if (!out)
         return TP_ERR_INVALID_PARAM;
@@ -161,10 +176,10 @@ tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out,
         return TP_ERR_ALLOC;
     }
 
-    r->buf      = copy;
-    r->bit_len  = bit_len;
-    r->pos      = 0;
-    r->order    = TP_BIT_ORDER_MSB_FIRST;
+    r->buf = copy;
+    r->bit_len = bit_len;
+    r->pos = 0;
+    r->order = TP_BIT_ORDER_MSB_FIRST;
     r->owns_buf = true;
     *out = r;
     return TP_OK;
@@ -193,8 +208,7 @@ tp_result tp_bs_reader_set_bit_order(tp_bitstream_reader *r, tp_bit_order order)
 
 /* ── Writer lifecycle ────────────────────────────────────────────────── */
 
-tp_result tp_bs_writer_create(tp_bitstream_writer **out,
-                              size_t initial_cap, size_t growth)
+tp_result tp_bs_writer_create(tp_bitstream_writer **out, size_t initial_cap, size_t growth)
 {
     if (!out)
         return TP_ERR_INVALID_PARAM;
@@ -203,10 +217,10 @@ tp_result tp_bs_writer_create(tp_bitstream_writer **out,
     if (!w)
         return TP_ERR_ALLOC;
 
-    w->cap    = initial_cap > 0 ? initial_cap : DEFAULT_WRITER_CAP;
+    w->cap = initial_cap > 0 ? initial_cap : DEFAULT_WRITER_CAP;
     w->growth = growth;
-    w->pos    = 0;
-    w->buf    = calloc(1, w->cap);
+    w->pos = 0;
+    w->buf = calloc(1, w->cap);
     if (!w->buf) {
         free(w);
         return TP_ERR_ALLOC;
@@ -295,25 +309,24 @@ uint64_t tp_bs_writer_position(const tp_bitstream_writer *w)
 
 /* ── Buffer access ───────────────────────────────────────────────────── */
 
-tp_result tp_bs_writer_get_buffer(const tp_bitstream_writer *w,
-                                  const uint8_t **buf, uint64_t *bit_len)
+tp_result tp_bs_writer_get_buffer(const tp_bitstream_writer *w, const uint8_t **buf,
+                                  uint64_t *bit_len)
 {
     if (!w || !buf || !bit_len)
         return TP_ERR_INVALID_PARAM;
-    *buf     = w->buf;
+    *buf = w->buf;
     *bit_len = w->pos;
     return TP_OK;
 }
 
-tp_result tp_bs_writer_detach_buffer(tp_bitstream_writer *w,
-                                     uint8_t **buf, size_t *byte_len,
+tp_result tp_bs_writer_detach_buffer(tp_bitstream_writer *w, uint8_t **buf, size_t *byte_len,
                                      uint64_t *bit_len)
 {
     if (!w || !buf || !byte_len || !bit_len)
         return TP_ERR_INVALID_PARAM;
-    *buf      = w->buf;
+    *buf = w->buf;
     *byte_len = (size_t)((w->pos + 7) / 8);
-    *bit_len  = w->pos;
+    *bit_len = w->pos;
 
     /* Reset writer to empty state */
     w->buf = calloc(1, w->cap);
@@ -326,18 +339,17 @@ tp_result tp_bs_writer_detach_buffer(tp_bitstream_writer *w,
     return TP_OK;
 }
 
-tp_result tp_bs_reader_get_buffer(const tp_bitstream_reader *r,
-                                  const uint8_t **buf, uint64_t *bit_len)
+tp_result tp_bs_reader_get_buffer(const tp_bitstream_reader *r, const uint8_t **buf,
+                                  uint64_t *bit_len)
 {
     if (!r || !buf || !bit_len)
         return TP_ERR_INVALID_PARAM;
-    *buf     = r->buf;
+    *buf = r->buf;
     *bit_len = r->bit_len;
     return TP_OK;
 }
 
-tp_result tp_bs_writer_to_reader(tp_bitstream_writer *w,
-                                 tp_bitstream_reader **reader)
+tp_result tp_bs_writer_to_reader(tp_bitstream_writer *w, tp_bitstream_reader **reader)
 {
     if (!w || !reader)
         return TP_ERR_INVALID_PARAM;

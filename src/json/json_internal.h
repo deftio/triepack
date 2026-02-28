@@ -14,7 +14,7 @@
 
 struct tp_json {
     const uint8_t *buf;
-    size_t         buf_len;
+    size_t buf_len;
     /* TODO: parsed header, root node offset, cached counts, etc. */
 };
 

@@ -10,9 +10,10 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "triepack/triepack.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "triepack/triepack.h"
 
 int main(void)
 {

@@ -13,10 +13,10 @@
 
 /* ── One-shot encode ─────────────────────────────────────────────────── */
 
-tp_result tp_json_encode(const char *json_str, size_t json_len,
-                         uint8_t **buf, size_t *buf_len)
+tp_result tp_json_encode(const char *json_str, size_t json_len, uint8_t **buf, size_t *buf_len)
 {
-    if (!json_str || !buf || !buf_len) return TP_ERR_INVALID_PARAM;
+    if (!json_str || !buf || !buf_len)
+        return TP_ERR_INVALID_PARAM;
     (void)json_len;
 
     /* TODO: parse JSON, build key/value tries, emit .trp buffer */

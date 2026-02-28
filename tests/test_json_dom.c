@@ -1,11 +1,14 @@
 /* test_json_dom.c — dom tests for triepack json */
-#include "unity.h"
 #include "triepack/triepack_json.h"
+#include "unity.h"
 
 void setUp(void) {}
 void tearDown(void) {}
 
-void test_placeholder(void) { TEST_PASS(); }
+void test_placeholder(void)
+{
+    TEST_PASS();
+}
 
 int main(void)
 {

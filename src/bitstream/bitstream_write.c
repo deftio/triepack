@@ -131,8 +131,7 @@ tp_result tp_bs_write_bytes(tp_bitstream_writer *w, const uint8_t *buf, size_t n
 
 /* ── Buffer append ───────────────────────────────────────────────────── */
 
-tp_result tp_bs_writer_append_buffer(tp_bitstream_writer *w,
-                                     const uint8_t *buf, uint64_t bit_len)
+tp_result tp_bs_writer_append_buffer(tp_bitstream_writer *w, const uint8_t *buf, uint64_t bit_len)
 {
     if (!w || (!buf && bit_len > 0))
         return TP_ERR_INVALID_PARAM;
@@ -142,8 +141,8 @@ tp_result tp_bs_writer_append_buffer(tp_bitstream_writer *w,
         return rc;
 
     for (uint64_t i = 0; i < bit_len; i++) {
-        size_t byte_idx  = (size_t)(i / 8);
-        uint8_t bit_idx  = (uint8_t)(7 - (i % 8));
+        size_t byte_idx = (size_t)(i / 8);
+        uint8_t bit_idx = (uint8_t)(7 - (i % 8));
         uint8_t bit = (uint8_t)((buf[byte_idx] >> bit_idx) & 1);
         write_bit_msb(w->buf, w->pos, bit);
         w->pos++;
@@ -153,8 +152,7 @@ tp_result tp_bs_writer_append_buffer(tp_bitstream_writer *w,
 
 /* ── Bulk copy ───────────────────────────────────────────────────────── */
 
-tp_result tp_bs_copy_bits(tp_bitstream_reader *r, tp_bitstream_writer *w,
-                          uint64_t n_bits)
+tp_result tp_bs_copy_bits(tp_bitstream_reader *r, tp_bitstream_writer *w, uint64_t n_bits)
 {
     if (!r || !w)
         return TP_ERR_INVALID_PARAM;
@@ -166,8 +164,8 @@ tp_result tp_bs_copy_bits(tp_bitstream_reader *r, tp_bitstream_writer *w,
         return rc;
 
     for (uint64_t i = 0; i < n_bits; i++) {
-        size_t byte_idx  = (size_t)(r->pos / 8);
-        uint8_t bit_idx  = (uint8_t)(7 - (r->pos % 8));
+        size_t byte_idx = (size_t)(r->pos / 8);
+        uint8_t bit_idx = (uint8_t)(7 - (r->pos % 8));
         uint8_t bit = (uint8_t)((r->buf[byte_idx] >> bit_idx) & 1);
         write_bit_msb(w->buf, w->pos, bit);
         r->pos++;

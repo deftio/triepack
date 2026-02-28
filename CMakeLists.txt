@@ -26,6 +26,13 @@ include(CompilerWarnings)
 include(CodeCoverage)
 include(GNUInstallDirs)
 
+# ── Global coverage flags (ensures static library objects are instrumented) ──
+if(ENABLE_COVERAGE AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+endif()
+
 # ── Version header ───────────────────────────────────────────────────────
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/triepack/triepack_version.h.in"

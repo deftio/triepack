@@ -14,15 +14,14 @@
  */
 static inline uint8_t read_bit_msb(const uint8_t *buf, uint64_t bit_pos)
 {
-    size_t byte_idx  = (size_t)(bit_pos / 8);
-    uint8_t bit_idx  = (uint8_t)(7 - (bit_pos % 8));
+    size_t byte_idx = (size_t)(bit_pos / 8);
+    uint8_t bit_idx = (uint8_t)(7 - (bit_pos % 8));
     return (uint8_t)((buf[byte_idx] >> bit_idx) & 1);
 }
 
 /* ── Stateless ROM functions ─────────────────────────────────────────── */
 
-tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos,
-                             uint8_t n, uint64_t *out)
+tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, uint64_t *out)
 {
     if (!buf || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -35,8 +34,7 @@ tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos,
     return TP_OK;
 }
 
-tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos,
-                                    uint8_t n, int64_t *out)
+tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, int64_t *out)
 {
     if (!buf || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -54,8 +52,8 @@ tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos,
     return TP_OK;
 }
 
-tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos,
-                                 uint64_t *out, uint8_t *bits_read)
+tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos, uint64_t *out,
+                                 uint8_t *bits_read)
 {
     if (!buf || !out || !bits_read)
         return TP_ERR_INVALID_PARAM;
@@ -192,8 +190,7 @@ tp_result tp_bs_read_bytes(tp_bitstream_reader *r, uint8_t *buf, size_t n)
     return TP_OK;
 }
 
-tp_result tp_bs_reader_direct_ptr(tp_bitstream_reader *r,
-                                  const uint8_t **ptr, size_t n)
+tp_result tp_bs_reader_direct_ptr(tp_bitstream_reader *r, const uint8_t **ptr, size_t n)
 {
     if (!r || !ptr)
         return TP_ERR_INVALID_PARAM;
@@ -206,4 +203,3 @@ tp_result tp_bs_reader_direct_ptr(tp_bitstream_reader *r,
     r->pos += (uint64_t)n * 8;
     return TP_OK;
 }
-

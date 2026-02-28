@@ -1,11 +1,14 @@
 /* test_core_integrity.c — integrity tests for triepack core */
-#include "unity.h"
 #include "triepack/triepack.h"
+#include "unity.h"
 
 void setUp(void) {}
 void tearDown(void) {}
 
-void test_placeholder(void) { TEST_PASS(); }
+void test_placeholder(void)
+{
+    TEST_PASS();
+}
 
 int main(void)
 {

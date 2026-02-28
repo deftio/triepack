@@ -13,8 +13,8 @@
 #ifndef TRIEPACK_JSON_H
 #define TRIEPACK_JSON_H
 
-#include "triepack_common.h"
 #include "triepack.h"
+#include "triepack_common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,24 +31,25 @@ typedef struct tp_json tp_json;
  *
  * On success, @p buf is allocated (caller must free()) and @p buf_len is set.
  */
-tp_result tp_json_encode(const char *json_str, size_t json_len,
-                         uint8_t **buf, size_t *buf_len);
+tp_result tp_json_encode(const char *json_str, size_t json_len, uint8_t **buf, size_t *buf_len);
 
 /**
  * @brief Decode a .trp buffer back to a JSON string.
  *
  * On success, @p json_str is allocated (caller must free()).
  */
-tp_result tp_json_decode(const uint8_t *buf, size_t buf_len,
-                         char **json_str, size_t *json_len);
+tp_result tp_json_decode(const uint8_t *buf, size_t buf_len, char **json_str, size_t *json_len);
 
 /**
  * @brief Decode a .trp buffer to a pretty-printed JSON string.
  *
- * @param indent  Indentation string per level (e.g. "  " or "\t").
+ * @param buf       Encoded .trp data.
+ * @param buf_len   Length of @p buf in bytes.
+ * @param indent    Indentation string per level (e.g. "  " or "\t").
+ * @param json_str  Receives the decoded JSON string (caller must free()).
+ * @param json_len  Receives the length of the decoded string.
  */
-tp_result tp_json_decode_pretty(const uint8_t *buf, size_t buf_len,
-                                const char *indent,
+tp_result tp_json_decode_pretty(const uint8_t *buf, size_t buf_len, const char *indent,
                                 char **json_str, size_t *json_len);
 
 /* ── DOM-style access ────────────────────────────────────────────────── */
@@ -73,7 +74,7 @@ tp_result tp_json_root_type(const tp_json *j, tp_value_type *type);
 tp_result tp_json_iterate(const tp_json *j, tp_iterator **out);
 
 /** Return the number of top-level keys or elements. */
-uint32_t  tp_json_count(const tp_json *j);
+uint32_t tp_json_count(const tp_json *j);
 
 #ifdef __cplusplus
 }

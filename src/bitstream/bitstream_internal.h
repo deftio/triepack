@@ -10,16 +10,16 @@
 
 struct tp_bitstream_reader {
     const uint8_t *buf;
-    uint64_t       bit_len;
-    uint64_t       pos;
-    tp_bit_order   order;
-    bool           owns_buf;
+    uint64_t bit_len;
+    uint64_t pos;
+    tp_bit_order order;
+    bool owns_buf;
 };
 
 struct tp_bitstream_writer {
     uint8_t *buf;
-    size_t   cap;
-    size_t   growth;
+    size_t cap;
+    size_t growth;
     uint64_t pos;
 };
 
