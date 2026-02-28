@@ -8,18 +8,13 @@ Checks: >
   clang-analyzer-*,
   misc-*,
   -misc-unused-parameters,
+  -misc-include-cleaner,
   performance-*,
   portability-*,
-  readability-braces-around-statements,
   readability-inconsistent-declaration-parameter-name,
   readability-misleading-indentation,
-  readability-non-const-parameter,
   readability-redundant-declaration
 
 WarningsAsErrors: '*'
 
 HeaderFilterRegex: 'include/triepack/.*'
-
-CheckOptions:
-  - key: readability-braces-around-statements.ShortStatementLines
-    value: 1

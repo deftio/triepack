@@ -19,11 +19,13 @@ function(triepack_add_coverage_target)
 
     add_custom_target(coverage
         COMMAND ${LCOV} --capture --directory . --output-file lcov_raw.info
-                --rc branch_coverage=1 --ignore-errors empty,empty
+                --rc branch_coverage=1
+                --ignore-errors empty,empty,unused,unused
         COMMAND ${LCOV} --remove lcov_raw.info
-                "*/tests/*" "*/Unity/*" "*/_deps/*" "/usr/*"
+                "*/tests/*" "*/_deps/*" "/usr/*"
                 --output-file lcov.info
-                --rc branch_coverage=1 --ignore-errors empty,empty
+                --rc branch_coverage=1
+                --ignore-errors empty,empty,unused,unused
         COMMAND ${GENHTML} lcov.info --output-directory coverage
                 --branch-coverage
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
