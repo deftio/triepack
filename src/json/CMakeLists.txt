@@ -11,6 +11,7 @@ target_include_directories(triepack_json
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/src/core
 )
 
 target_link_libraries(triepack_json PUBLIC triepack_core)

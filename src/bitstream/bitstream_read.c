@@ -21,20 +21,21 @@ static inline uint8_t read_bit_msb(const uint8_t *buf, uint64_t bit_pos)
 
 /* ── Stateless ROM functions ─────────────────────────────────────────── */
 
-tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, uint64_t *out)
+tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos, unsigned int n, uint64_t *out)
 {
     if (!buf || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
 
     uint64_t val = 0;
-    for (uint8_t i = 0; i < n; i++) {
+    for (unsigned int i = 0; i < n; i++) {
         val = (val << 1) | read_bit_msb(buf, bit_pos + i);
     }
     *out = val;
     return TP_OK;
 }
 
-tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, int64_t *out)
+tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, unsigned int n,
+                                    int64_t *out)
 {
     if (!buf || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -53,14 +54,14 @@ tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, uint8_
 }
 
 tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos, uint64_t *out,
-                                 uint8_t *bits_read)
+                                 unsigned int *bits_read)
 {
     if (!buf || !out || !bits_read)
         return TP_ERR_INVALID_PARAM;
 
     uint64_t val = 0;
-    uint8_t shift = 0;
-    uint8_t total_bits = 0;
+    unsigned int shift = 0;
+    unsigned int total_bits = 0;
 
     for (int group = 0; group < TP_VARINT_MAX_GROUPS; group++) {
         uint64_t byte_val;
@@ -83,7 +84,7 @@ tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos, uint64_t 
 
 /* ── Bit-level read ──────────────────────────────────────────────────── */
 
-tp_result tp_bs_read_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out)
+tp_result tp_bs_read_bits(tp_bitstream_reader *r, unsigned int n, uint64_t *out)
 {
     if (!r || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -96,7 +97,7 @@ tp_result tp_bs_read_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out)
     return rc;
 }
 
-tp_result tp_bs_read_bits_signed(tp_bitstream_reader *r, uint8_t n, int64_t *out)
+tp_result tp_bs_read_bits_signed(tp_bitstream_reader *r, unsigned int n, int64_t *out)
 {
     if (!r || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -121,7 +122,7 @@ tp_result tp_bs_read_bit(tp_bitstream_reader *r, uint8_t *out)
     return TP_OK;
 }
 
-tp_result tp_bs_peek_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out)
+tp_result tp_bs_peek_bits(tp_bitstream_reader *r, unsigned int n, uint64_t *out)
 {
     if (!r || !out || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -131,7 +132,7 @@ tp_result tp_bs_peek_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out)
     return tp_bs_read_bits_at(r->buf, r->pos, n, out);
 }
 
-tp_result tp_bs_read_bits32(tp_bitstream_reader *r, uint8_t n, uint32_t *out)
+tp_result tp_bs_read_bits32(tp_bitstream_reader *r, unsigned int n, uint32_t *out)
 {
     if (!r || !out || n == 0 || n > 32)
         return TP_ERR_INVALID_PARAM;

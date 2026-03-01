@@ -1,9 +1,9 @@
 /*
  * rom_lookup.c
  *
- * Demonstrates opening a pre-compiled .trp blob (e.g. from a file
- * or embedded in ROM) and performing key lookups without any
- * encoding step.
+ * Demonstrates ROM-style zero-allocation lookup. Encodes a small
+ * dictionary in-code, then opens with tp_dict_open_unchecked() and
+ * performs lookups directly on the const buffer.
  *
  * Copyright (c) 2026 M. A. Chatterjee
  * SPDX-License-Identifier: BSD-2-Clause
@@ -14,59 +14,77 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char *argv[])
+int main(void)
 {
-    const char *path;
+    printf("=== ROM Lookup Example ===\n\n");
 
-    (void)argc;
-    (void)argv;
+    /* Step 1 -- Build a dictionary blob (in a real ROM scenario this
+       would be a pre-compiled const array embedded in firmware). */
+    tp_encoder *enc = NULL;
+    tp_result rc = tp_encoder_create(&enc);
+    if (rc != TP_OK) {
+        fprintf(stderr, "encoder_create: %s\n", tp_result_str(rc));
+        return 1;
+    }
 
-    path = (argc > 1) ? argv[1] : "data/sample.trp";
+    tp_value v;
 
-    /*
-     * Step 1 -- Load the blob into memory (or map it read-only).
-     *
-     * FILE *fp = fopen(path, "rb");
-     * fseek(fp, 0, SEEK_END);
-     * long file_len = ftell(fp);
-     * rewind(fp);
-     * uint8_t *buf = malloc((size_t)file_len);
-     * fread(buf, 1, (size_t)file_len, fp);
-     * fclose(fp);
-     */
+    v = tp_value_int(200);
+    tp_encoder_add(enc, "HTTP_OK", &v);
 
-    /*
-     * Step 2 -- Open the blob for lookup.
-     *
-     * tp_dict *dict = NULL;
-     * tp_result rc = tp_dict_open(&dict, buf, (size_t)file_len);
-     * if (rc != TP_OK) {
-     *     fprintf(stderr, "open failed: %s\n", tp_result_str(rc));
-     *     free(buf);
-     *     return 1;
-     * }
-     */
+    v = tp_value_int(404);
+    tp_encoder_add(enc, "HTTP_NOT_FOUND", &v);
 
-    /*
-     * Step 3 -- Perform lookups.
-     *
-     * tp_value val;
-     * rc = tp_dict_lookup(dict, "hello", &val);
-     * if (rc == TP_OK) {
-     *     printf("hello -> %lld\n", (long long)val.data.int_val);
-     * } else {
-     *     printf("hello: not found\n");
-     * }
-     */
+    v = tp_value_int(500);
+    tp_encoder_add(enc, "HTTP_SERVER_ERROR", &v);
 
-    /*
-     * Step 4 -- Clean up.
-     *
-     * tp_dict_close(&dict);
-     * free(buf);
-     */
+    v = tp_value_string("text/html");
+    tp_encoder_add(enc, "CONTENT_TYPE", &v);
 
-    printf("triepack ROM lookup example (stub -- core not yet implemented)\n");
-    printf("would load blob from: %s\n", path);
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    rc = tp_encoder_build(enc, &buf, &len);
+    tp_encoder_destroy(&enc);
+    if (rc != TP_OK) {
+        fprintf(stderr, "encoder_build: %s\n", tp_result_str(rc));
+        return 1;
+    }
+    printf("Compiled blob: %zu bytes\n\n", len);
+
+    /* Step 2 -- Open without CRC check (ROM-style, trusted data). */
+    tp_dict *dict = NULL;
+    rc = tp_dict_open_unchecked(&dict, buf, len);
+    if (rc != TP_OK) {
+        fprintf(stderr, "dict_open_unchecked: %s\n", tp_result_str(rc));
+        free(buf);
+        return 1;
+    }
+
+    /* Step 3 -- Perform lookups. */
+    const char *keys[] = {"HTTP_OK", "HTTP_NOT_FOUND", "HTTP_SERVER_ERROR", "CONTENT_TYPE",
+                          "MISSING_KEY"};
+    size_t num_keys = sizeof(keys) / sizeof(keys[0]);
+
+    for (size_t i = 0; i < num_keys; i++) {
+        tp_value val;
+        rc = tp_dict_lookup(dict, keys[i], &val);
+        if (rc == TP_OK) {
+            if (val.type == TP_INT)
+                printf("  %-20s -> %lld\n", keys[i], (long long)val.data.int_val);
+            else if (val.type == TP_STRING)
+                printf("  %-20s -> \"%.*s\"\n", keys[i], (int)val.data.string_val.str_len,
+                       val.data.string_val.str);
+            else
+                printf("  %-20s -> (type %d)\n", keys[i], val.type);
+        } else {
+            printf("  %-20s -> NOT FOUND\n", keys[i]);
+        }
+    }
+
+    /* Step 4 -- Clean up. */
+    tp_dict_close(&dict);
+    free(buf);
+
+    printf("\nDone.\n");
     return 0;
 }

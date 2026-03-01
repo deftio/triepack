@@ -1,20 +1,172 @@
-/* test_wrapper_core.cpp — C++ wrapper tests */
+/**
+ * @file test_wrapper_core.cpp
+ * @brief C++ wrapper tests for core Encoder/Dict/Iterator.
+ */
+
 extern "C" {
 #include "unity.h"
 }
+
 #include "triepack/triepack.hpp"
+
+#include <cstdlib>
+#include <cstring>
 
 void setUp(void) {}
 void tearDown(void) {}
 
-void test_placeholder(void)
+/* ── Tests ───────────────────────────────────────────────────────────── */
+
+void test_encoder_create(void)
 {
-    TEST_PASS();
+    triepack::Encoder enc;
+    TEST_ASSERT_NOT_NULL(enc.handle());
+}
+
+void test_encoder_insert_and_encode(void)
+{
+    triepack::Encoder enc;
+    enc.insert("apple", 10);
+    enc.insert("banana", 20);
+    enc.insert("cherry", 30);
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    int rc = enc.encode(&data, &size);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_NOT_NULL(data);
+    TEST_ASSERT_GREATER_THAN(0, size);
+}
+
+void test_dict_open_and_lookup(void)
+{
+    triepack::Encoder enc;
+    enc.insert("hello", 42);
+    enc.insert("world", 99);
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    enc.encode(&data, &size);
+
+    triepack::Dict dict(data, size);
+    TEST_ASSERT_NOT_NULL(dict.handle());
+
+    int32_t val = 0;
+    TEST_ASSERT_TRUE(dict.lookup("hello", &val));
+    TEST_ASSERT_EQUAL_INT32(42, val);
+
+    TEST_ASSERT_TRUE(dict.lookup("world", &val));
+    TEST_ASSERT_EQUAL_INT32(99, val);
+}
+
+void test_dict_size(void)
+{
+    triepack::Encoder enc;
+    enc.insert("a", 1);
+    enc.insert("b", 2);
+    enc.insert("c", 3);
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    enc.encode(&data, &size);
+
+    triepack::Dict dict(data, size);
+    TEST_ASSERT_EQUAL(3, dict.size());
+}
+
+void test_lookup_missing_key(void)
+{
+    triepack::Encoder enc;
+    enc.insert("exists", 1);
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    enc.encode(&data, &size);
+
+    triepack::Dict dict(data, size);
+    int32_t val = 0;
+    TEST_ASSERT_FALSE(dict.lookup("missing", &val));
+}
+
+void test_move_encoder(void)
+{
+    triepack::Encoder enc1;
+    enc1.insert("key", 42);
+
+    triepack::Encoder enc2(static_cast<triepack::Encoder &&>(enc1));
+    TEST_ASSERT_NULL(enc1.handle());
+    TEST_ASSERT_NOT_NULL(enc2.handle());
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    int rc = enc2.encode(&data, &size);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+}
+
+void test_move_assign_encoder(void)
+{
+    triepack::Encoder enc1;
+    enc1.insert("key", 1);
+
+    triepack::Encoder enc2;
+    enc2 = static_cast<triepack::Encoder &&>(enc1);
+    TEST_ASSERT_NULL(enc1.handle());
+    TEST_ASSERT_NOT_NULL(enc2.handle());
+}
+
+void test_move_dict(void)
+{
+    triepack::Encoder enc;
+    enc.insert("x", 5);
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    enc.encode(&data, &size);
+
+    triepack::Dict dict1(data, size);
+    triepack::Dict dict2(static_cast<triepack::Dict &&>(dict1));
+    TEST_ASSERT_NULL(dict1.handle());
+    TEST_ASSERT_NOT_NULL(dict2.handle());
+
+    int32_t val = 0;
+    TEST_ASSERT_TRUE(dict2.lookup("x", &val));
+    TEST_ASSERT_EQUAL_INT32(5, val);
+}
+
+void test_shared_prefix_keys(void)
+{
+    triepack::Encoder enc;
+    enc.insert("abc", 1);
+    enc.insert("abd", 2);
+    enc.insert("xyz", 3);
+
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    enc.encode(&data, &size);
+
+    triepack::Dict dict(data, size);
+    int32_t val = 0;
+
+    TEST_ASSERT_TRUE(dict.lookup("abc", &val));
+    TEST_ASSERT_EQUAL_INT32(1, val);
+
+    TEST_ASSERT_TRUE(dict.lookup("abd", &val));
+    TEST_ASSERT_EQUAL_INT32(2, val);
+
+    TEST_ASSERT_TRUE(dict.lookup("xyz", &val));
+    TEST_ASSERT_EQUAL_INT32(3, val);
 }
 
 int main(void)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_placeholder);
+    RUN_TEST(test_encoder_create);
+    RUN_TEST(test_encoder_insert_and_encode);
+    RUN_TEST(test_dict_open_and_lookup);
+    RUN_TEST(test_dict_size);
+    RUN_TEST(test_lookup_missing_key);
+    RUN_TEST(test_move_encoder);
+    RUN_TEST(test_move_assign_encoder);
+    RUN_TEST(test_move_dict);
+    RUN_TEST(test_shared_prefix_keys);
     return UNITY_END();
 }

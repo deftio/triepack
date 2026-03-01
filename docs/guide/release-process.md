@@ -1,3 +1,8 @@
+---
+layout: default
+title: Release Process
+---
+
 # Release Process
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->

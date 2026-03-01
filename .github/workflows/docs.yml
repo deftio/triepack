@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Doxygen
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen graphviz
@@ -30,13 +30,57 @@ jobs:
       - name: Configure
         run: cmake -B build -DBUILD_DOCS=ON
 
-      - name: Build docs
+      - name: Build Doxygen API docs
         run: cmake --build build --target docs
+
+      - name: Copy Doxygen output into docs site
+        run: |
+          mkdir -p docs/api
+          cp -r build/docs/html/* docs/api/
+
+      - name: Generate releases page from CHANGELOG
+        run: |
+          # Build docs/releases.md from CHANGELOG.md with Jekyll front matter
+          {
+            echo '---'
+            echo 'layout: default'
+            echo 'title: Releases'
+            echo '---'
+            echo ''
+            echo '# Releases'
+            echo ''
+            echo 'Download releases from the [GitHub Releases page](https://github.com/${{ github.repository }}/releases).'
+            echo ''
+            echo '---'
+            echo ''
+            # Strip the CHANGELOG header lines, keep version entries
+            sed -n '/^## \[/,$p' CHANGELOG.md | sed 's/^## \[/## v/; s/\] - / -- /'
+            echo ''
+            echo '---'
+            echo ''
+            echo '## Installing a Release'
+            echo ''
+            echo '```bash'
+            echo 'git clone https://github.com/${{ github.repository }}.git'
+            echo 'cd triepack'
+            echo 'git checkout v1.0.0'
+            echo 'cmake -B build -DCMAKE_BUILD_TYPE=Release'
+            echo 'cmake --build build'
+            echo 'sudo cmake --install build'
+            echo '```'
+          } > docs/releases.md
+
+      - name: Setup Jekyll
+        uses: actions/configure-pages@v4
+
+      - name: Build Jekyll site
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: docs/
+          destination: ./_site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/docs/html/
 
       - name: Deploy to GitHub Pages
         id: deployment

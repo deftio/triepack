@@ -1,8 +1,8 @@
-# triepack
+# triepack v1.0.0
 
 A compressed trie-based dictionary format for fast, compact key-value storage.
 
-Triepack encodes dictionaries into a compact binary format (`.trp`) optimized for fast lookups, prefix search, and ROM-safe deployment. It uses a two-trie architecture (prefix trie + suffix trie) with configurable symbol encoding and full value type support.
+TriePack encodes dictionaries into a compact binary format (`.trp`) optimized for fast lookups, prefix search, and ROM-safe deployment. It uses prefix sharing and bit-level packing with configurable symbol encoding and full value type support.
 
 ## Features
 
@@ -30,27 +30,34 @@ ctest --test-dir build --output-on-failure
 ### C API
 
 ```c
-#include <triepack/triepack.h>
+#include "triepack/triepack.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /* Encode */
 tp_encoder *enc = NULL;
 tp_encoder_create(&enc);
-tp_encoder_add(enc, "hello", &tp_value_int(42));
-tp_encoder_add(enc, "world", &tp_value_string("foo"));
+
+tp_value v = tp_value_int(42);
+tp_encoder_add(enc, "hello", &v);
+
+v = tp_value_string("foo");
+tp_encoder_add(enc, "world", &v);
 
 uint8_t *buf = NULL;
 size_t len = 0;
 tp_encoder_build(enc, &buf, &len);
-tp_encoder_destroy(&enc);
 
 /* Decode */
 tp_dict *dict = NULL;
 tp_dict_open(&dict, buf, len);
 
 tp_value val;
-tp_dict_lookup(dict, "hello", &val);  /* val.data.int_val == 42 */
+if (tp_dict_lookup(dict, "hello", &val) == TP_OK)
+    printf("hello -> %lld\n", (long long)val.data.int_val);
 
 tp_dict_close(&dict);
+tp_encoder_destroy(&enc);
 free(buf);
 ```
 
@@ -119,7 +126,9 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-Phase 1 (scaffolding) is complete. The C API headers are defined and the build system works. Implementation of the bitstream, core trie codec, and JSON libraries is next.
+**v1.0.0 released.** The bitstream library, trie codec, and JSON library are fully implemented. All 22 tests pass (16 unit test suites + 6 example integration tests). Run `compaction_benchmark` to see compression ratios on ~10k generated words.
+
+Future work: suffix table, Huffman symbols, language bindings.
 
 ## License
 

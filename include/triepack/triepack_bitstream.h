@@ -96,24 +96,37 @@ bool tp_bs_reader_is_byte_aligned(const tp_bitstream_reader *r);
 /* ── Bit-level read ──────────────────────────────────────────────────── */
 
 /** Read @p n bits (1..64) as an unsigned value. */
-tp_result tp_bs_read_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out);
+tp_result tp_bs_read_bits(tp_bitstream_reader *r, unsigned int n, uint64_t *out);
 
 /** Read @p n bits (1..64) as a sign-extended value. */
-tp_result tp_bs_read_bits_signed(tp_bitstream_reader *r, uint8_t n, int64_t *out);
+tp_result tp_bs_read_bits_signed(tp_bitstream_reader *r, unsigned int n, int64_t *out);
 
 /** Read a single bit. */
 tp_result tp_bs_read_bit(tp_bitstream_reader *r, uint8_t *out);
 
 /** Peek @p n bits without advancing the cursor. */
-tp_result tp_bs_peek_bits(tp_bitstream_reader *r, uint8_t n, uint64_t *out);
+tp_result tp_bs_peek_bits(tp_bitstream_reader *r, unsigned int n, uint64_t *out);
 
-/** Read @p n bits (1..32) as a 32-bit unsigned value (fast path). */
-tp_result tp_bs_read_bits32(tp_bitstream_reader *r, uint8_t n, uint32_t *out);
+/** Read @p n bits (1..32) as a 32-bit unsigned value. */
+tp_result tp_bs_read_bits32(tp_bitstream_reader *r, unsigned int n, uint32_t *out);
 
 /* ── Bit-level write ─────────────────────────────────────────────────── */
 
 /** Write the low @p n bits (1..64) of @p value. */
-tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, uint8_t n);
+tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, unsigned int n);
+
+/**
+ * @brief Write the low @p n bits (1..64) of a signed value.
+ *
+ * The value is truncated to @p n bits.  On read-back with
+ * tp_bs_read_bits_signed(), the MSB is sign-extended to recover the
+ * original signed value.  The valid range for a @p n-bit signed field
+ * is -(2^(n-1)) to 2^(n-1)-1.
+ *
+ * Example: writing -3 as a 5-bit signed field stores 11101 (binary).
+ * Reading 5 signed bits back yields -3.
+ */
+tp_result tp_bs_write_bits_signed(tp_bitstream_writer *w, int64_t value, unsigned int n);
 
 /** Write a single bit. */
 tp_result tp_bs_write_bit(tp_bitstream_writer *w, uint8_t value);
@@ -126,10 +139,19 @@ uint64_t tp_bs_writer_position(const tp_bitstream_writer *w);
 
 /* ── Byte-level read ─────────────────────────────────────────────────── */
 
+/** Read an 8-bit unsigned integer (1 byte). */
 tp_result tp_bs_read_u8(tp_bitstream_reader *r, uint8_t *out);
+
+/** Read a 16-bit unsigned integer (2 bytes, big-endian). */
 tp_result tp_bs_read_u16(tp_bitstream_reader *r, uint16_t *out);
+
+/** Read a 32-bit unsigned integer (4 bytes, big-endian). */
 tp_result tp_bs_read_u32(tp_bitstream_reader *r, uint32_t *out);
+
+/** Read a 64-bit unsigned integer (8 bytes, big-endian). */
 tp_result tp_bs_read_u64(tp_bitstream_reader *r, uint64_t *out);
+
+/** Read @p n raw bytes into @p buf. */
 tp_result tp_bs_read_bytes(tp_bitstream_reader *r, uint8_t *buf, size_t n);
 
 /**
@@ -142,10 +164,19 @@ tp_result tp_bs_reader_direct_ptr(tp_bitstream_reader *r, const uint8_t **ptr, s
 
 /* ── Byte-level write ────────────────────────────────────────────────── */
 
+/** Write an 8-bit unsigned integer (1 byte). */
 tp_result tp_bs_write_u8(tp_bitstream_writer *w, uint8_t val);
+
+/** Write a 16-bit unsigned integer (2 bytes, big-endian). */
 tp_result tp_bs_write_u16(tp_bitstream_writer *w, uint16_t val);
+
+/** Write a 32-bit unsigned integer (4 bytes, big-endian). */
 tp_result tp_bs_write_u32(tp_bitstream_writer *w, uint32_t val);
+
+/** Write a 64-bit unsigned integer (8 bytes, big-endian). */
 tp_result tp_bs_write_u64(tp_bitstream_writer *w, uint64_t val);
+
+/** Write @p n raw bytes from @p buf. */
 tp_result tp_bs_write_bytes(tp_bitstream_writer *w, const uint8_t *buf, size_t n);
 
 /* ── VarInt ──────────────────────────────────────────────────────────── */
@@ -165,10 +196,10 @@ tp_result tp_bs_write_varint_s(tp_bitstream_writer *w, int64_t value);
 /* ── Symbol ──────────────────────────────────────────────────────────── */
 
 /** Read a fixed-width symbol of @p bps bits. */
-tp_result tp_bs_read_symbol(tp_bitstream_reader *r, uint8_t bps, uint32_t *out);
+tp_result tp_bs_read_symbol(tp_bitstream_reader *r, unsigned int bps, uint32_t *out);
 
 /** Write a fixed-width symbol of @p bps bits. */
-tp_result tp_bs_write_symbol(tp_bitstream_writer *w, uint32_t val, uint8_t bps);
+tp_result tp_bs_write_symbol(tp_bitstream_writer *w, uint32_t val, unsigned int bps);
 
 /** Read a UTF-8 encoded codepoint. */
 tp_result tp_bs_read_utf8(tp_bitstream_reader *r, uint32_t *out);
@@ -183,10 +214,11 @@ tp_result tp_bs_write_utf8(tp_bitstream_writer *w, uint32_t cp);
  *
  * No object, no cursor, no allocation. Safe for ROM.
  */
-tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, uint64_t *out);
+tp_result tp_bs_read_bits_at(const uint8_t *buf, uint64_t bit_pos, unsigned int n, uint64_t *out);
 
 /** Read @p n bits at a given bit offset as a sign-extended value. */
-tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, uint8_t n, int64_t *out);
+tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, unsigned int n,
+                                    int64_t *out);
 
 /**
  * @brief Read a VarInt at a given bit offset.
@@ -197,7 +229,7 @@ tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, uint8_
  * @param bits_read  On success, set to the number of bits consumed.
  */
 tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos, uint64_t *out,
-                                 uint8_t *bits_read);
+                                 unsigned int *bits_read);
 
 /* ── Buffer access ───────────────────────────────────────────────────── */
 

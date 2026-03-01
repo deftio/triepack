@@ -1,0 +1,28 @@
+title: TriePack
+description: Compressed trie-based dictionary format for fast, compact key-value storage
+theme: minima
+baseurl: ""
+
+header_pages:
+  - index.md
+  - guide/getting-started.md
+  - guide/how-it-works.md
+  - guide/api-reference.md
+  - guide/bitstream-guide.md
+  - guide/examples.md
+  - releases.md
+
+exclude:
+  - build/
+  - bindings/
+  - cmake/
+  - src/
+  - tests/
+  - wrapper/
+  - plan/
+  - CMakeLists.txt
+  - Doxyfile.in
+  - "*.c"
+  - "*.h"
+  - "*.cpp"
+  - "*.hpp"

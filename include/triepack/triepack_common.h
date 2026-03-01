@@ -13,6 +13,25 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/*
+ * C99 makes the exact-width types (uint64_t, int64_t) optional -- they are
+ * only required when the platform has a native integer type with exactly 64
+ * bits and no padding.  Most modern compilers (GCC, Clang, MSVC) define them
+ * even on 32-bit targets because `unsigned long long` is exactly 64 bits on
+ * all practical architectures (i386, 68k, MIPS32, Xtensa/ESP32, ARM32, etc.).
+ *
+ * For strict portability, we provide a fallback.  C99 does guarantee that
+ * `unsigned long long` is at least 64 bits, and `long long` is at least 64
+ * bits.  On every real-world 32-bit target these are exactly 64 bits.
+ */
+#if !defined(UINT64_MAX)
+typedef unsigned long long uint64_t;
+typedef long long int64_t;
+#define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
+#define INT64_MAX  0x7FFFFFFFFFFFFFFFLL
+#define INT64_MIN  (-INT64_MAX - 1)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -114,14 +133,31 @@ typedef enum { TP_CHECKSUM_CRC32 = 0, TP_CHECKSUM_SHA256, TP_CHECKSUM_XXHASH64 }
 
 /* ── Value construction helpers ───────────────────────────────────────── */
 
+/** Create a null value. */
 tp_value tp_value_null(void);
+
+/** Create a boolean value. */
 tp_value tp_value_bool(bool val);
+
+/** Create a signed 64-bit integer value. */
 tp_value tp_value_int(int64_t val);
+
+/** Create an unsigned 64-bit integer value. */
 tp_value tp_value_uint(uint64_t val);
+
+/** Create a 32-bit float value. */
 tp_value tp_value_float32(float val);
+
+/** Create a 64-bit double value. */
 tp_value tp_value_float64(double val);
+
+/** Create a string value from a NUL-terminated C string. */
 tp_value tp_value_string(const char *str);
+
+/** Create a string value with explicit length (may contain NUL bytes). */
 tp_value tp_value_string_n(const char *str, size_t len);
+
+/** Create a binary blob value. */
 tp_value tp_value_blob(const uint8_t *data, size_t len);
 
 #ifdef __cplusplus

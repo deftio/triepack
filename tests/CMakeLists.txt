@@ -5,6 +5,7 @@ FetchContent_Declare(
     GIT_TAG        v2.6.0
 )
 FetchContent_MakeAvailable(unity)
+target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
 
 function(triepack_add_c_test name source lib)
     add_executable(${name} ${source})

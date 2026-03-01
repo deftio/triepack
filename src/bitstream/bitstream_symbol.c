@@ -7,7 +7,7 @@
 
 /* ── Symbol ──────────────────────────────────────────────────────────── */
 
-tp_result tp_bs_read_symbol(tp_bitstream_reader *r, uint8_t bps, uint32_t *out)
+tp_result tp_bs_read_symbol(tp_bitstream_reader *r, unsigned int bps, uint32_t *out)
 {
     if (!r || !out || bps == 0 || bps > 32)
         return TP_ERR_INVALID_PARAM;
@@ -19,7 +19,7 @@ tp_result tp_bs_read_symbol(tp_bitstream_reader *r, uint8_t bps, uint32_t *out)
     return rc;
 }
 
-tp_result tp_bs_write_symbol(tp_bitstream_writer *w, uint32_t val, uint8_t bps)
+tp_result tp_bs_write_symbol(tp_bitstream_writer *w, uint32_t val, unsigned int bps)
 {
     if (!w || bps == 0 || bps > 32)
         return TP_ERR_INVALID_PARAM;
@@ -67,6 +67,18 @@ tp_result tp_bs_read_utf8(tp_bitstream_reader *r, uint32_t *out)
         cp = (cp << 6) | (b & 0x3F);
     }
 
+    /* Reject overlong encodings */
+    if (cont == 1 && cp < 0x80)
+        return TP_ERR_INVALID_UTF8;
+    if (cont == 2 && cp < 0x800)
+        return TP_ERR_INVALID_UTF8;
+    if (cont == 3 && cp < 0x10000)
+        return TP_ERR_INVALID_UTF8;
+
+    /* Reject surrogates U+D800..U+DFFF */
+    if (cp >= 0xD800 && cp <= 0xDFFF)
+        return TP_ERR_INVALID_UTF8;
+
     *out = cp;
     return TP_OK;
 }
@@ -75,6 +87,10 @@ tp_result tp_bs_write_utf8(tp_bitstream_writer *w, uint32_t cp)
 {
     if (!w)
         return TP_ERR_INVALID_PARAM;
+
+    /* Reject surrogates U+D800..U+DFFF */
+    if (cp >= 0xD800 && cp <= 0xDFFF)
+        return TP_ERR_INVALID_UTF8;
 
     if (cp <= 0x7F) {
         return tp_bs_write_u8(w, (uint8_t)cp);

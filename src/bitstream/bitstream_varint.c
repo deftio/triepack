@@ -13,7 +13,7 @@ tp_result tp_bs_read_varint_u(tp_bitstream_reader *r, uint64_t *out)
         return TP_ERR_INVALID_PARAM;
 
     uint64_t val = 0;
-    uint8_t shift = 0;
+    unsigned int shift = 0;
 
     for (int group = 0; group < TP_VARINT_MAX_GROUPS; group++) {
         if (r->pos + 8 > r->bit_len)

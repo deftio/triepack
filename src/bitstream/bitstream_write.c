@@ -47,7 +47,7 @@ static inline void write_bit_msb(uint8_t *buf, uint64_t bit_pos, uint8_t val)
 
 /* ── Bit-level write ─────────────────────────────────────────────────── */
 
-tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, uint8_t n)
+tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, unsigned int n)
 {
     if (!w || n == 0 || n > 64)
         return TP_ERR_INVALID_PARAM;
@@ -56,12 +56,28 @@ tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, uint8_t n)
     if (rc != TP_OK)
         return rc;
 
-    for (uint8_t i = 0; i < n; i++) {
+    for (unsigned int i = 0; i < n; i++) {
         uint8_t bit = (uint8_t)((value >> (n - 1 - i)) & 1);
         write_bit_msb(w->buf, w->pos, bit);
         w->pos++;
     }
     return TP_OK;
+}
+
+tp_result tp_bs_write_bits_signed(tp_bitstream_writer *w, int64_t value, unsigned int n)
+{
+    if (!w || n == 0 || n > 64)
+        return TP_ERR_INVALID_PARAM;
+
+    /* Mask to n bits -- this truncates the sign extension so only the
+     * low n bits are written, exactly as they would appear in a two's
+     * complement representation.  On read-back, tp_bs_read_bits_signed()
+     * will re-extend the MSB. */
+    uint64_t raw = (uint64_t)value;
+    if (n < 64)
+        raw &= ((uint64_t)1 << n) - 1;
+
+    return tp_bs_write_bits(w, raw, n);
 }
 
 tp_result tp_bs_write_bit(tp_bitstream_writer *w, uint8_t value)

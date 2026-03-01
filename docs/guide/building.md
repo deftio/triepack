@@ -1,3 +1,8 @@
+---
+layout: default
+title: Building
+---
+
 # Building triepack
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->
