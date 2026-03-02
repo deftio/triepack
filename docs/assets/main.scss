@@ -47,11 +47,20 @@ $spacing-unit: 16px;
 h2 {
   border-bottom: 1px solid #e8e8e8;
   padding-bottom: 0.3em;
+  margin-top: 1.8em;
+}
+
+/* ── Horizontal rules ────────────────────────────────────────────────── */
+
+hr {
+  margin-top: 2em;
+  margin-bottom: 2em;
 }
 
 /* ── Navigation ──────────────────────────────────────────────────────── */
 
 .site-header {
+  border-top: none;
   border-bottom: 2px solid #424242;
 }
 
