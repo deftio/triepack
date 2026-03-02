@@ -781,6 +781,14 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
         }
     }
 
+    if (rc != TP_OK) {
+        tp_bs_reader_destroy(&reader);
+        free(stack);
+        free(entries);
+        tp_dict_close(&dict);
+        return rc;
+    }
+
 done:
     tp_bs_reader_destroy(&reader);
     free(stack);
