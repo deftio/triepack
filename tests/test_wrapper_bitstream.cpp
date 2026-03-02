@@ -107,6 +107,50 @@ void test_multi_bit_widths(void)
     TEST_ASSERT_EQUAL_UINT32(0, r.read(1));
 }
 
+/* ── Move-assign coverage ────────────────────────────────────────── */
+
+void test_move_assign_reader(void)
+{
+    uint8_t data[] = {0xAB, 0xCD};
+    triepack::BitstreamReader r1(data, sizeof(data));
+    triepack::BitstreamReader r2(data, sizeof(data));
+    r2 = static_cast<triepack::BitstreamReader &&>(r1);
+    TEST_ASSERT_NULL(r1.handle());
+    TEST_ASSERT_NOT_NULL(r2.handle());
+    TEST_ASSERT_EQUAL_UINT32(0xAB, r2.read(8));
+}
+
+void test_move_assign_reader_self(void)
+{
+    uint8_t data[] = {0xFF};
+    triepack::BitstreamReader r(data, sizeof(data));
+    triepack::BitstreamReader &ref = r;
+    r = static_cast<triepack::BitstreamReader &&>(ref);
+    TEST_ASSERT_NOT_NULL(r.handle());
+    TEST_ASSERT_EQUAL_UINT32(0xFF, r.read(8));
+}
+
+void test_move_assign_writer(void)
+{
+    triepack::BitstreamWriter w1;
+    w1.write(42, 8);
+    triepack::BitstreamWriter w2;
+    w2 = static_cast<triepack::BitstreamWriter &&>(w1);
+    TEST_ASSERT_NULL(w1.handle());
+    TEST_ASSERT_NOT_NULL(w2.handle());
+    TEST_ASSERT_EQUAL(8, w2.position());
+}
+
+void test_move_assign_writer_self(void)
+{
+    triepack::BitstreamWriter w;
+    w.write(123, 8);
+    triepack::BitstreamWriter &ref = w;
+    w = static_cast<triepack::BitstreamWriter &&>(ref);
+    TEST_ASSERT_NOT_NULL(w.handle());
+    TEST_ASSERT_EQUAL(8, w.position());
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -118,5 +162,10 @@ int main(void)
     RUN_TEST(test_move_reader);
     RUN_TEST(test_varint_via_c_api);
     RUN_TEST(test_multi_bit_widths);
+    /* Coverage additions */
+    RUN_TEST(test_move_assign_reader);
+    RUN_TEST(test_move_assign_reader_self);
+    RUN_TEST(test_move_assign_writer);
+    RUN_TEST(test_move_assign_writer_self);
     return UNITY_END();
 }

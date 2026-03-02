@@ -252,7 +252,7 @@ that handle lifetime management automatically.
 ### Build
 
 ```bash
-git clone <repo-url> triepack
+git clone https://github.com/deftio/triepack.git
 cd triepack
 cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
 cmake --build build
@@ -388,16 +388,19 @@ and reconstructs them on decode.
 - [Examples](guide/examples.md) -- six runnable example programs
 - [Testing](guide/testing.md) -- running tests, coverage, adding new tests
 
-### Format Specifications
+### Internals
 
+- [Architecture](internals/architecture.md) -- library stack, encoding pipeline, two-trie design
 - [Binary Format Specification](internals/format-spec.md) -- byte-level `.trp` file format
 - [Bitstream Specification](internals/bitstream-spec.md) -- bit-level I/O, VarInt, UTF-8
 - [Technical Deep Dive](triepack-technical-doc.md) -- encoding pipeline, algorithms, ROM deployment
 
 ### Project
 
+- [GitHub Repository](https://github.com/deftio/triepack) -- source code, issues, pull requests
 - [Releases](releases.md) -- release history and downloads
 - [Release Process](guide/release-process.md) -- versioning policy and release checklist
+- [Code Coverage](coverage/) -- line and branch coverage report
 
 ---
 

@@ -17,7 +17,7 @@ The encoded output supports direct read access without full decompression.
 ## Quick Install
 
 ```bash
-git clone <repo-url> triepack
+git clone https://github.com/deftio/triepack.git
 cd triepack
 cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
 cmake --build build

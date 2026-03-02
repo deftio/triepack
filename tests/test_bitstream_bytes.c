@@ -268,6 +268,61 @@ void test_read_bytes_eof(void)
     tp_bs_reader_destroy(&r);
 }
 
+/* ── Writer with fixed growth mode ───────────────────────────────── */
+
+void test_writer_fixed_growth(void)
+{
+    /* growth=32 means grow by 32 bytes at a time */
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 4, 32);
+
+    /* Write enough to trigger growth past initial cap */
+    for (int i = 0; i < 100; i++) {
+        tp_bs_write_u8(w, (uint8_t)(i & 0xFF));
+    }
+
+    /* Verify we can read it back */
+    tp_bitstream_reader *r = NULL;
+    tp_bs_writer_to_reader(w, &r);
+
+    uint8_t u8;
+    for (int i = 0; i < 100; i++) {
+        TEST_ASSERT_EQUAL(TP_OK, tp_bs_read_u8(r, &u8));
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)(i & 0xFF), u8);
+    }
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+/* ── Reader create_copy with zero-length ─────────────────────────── */
+
+void test_reader_create_copy_zero_len(void)
+{
+    tp_bitstream_reader *r = NULL;
+    uint8_t dummy = 0;
+    tp_result rc = tp_bs_reader_create_copy(&r, &dummy, 0);
+    TEST_ASSERT_EQUAL(TP_OK, rc);
+    TEST_ASSERT_NOT_NULL(r);
+    tp_bs_reader_destroy(&r);
+}
+
+/* ── Writer with initial_cap=0 (default) ─────────────────────────── */
+
+void test_writer_zero_initial_cap(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, 0xDEAD, 16);
+
+    const uint8_t *buf;
+    uint64_t bit_len;
+    tp_bs_writer_get_buffer(w, &buf, &bit_len);
+    TEST_ASSERT_EQUAL_UINT64(16, bit_len);
+
+    tp_bs_writer_destroy(&w);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -286,5 +341,9 @@ int main(void)
     RUN_TEST(test_mixed_bit_and_byte);
     RUN_TEST(test_non_aligned_byte_read);
     RUN_TEST(test_read_bytes_eof);
+    /* Coverage additions */
+    RUN_TEST(test_writer_fixed_growth);
+    RUN_TEST(test_reader_create_copy_zero_len);
+    RUN_TEST(test_writer_zero_initial_cap);
     return UNITY_END();
 }

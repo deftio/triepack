@@ -1,3 +1,8 @@
+---
+layout: default
+title: Architecture
+---
+
 # Architecture
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->

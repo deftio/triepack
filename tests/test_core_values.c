@@ -286,6 +286,131 @@ void test_value_blob_binary(void)
     free(buf);
 }
 
+/* ── Multiple values ──────────────────────────────────────────────── */
+
+void test_multiple_value_types(void)
+{
+    tp_encoder *enc = NULL;
+    tp_encoder_create(&enc);
+
+    tp_value v;
+    v = tp_value_null();
+    tp_encoder_add(enc, "a_null", &v);
+    v = tp_value_bool(true);
+    tp_encoder_add(enc, "b_true", &v);
+    v = tp_value_int(-42);
+    tp_encoder_add(enc, "c_neg", &v);
+    v = tp_value_uint(99);
+    tp_encoder_add(enc, "d_uint", &v);
+    v = tp_value_float32(1.5f);
+    tp_encoder_add(enc, "e_f32", &v);
+    v = tp_value_float64(2.718);
+    tp_encoder_add(enc, "f_f64", &v);
+    v = tp_value_string("hello");
+    tp_encoder_add(enc, "g_str", &v);
+    uint8_t blob_data[] = {0xDE, 0xAD};
+    v = tp_value_blob(blob_data, 2);
+    tp_encoder_add(enc, "h_blob", &v);
+
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_encoder_build(enc, &buf, &len);
+
+    tp_dict *dict = NULL;
+    tp_dict_open(&dict, buf, len);
+
+    tp_value out;
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "a_null", &out));
+    TEST_ASSERT_EQUAL(TP_NULL, out.type);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "b_true", &out));
+    TEST_ASSERT_EQUAL(TP_BOOL, out.type);
+    TEST_ASSERT_TRUE(out.data.bool_val);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "c_neg", &out));
+    TEST_ASSERT_EQUAL_INT64(-42, out.data.int_val);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "d_uint", &out));
+    TEST_ASSERT_EQUAL(TP_UINT, out.type);
+    TEST_ASSERT_EQUAL_UINT64(99, out.data.uint_val);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "e_f32", &out));
+    TEST_ASSERT_EQUAL(TP_FLOAT32, out.type);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 1.5f, out.data.float32_val);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "f_f64", &out));
+    TEST_ASSERT_EQUAL(TP_FLOAT64, out.type);
+    TEST_ASSERT_DOUBLE_WITHIN(0.001, 2.718, out.data.float64_val);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "g_str", &out));
+    TEST_ASSERT_EQUAL(TP_STRING, out.type);
+    TEST_ASSERT_EQUAL(5, out.data.string_val.str_len);
+    TEST_ASSERT_EQUAL_MEMORY("hello", out.data.string_val.str, 5);
+
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "h_blob", &out));
+    TEST_ASSERT_EQUAL(TP_BLOB, out.type);
+    TEST_ASSERT_EQUAL(2, out.data.blob_val.len);
+    TEST_ASSERT_EQUAL_MEMORY(blob_data, out.data.blob_val.data, 2);
+
+    tp_dict_close(&dict);
+    tp_encoder_destroy(&enc);
+    free(buf);
+}
+
+/* ── Duplicate key dedup ─────────────────────────────────────────── */
+
+void test_duplicate_keys_dedup(void)
+{
+    tp_encoder *enc = NULL;
+    tp_encoder_create(&enc);
+
+    tp_value v = tp_value_int(1);
+    tp_encoder_add(enc, "key", &v);
+    v = tp_value_int(2);
+    tp_encoder_add(enc, "key", &v); /* duplicate - should keep last */
+
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_encoder_build(enc, &buf, &len);
+
+    tp_dict *dict = NULL;
+    tp_dict_open(&dict, buf, len);
+
+    TEST_ASSERT_EQUAL(1, tp_dict_count(dict));
+    tp_value out;
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_lookup(dict, "key", &out));
+    TEST_ASSERT_EQUAL_INT64(2, out.data.int_val);
+
+    tp_dict_close(&dict);
+    tp_encoder_destroy(&enc);
+    free(buf);
+}
+
+/* ── Key-only (null value) ───────────────────────────────────────── */
+
+void test_key_only_entry(void)
+{
+    tp_encoder *enc = NULL;
+    tp_encoder_create(&enc);
+    tp_encoder_add(enc, "flag", NULL);
+
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_encoder_build(enc, &buf, &len);
+
+    tp_dict *dict = NULL;
+    tp_dict_open(&dict, buf, len);
+
+    bool found = false;
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_contains(dict, "flag", &found));
+    TEST_ASSERT_TRUE(found);
+
+    tp_dict_close(&dict);
+    tp_encoder_destroy(&enc);
+    free(buf);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -310,5 +435,9 @@ int main(void)
     RUN_TEST(test_value_string_ascii);
     RUN_TEST(test_value_blob_empty);
     RUN_TEST(test_value_blob_binary);
+    /* Coverage additions */
+    RUN_TEST(test_multiple_value_types);
+    RUN_TEST(test_duplicate_keys_dedup);
+    RUN_TEST(test_key_only_entry);
     return UNITY_END();
 }

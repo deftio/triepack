@@ -237,6 +237,340 @@ void test_large_number(void)
     free(buf);
 }
 
+/* ── Number exceeding INT64_MAX (uint path) ──────────────────────── */
+
+void test_number_exceeds_int64_max(void)
+{
+    /* 9223372036854775808 = INT64_MAX + 1 */
+    const char *json = "{\"big\":9223372036854775808}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "big", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_UINT, val.type);
+    TEST_ASSERT_EQUAL_UINT64(9223372036854775808ULL, val.data.uint_val);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── Float with exponent ─────────────────────────────────────────── */
+
+void test_float_with_exponent(void)
+{
+    const char *json = "{\"x\":1e10}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_FLOAT64, val.type);
+    TEST_ASSERT_DOUBLE_WITHIN(1.0, 1e10, val.data.float64_val);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_float_with_negative_exponent(void)
+{
+    const char *json = "{\"x\":2.5e-3}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_FLOAT64, val.type);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-10, 0.0025, val.data.float64_val);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_float_with_positive_exponent(void)
+{
+    const char *json = "{\"x\":3E+2}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_FLOAT64, val.type);
+    TEST_ASSERT_DOUBLE_WITHIN(0.1, 300.0, val.data.float64_val);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── UTF-8 multi-byte encoding ───────────────────────────────────── */
+
+void test_unicode_2byte(void)
+{
+    /* \u00E9 = 'é' (2-byte UTF-8: 0xC3 0xA9) */
+    const char *json = "{\"x\":\"caf\\u00E9\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+    /* "café" = 3 ASCII + 2 UTF-8 = 5 bytes */
+    TEST_ASSERT_EQUAL_INT(5, val.data.string_val.str_len);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_unicode_3byte(void)
+{
+    /* \u4E16 = '世' (3-byte UTF-8: 0xE4 0xB8 0x96) */
+    const char *json = "{\"x\":\"\\u4E16\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+    TEST_ASSERT_EQUAL_INT(3, val.data.string_val.str_len);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_unicode_surrogate_pair(void)
+{
+    /* \uD83D\uDE00 = U+1F600 '😀' (4-byte UTF-8) */
+    const char *json = "{\"x\":\"\\uD83D\\uDE00\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+    TEST_ASSERT_EQUAL_INT(4, val.data.string_val.str_len);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_unicode_invalid_surrogate(void)
+{
+    /* High surrogate followed by non-low-surrogate */
+    const char *json = "{\"x\":\"\\uD800\\u0041\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+void test_unicode_lone_high_surrogate(void)
+{
+    /* High surrogate at end of string */
+    const char *json = "{\"x\":\"\\uD800\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+void test_invalid_escape_sequence(void)
+{
+    const char *json = "{\"x\":\"\\q\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Top-level array ─────────────────────────────────────────────── */
+
+void test_top_level_array(void)
+{
+    const char *json = "[1,2,3]";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    /* Decode back and verify array elements */
+    char *out = NULL;
+    size_t out_len = 0;
+    rc = tp_json_decode(buf, buf_len, &out, &out_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_NOT_NULL(strstr(out, "1"));
+    TEST_ASSERT_NOT_NULL(strstr(out, "2"));
+    TEST_ASSERT_NOT_NULL(strstr(out, "3"));
+
+    free(out);
+    free(buf);
+}
+
+void test_top_level_array_dom(void)
+{
+    const char *json = "[10,20]";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value_type type;
+    rc = tp_json_root_type(j, &type);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_ARRAY, type);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "[0]", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT64(10, val.data.int_val);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── Pretty-print with nested structure ──────────────────────────── */
+
+void test_pretty_print_nested(void)
+{
+    const char *json = "{\"a\":{\"b\":1},\"c\":[2,3]}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    rc = tp_json_decode_pretty(buf, buf_len, "    ", &out, &out_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_NOT_NULL(out);
+    /* Should have indentation */
+    TEST_ASSERT_NOT_NULL(strstr(out, "    "));
+
+    free(out);
+    free(buf);
+}
+
+/* ── Decode null out_len ─────────────────────────────────────────── */
+
+void test_decode_null_len(void)
+{
+    uint8_t dummy[4] = {0};
+    char *out;
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, tp_json_decode(dummy, 4, &out, NULL));
+}
+
+void test_decode_pretty_null_out(void)
+{
+    uint8_t dummy[4] = {0};
+    size_t len;
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, tp_json_decode_pretty(dummy, 4, "  ", NULL, &len));
+}
+
+void test_decode_pretty_null_len(void)
+{
+    uint8_t dummy[4] = {0};
+    char *out;
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, tp_json_decode_pretty(dummy, 4, "  ", &out, NULL));
+}
+
+/* ── Mixed types in arrays ───────────────────────────────────────── */
+
+void test_array_mixed_types(void)
+{
+    const char *json = "{\"arr\":[1,\"hello\",true,null,3.14]}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    rc = tp_json_decode(buf, buf_len, &out, &out_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"hello\""));
+    TEST_ASSERT_NOT_NULL(strstr(out, "true"));
+    TEST_ASSERT_NOT_NULL(strstr(out, "null"));
+
+    free(out);
+    free(buf);
+}
+
+/* ── Escaped characters round-trip ───────────────────────────────── */
+
+void test_all_escape_sequences(void)
+{
+    /* Test \\, \/, \b, \f, \r */
+    const char *json = "{\"x\":\"a\\\\b\\/c\\bd\\fe\\r\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -259,5 +593,24 @@ int main(void)
     RUN_TEST(test_whitespace_in_json);
     RUN_TEST(test_empty_array);
     RUN_TEST(test_large_number);
+    /* Coverage additions */
+    RUN_TEST(test_number_exceeds_int64_max);
+    RUN_TEST(test_float_with_exponent);
+    RUN_TEST(test_float_with_negative_exponent);
+    RUN_TEST(test_float_with_positive_exponent);
+    RUN_TEST(test_unicode_2byte);
+    RUN_TEST(test_unicode_3byte);
+    RUN_TEST(test_unicode_surrogate_pair);
+    RUN_TEST(test_unicode_invalid_surrogate);
+    RUN_TEST(test_unicode_lone_high_surrogate);
+    RUN_TEST(test_invalid_escape_sequence);
+    RUN_TEST(test_top_level_array);
+    RUN_TEST(test_top_level_array_dom);
+    RUN_TEST(test_pretty_print_nested);
+    RUN_TEST(test_decode_null_len);
+    RUN_TEST(test_decode_pretty_null_out);
+    RUN_TEST(test_decode_pretty_null_len);
+    RUN_TEST(test_array_mixed_types);
+    RUN_TEST(test_all_escape_sequences);
     return UNITY_END();
 }

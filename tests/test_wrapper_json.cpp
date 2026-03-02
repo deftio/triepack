@@ -98,6 +98,43 @@ void test_json_wrapper_encode_decode(void)
     std::free(const_cast<char *>(json_out));
 }
 
+/* ── Coverage additions ──────────────────────────────────────────── */
+
+void test_json_wrapper_move_assign(void)
+{
+    triepack::Json j1;
+    triepack::Json j2;
+    j2 = static_cast<triepack::Json &&>(j1);
+    TEST_ASSERT_NULL(j1.handle());
+}
+
+void test_json_wrapper_move_assign_self(void)
+{
+    triepack::Json j;
+    triepack::Json &ref = j;
+    j = static_cast<triepack::Json &&>(ref);
+    /* Self-assign should not crash */
+}
+
+void test_json_encode_null_params(void)
+{
+    triepack::Json j;
+    const uint8_t *data = nullptr;
+    size_t size = 0;
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, j.encode(nullptr, &data, &size));
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, j.encode("{}", nullptr, &size));
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, j.encode("{}", &data, nullptr));
+}
+
+void test_json_decode_null_params(void)
+{
+    triepack::Json j;
+    const char *out = nullptr;
+    uint8_t dummy[] = {0};
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, j.decode(nullptr, 1, &out));
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, j.decode(dummy, 1, nullptr));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -106,5 +143,10 @@ int main(void)
     RUN_TEST(test_json_dom_from_cpp);
     RUN_TEST(test_json_wrapper_move);
     RUN_TEST(test_json_wrapper_encode_decode);
+    /* Coverage additions */
+    RUN_TEST(test_json_wrapper_move_assign);
+    RUN_TEST(test_json_wrapper_move_assign_self);
+    RUN_TEST(test_json_encode_null_params);
+    RUN_TEST(test_json_decode_null_params);
     return UNITY_END();
 }
