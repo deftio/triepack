@@ -1,5 +1,5 @@
 title: TriePack
-version: "1.0.4"
+version: "1.0.5"
 description: Compressed trie-based dictionary format for fast, compact key-value storage
 theme: minima
 baseurl: "/triepack"

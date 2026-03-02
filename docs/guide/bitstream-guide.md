@@ -186,6 +186,32 @@ Width    Signed range
 The formula: an n-bit signed field holds values from -(2^(n-1)) to
 2^(n-1) - 1.
 
+### The challenge: narrow signed fields in wide registers
+
+With standard types like `int32_t`, sign handling is invisible — the
+hardware does it for you.  But when you read a 5-bit signed field from a
+bitstream, you get 5 raw bits sitting in a 64-bit register.  The
+register doesn't know those 5 bits are supposed to be signed.
+
+Consider the value **-3** stored as a 5-bit signed integer:
+
+```
+In the bitstream:   11101      (5 bits — this is -3 in 5-bit two's complement)
+Raw read into a register:      00000000 00000000 00000000 00011101  = 29 (unsigned)
+```
+
+The register holds 29, not -3.  The upper bits are all zeros because
+`tp_bs_read_bits` zero-fills them.  To recover the true signed value, the
+library must **sign-extend** — it checks the MSB of the 5-bit field
+(bit 4, which is 1), and fills all upper bits with 1s:
+
+```
+After sign extension:          11111111 11111111 11111111 11111101  = -3 (signed)
+```
+
+This is what `tp_bs_read_bits_signed()` does automatically.  Sections 6
+and 7 below walk through the mechanics in detail.
+
 ---
 
 ## 6. Two's Complement at Arbitrary Widths
