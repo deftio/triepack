@@ -1,26 +1,23 @@
 ---
 ---
 
-$content-width: 1200px;
-$on-large: 1280px;
+$content-width: 10000px;
+$on-large: 10000px;
+$spacing-unit: 16px;
 
 @import "minima";
 
-/* ── Wider content area — ~75% viewport, ~12.5% gutter each side ─────── */
+/* ── Content fills ~75% of viewport, ~12.5% gutter each side ─────────── */
 
 .wrapper {
-  max-width: 75%;
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-left: auto;
-  margin-right: auto;
+  max-width: 75% !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
 }
 
 @media screen and (max-width: 768px) {
   .wrapper {
-    max-width: 100%;
-    padding-left: 16px;
-    padding-right: 16px;
+    max-width: 100% !important;
   }
 }
 
@@ -37,12 +34,12 @@ $on-large: 1280px;
 /* ── Version label (inline with site title) ──────────────────────────── */
 
 .site-version {
-  font-size: 0.55em;
-  font-weight: 400;
-  color: #888;
+  font-size: 0.45em;
+  font-weight: 300;
+  color: #999;
   letter-spacing: 0;
   vertical-align: middle;
-  margin-left: 4px;
+  margin-left: 6px;
 }
 
 /* ── Headings ────────────────────────────────────────────────────────── */
