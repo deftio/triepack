@@ -20,6 +20,12 @@
  * BSD-2-Clause -- see LICENSE.txt
  */
 
+/* Expose POSIX isatty/fileno under strict C99 (must precede all includes) */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#include <unistd.h>
+#endif
+
 #include "triepack/triepack.h"
 #include "triepack/triepack_json.h"
 
@@ -32,8 +38,6 @@
 #include <io.h>
 #define isatty _isatty
 #define fileno _fileno
-#else
-#include <unistd.h>
 #endif
 
 /* ── ANSI colour helpers ─────────────────────────────────────────────── */
