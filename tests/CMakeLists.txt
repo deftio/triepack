@@ -34,6 +34,7 @@ triepack_add_c_test(test_bitstream_bytes   test_bitstream_bytes.c   triepack_bit
 triepack_add_c_test(test_bitstream_varint  test_bitstream_varint.c  triepack_bitstream)
 triepack_add_c_test(test_bitstream_symbol  test_bitstream_symbol.c  triepack_bitstream)
 triepack_add_c_test(test_bitstream_rom     test_bitstream_rom.c     triepack_bitstream)
+triepack_add_c_test(test_bitstream_errors  test_bitstream_errors.c  triepack_bitstream)
 
 # Core tests
 triepack_add_c_test(test_core_roundtrip    test_core_roundtrip.c    triepack_core)
@@ -42,11 +43,16 @@ triepack_add_c_test(test_core_values       test_core_values.c       triepack_cor
 triepack_add_c_test(test_core_edge_cases   test_core_edge_cases.c   triepack_core)
 triepack_add_c_test(test_core_integrity    test_core_integrity.c    triepack_core)
 
+# Core internals test (needs access to src/core/ for core_internal.h)
+triepack_add_c_test(test_core_internal     test_core_internal.c     triepack_core)
+target_include_directories(test_core_internal PRIVATE ${CMAKE_SOURCE_DIR}/src/core)
+
 # JSON tests
 if(BUILD_JSON)
     triepack_add_c_test(test_json_roundtrip    test_json_roundtrip.c    triepack_json)
     triepack_add_c_test(test_json_dom          test_json_dom.c          triepack_json)
     triepack_add_c_test(test_json_edge_cases   test_json_edge_cases.c   triepack_json)
+    triepack_add_c_test(test_json_decode       test_json_decode.c       triepack_json)
 endif()
 
 # Cross-language fixture tests

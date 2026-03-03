@@ -5,9 +5,9 @@ They do not use FFI or call into the C library.
 
 | Language   | Directory                  | Status              |
 |------------|----------------------------|---------------------|
-| Python     | [python/](./python/)       | Not yet implemented |
+| Python     | [python/](./python/)       | Implemented         |
 | TypeScript | [typescript/](./typescript/)| Not yet implemented |
-| JavaScript | [javascript/](./javascript/)| Not yet implemented |
+| JavaScript | [javascript/](./javascript/)| Implemented         |
 | Go         | [go/](./go/)               | Not yet implemented |
 | Swift      | [swift/](./swift/)         | Not yet implemented |
 | Rust       | [rust/](./rust/)           | Not yet implemented |

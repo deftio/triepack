@@ -175,6 +175,55 @@ void test_null_params(void)
     TEST_ASSERT_EQUAL_UINT32(0, tp_json_count(NULL));
 }
 
+void test_iterate_null(void)
+{
+    tp_result rc = tp_json_iterate(NULL, NULL);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, rc);
+}
+
+void test_iterate_basic(void)
+{
+    encode_test_json();
+
+    tp_json *j = NULL;
+    tp_json_open(&j, g_buf, g_buf_len);
+
+    tp_iterator *it = NULL;
+    tp_result rc = tp_json_iterate(j, &it);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_NOT_NULL(it);
+
+    tp_iter_destroy(&it);
+    tp_json_close(&j);
+}
+
+void test_root_type_array(void)
+{
+    const char *json = "[10,20,30]";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_json_encode(json, strlen(json), &buf, &buf_len);
+
+    tp_json *j = NULL;
+    tp_json_open(&j, buf, buf_len);
+
+    tp_value_type type;
+    tp_result rc = tp_json_root_type(j, &type);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_ARRAY, type);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+void test_open_corrupted_buffer(void)
+{
+    uint8_t bad[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    tp_json *j = NULL;
+    tp_result rc = tp_json_open(&j, bad, sizeof(bad));
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -187,6 +236,10 @@ int main(void)
     RUN_TEST(test_missing_path);
     RUN_TEST(test_array_index_lookup);
     RUN_TEST(test_null_params);
+    RUN_TEST(test_iterate_null);
+    RUN_TEST(test_iterate_basic);
+    RUN_TEST(test_root_type_array);
+    RUN_TEST(test_open_corrupted_buffer);
 
     free(g_buf);
     return UNITY_END();

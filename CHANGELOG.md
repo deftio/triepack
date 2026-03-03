@@ -5,6 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-03-02
+
+### Fixed
+- Encoder: deep-copy string/blob value data to prevent use-after-return when
+  JSON encoder passes stack-allocated buffers (root cause of CI flaky test)
+- JSON decoder: fix heap-buffer-overflow in segment dedup that used entry index
+  as byte offset into key string
+- Bitstream: fix undefined behavior in zigzag encode (left-shift of negative
+  value); cast to uint64_t before shifting
+
+### Added
+- README: CI build, coverage, and BSD-2-Clause license badges
+- README: roadmap section with planned milestones for language bindings,
+  format enhancements, and tooling
+- CLI tool: `trp encode`, `trp decode`, `trp validate` commands with stdin
+  support and `-o`/`--pretty` flags
+
+### Changed
+- README: updated language bindings table (Python, JavaScript now implemented)
+- README: updated project status to v1.0.5 test counts
+- CLI tool: removed `trp json` command (replaced by `trp decode`)
+
+## [1.0.5] - 2026-03-02
+
+### Added
+- Native Python binding: pure-Python `.trp` encoder/decoder with byte-for-byte compatibility
+- Python test suite: 70 tests across 5 files (crc32, bitstream, varint, roundtrip, fixtures)
+- Complex JSON example (`json_complex.c`): nested objects, arrays, DOM lookups, pretty-print
+- Test data files: `common_words_10k.txt` (10K words) and `benchmark_100k.json` (202 KB)
+- Generator script: `tools/generate_benchmark_json.py`
+- 3 new C test files: `test_json_decode.c`, `test_core_internal.c`, `test_bitstream_errors.c`
+- Expanded existing test files with error-path and edge-case coverage
+
+### Changed
+- C test suite: 16 test programs -> 20 test programs, ~330 individual tests
+- Total tests across all languages: ~400 (C/C++ + Python)
+- Updated testing documentation (`docs/guide/testing.md`)
+- Updated bindings README: Python and JavaScript marked as implemented
+
+## [1.0.4] - 2026-03-02
+
+### Fixed
+- Bitstream guide: clarify signed bit-field extraction with worked example
+
+## [1.0.3] - 2026-03-02
+
+### Fixed
+- CSS: move stylesheet to `assets/main.scss` so minima theme loads correctly
+- Remove hardcoded top bar above nav, add whitespace around section dividers
+- Adjust version label size and color for readability
+
+## [1.0.2] - 2026-03-01
+
+### Added
+- Native JavaScript `.trp` implementation: pure-JS encoder/decoder
+- Cross-language fixture files (7 `.trp` files) for interop testing
+- Cross-language test (`test_cross_language.c`) validating fixture files
+
+### Fixed
+- 32-bit CI: enable Unity 64-bit type support, switch Pages to workflow build
+- Site margins: use 75% viewport width, fix `!important` overrides
+- clang-tidy: suppress `misc-no-recursion` false positive, fix dead store bug
+- GitHub Pages: fix lcov report overwriting docs site, fix broken links
+
+## [1.0.1] - 2026-03-01
+
+### Fixed
+- GitHub Pages deployment: docs site was showing lcov coverage report instead of Jekyll site
+- Fix broken navigation links on docs site
+
 ## [1.0.0] - 2026-02-28
 
 ### Added

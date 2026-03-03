@@ -11,6 +11,99 @@ Download releases from the [GitHub Releases page](https://github.com/deftio/trie
 
 ---
 
+## v1.0.6 -- 2026-03-02
+
+Bug fixes for CI stability, CLI conversion commands, and README improvements.
+
+### Fixed
+- **Encoder string value corruption** -- `tp_encoder_add_n()` now deep-copies string
+  and blob data so the encoder owns it, preventing use-after-return from stack buffers
+- **JSON decoder heap overflow** -- segment dedup was using entry index as byte offset
+  into key strings, causing out-of-bounds reads
+- **Bitstream zigzag UB** -- left-shift of negative `int64_t` replaced with unsigned cast
+
+### Added
+- **CLI conversion commands** -- `trp encode` (JSON to `.trp`), `trp decode` (`.trp` to
+  JSON with `--pretty`), `trp validate` (integrity check); all accept `-` for stdin
+- README badges (CI build, coverage, BSD-2-Clause license)
+- README roadmap section with language binding and format enhancement milestones
+
+### Changed
+- CLI: removed `trp json` (replaced by `trp decode`)
+- README: language bindings table updated (Python, JavaScript = implemented)
+
+---
+
+## v1.0.5 -- 2026-03-02
+
+Python binding, expanded test coverage, complex JSON example, and test data files.
+
+### Added
+- **Native Python binding** -- pure-Python `.trp` encoder/decoder with byte-for-byte
+  cross-language compatibility (70 tests, 5 test files)
+- **Complex JSON example** (`json_complex.c`) -- nested objects, arrays, DOM lookups, pretty-print
+- **Test data files** -- `common_words_10k.txt` (10K English words), `benchmark_100k.json` (202 KB synthetic catalog)
+- **Benchmark generator** -- `tools/generate_benchmark_json.py`
+- **3 new C test files** -- `test_json_decode.c` (27 tests), `test_core_internal.c` (21 tests), `test_bitstream_errors.c` (46 tests)
+- Expanded 6 existing C test files with error-path and edge-case coverage
+- Updated testing documentation with full test inventory
+
+### Test Totals
+- C/C++: 27 test programs, ~330 individual tests
+- Python: 5 test files, 70 individual tests
+- Grand total: ~400 tests across C, C++, and Python
+
+---
+
+## v1.0.4 -- 2026-03-02
+
+Documentation improvement.
+
+### Fixed
+- Bitstream guide: clarify signed bit-field extraction with worked example
+
+---
+
+## v1.0.3 -- 2026-03-02
+
+Site styling fixes.
+
+### Fixed
+- Move stylesheet to `assets/main.scss` so minima theme loads correctly
+- Remove hardcoded top bar above navigation
+- Add whitespace around section dividers
+- Adjust version label size and color for readability
+
+---
+
+## v1.0.2 -- 2026-03-01
+
+JavaScript binding, cross-language fixtures, CI and site fixes.
+
+### Added
+- **Native JavaScript binding** -- pure-JS `.trp` encoder/decoder
+- **Cross-language fixture files** -- 7 `.trp` files for interop testing
+  (`empty`, `single_null`, `single_int`, `multi_mixed`, `shared_prefix`, `large`, `keys_only`)
+- **Cross-language test** (`test_cross_language.c`) validating fixture files from C, JavaScript, and Python
+
+### Fixed
+- 32-bit CI: enable Unity 64-bit type support, switch Pages to workflow-based build
+- Site margins: use 75% viewport width, fix `!important` overrides
+- clang-tidy: suppress `misc-no-recursion` false positive, fix dead store bug
+- GitHub Pages: fix lcov coverage report overwriting the docs site, fix broken navigation links
+
+---
+
+## v1.0.1 -- 2026-03-01
+
+GitHub Pages deployment fix.
+
+### Fixed
+- Docs site was showing lcov coverage report instead of the Jekyll documentation site
+- Broken navigation links on the docs site
+
+---
+
 ## v1.0.0 -- 2026-02-28
 
 First stable release. All core libraries are implemented and tested.
@@ -105,7 +198,7 @@ Initial project scaffolding.
 ```bash
 git clone https://github.com/deftio/triepack.git
 cd triepack
-git checkout v1.0.0
+git checkout v1.0.6
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 sudo cmake --install build
@@ -114,7 +207,7 @@ sudo cmake --install build
 ### Verifying
 
 ```bash
-cmake -B build -DBUILD_TESTS=ON
+cmake -B build -DBUILD_TESTS=ON -DBUILD_JSON=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```

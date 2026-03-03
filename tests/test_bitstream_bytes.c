@@ -323,6 +323,49 @@ void test_writer_zero_initial_cap(void)
     tp_bs_writer_destroy(&w);
 }
 
+/* ── NULL writer param for each write function ──────────────────────── */
+
+void test_null_writer_u8(void)
+{
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_bs_write_u8(NULL, 0));
+}
+
+void test_null_writer_u16(void)
+{
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_bs_write_u16(NULL, 0));
+}
+
+void test_null_writer_u32(void)
+{
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_bs_write_u32(NULL, 0));
+}
+
+void test_null_writer_u64(void)
+{
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_bs_write_u64(NULL, 0));
+}
+
+void test_null_writer_bytes(void)
+{
+    uint8_t data[] = {0};
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_bs_write_bytes(NULL, data, 1));
+}
+
+/* ── Align when already aligned ─────────────────────────────────────── */
+
+void test_writer_align_when_aligned(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_u8(w, 0x42); /* exactly 8 bits — already aligned */
+
+    TEST_ASSERT_EQUAL_UINT64(8, tp_bs_writer_position(w));
+    tp_bs_writer_align_to_byte(w);
+    TEST_ASSERT_EQUAL_UINT64(8, tp_bs_writer_position(w)); /* no change */
+
+    tp_bs_writer_destroy(&w);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -345,5 +388,13 @@ int main(void)
     RUN_TEST(test_writer_fixed_growth);
     RUN_TEST(test_reader_create_copy_zero_len);
     RUN_TEST(test_writer_zero_initial_cap);
+    /* NULL writer for each write function */
+    RUN_TEST(test_null_writer_u8);
+    RUN_TEST(test_null_writer_u16);
+    RUN_TEST(test_null_writer_u32);
+    RUN_TEST(test_null_writer_u64);
+    RUN_TEST(test_null_writer_bytes);
+    /* Align when already aligned */
+    RUN_TEST(test_writer_align_when_aligned);
     return UNITY_END();
 }

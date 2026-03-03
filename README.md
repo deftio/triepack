@@ -1,5 +1,9 @@
 # triepack v1.0.0
 
+[![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
+[![Coverage Report](https://github.com/deftio/triepack/actions/workflows/coverage.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/coverage.yml)
+[![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-blue.svg)](LICENSE.txt)
+
 A compressed trie-based dictionary format for fast, compact key-value storage.
 
 TriePack encodes dictionaries into a compact binary format (`.trp`) optimized for fast lookups, prefix search, and ROM-safe deployment. It uses prefix sharing and bit-level packing with configurable symbol encoding and full value type support.
@@ -94,16 +98,16 @@ Each layer can be used independently. `triepack_wrapper` provides C++11 RAII wra
 
 ## Language Bindings
 
-Native implementations (not FFI) are planned for:
+All bindings are native implementations that read/write the `.trp` format directly (no FFI).
 
 | Language | Status | Directory |
 |----------|--------|-----------|
-| Python | Scaffolded | `bindings/python/` |
-| TypeScript | Scaffolded | `bindings/typescript/` |
-| JavaScript | Scaffolded | `bindings/javascript/` |
-| Go | Scaffolded | `bindings/go/` |
-| Swift | Scaffolded | `bindings/swift/` |
-| Rust | Scaffolded | `bindings/rust/` |
+| Python | Implemented | `bindings/python/` |
+| JavaScript | Implemented | `bindings/javascript/` |
+| TypeScript | Not yet implemented | `bindings/typescript/` |
+| Go | Not yet implemented | `bindings/go/` |
+| Swift | Not yet implemented | `bindings/swift/` |
+| Rust | Not yet implemented | `bindings/rust/` |
 
 ## File Format
 
@@ -126,9 +130,28 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.0.0 released.** The bitstream library, trie codec, and JSON library are fully implemented. All 22 tests pass (16 unit test suites + 6 example integration tests). Run `compaction_benchmark` to see compression ratios on ~10k generated words.
+**v1.0.5 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, Python binding, and JavaScript binding are implemented. 27 test programs with ~400 individual tests across C, C++, and Python.
 
-Future work: suffix table, Huffman symbols, language bindings.
+## Roadmap
+
+### v1.1 — Client Libraries
+- [ ] TypeScript binding (native `.trp` reader/writer)
+- [ ] Go binding
+- [ ] Swift binding (with SPM package)
+- [ ] Rust binding (with crate on crates.io)
+- [ ] npm package for JavaScript/TypeScript
+- [ ] PyPI package for Python
+
+### v1.2 — Format Enhancements
+- [ ] Suffix table (shared ending compression)
+- [ ] Huffman symbol encoding (for large dictionaries)
+- [ ] Nested dict values (embed sub-dictionaries inline)
+
+### v1.3 — Tooling & Ecosystem
+- [ ] `trp` CLI: encode/decode/validate/inspect (in progress)
+- [ ] Fuzzy search (edit distance d<=2)
+- [ ] Performance benchmarks across languages
+- [ ] Language binding conformance test suite
 
 ## License
 

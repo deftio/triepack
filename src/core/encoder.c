@@ -8,6 +8,45 @@
 
 #include "core_internal.h"
 
+/* ── Value deep copy / free helpers ───────────────────────────────────── */
+
+/**
+ * Deep-copy heap-referencing data (string/blob) inside a tp_value so
+ * the encoder owns it.  Must be paired with value_free_copy().
+ */
+static tp_result value_deep_copy(tp_value *v)
+{
+    if (v->type == TP_STRING && v->data.string_val.str) {
+        size_t len = v->data.string_val.str_len;
+        char *copy = malloc(len + 1);
+        if (!copy)
+            return TP_ERR_ALLOC;
+        memcpy(copy, v->data.string_val.str, len);
+        copy[len] = '\0';
+        v->data.string_val.str = copy;
+    } else if (v->type == TP_BLOB && v->data.blob_val.data && v->data.blob_val.len > 0) {
+        size_t len = v->data.blob_val.len;
+        uint8_t *copy = malloc(len);
+        if (!copy)
+            return TP_ERR_ALLOC;
+        memcpy(copy, v->data.blob_val.data, len);
+        v->data.blob_val.data = copy;
+    }
+    return TP_OK;
+}
+
+/** Free deep-copied data inside a tp_value. */
+static void value_free_copy(tp_value *v)
+{
+    if (v->type == TP_STRING && v->data.string_val.str) {
+        free((void *)v->data.string_val.str);
+        v->data.string_val.str = NULL;
+    } else if (v->type == TP_BLOB && v->data.blob_val.data) {
+        free((void *)v->data.blob_val.data);
+        v->data.blob_val.data = NULL;
+    }
+}
+
 /* ── Defaults ────────────────────────────────────────────────────────── */
 
 tp_encoder_options tp_encoder_defaults(void)
@@ -57,8 +96,10 @@ tp_result tp_encoder_destroy(tp_encoder **enc)
     if (!enc)
         return TP_ERR_INVALID_PARAM;
     if (*enc) {
-        for (uint32_t i = 0; i < (*enc)->count; i++)
+        for (uint32_t i = 0; i < (*enc)->count; i++) {
+            value_free_copy(&(*enc)->entries[i].val);
             free((*enc)->entries[i].key);
+        }
         free((*enc)->entries);
         free(*enc);
         *enc = NULL;
@@ -104,6 +145,13 @@ tp_result tp_encoder_add_n(tp_encoder *enc, const char *key, size_t key_len, con
         e->val = *val;
     else
         e->val = tp_value_null();
+
+    /* Deep-copy string/blob data so the encoder owns it */
+    tp_result vrc = value_deep_copy(&e->val);
+    if (vrc != TP_OK) {
+        free(key_copy);
+        return vrc;
+    }
 
     enc->count++;
     enc->sorted = false;
@@ -152,6 +200,7 @@ static void dedup_entries(tp_encoder *enc)
     for (uint32_t i = 0; i < enc->count; i++) {
         if (i + 1 < enc->count && enc->entries[i].key_len == enc->entries[i + 1].key_len &&
             memcmp(enc->entries[i].key, enc->entries[i + 1].key, enc->entries[i].key_len) == 0) {
+            value_free_copy(&enc->entries[i].val);
             free(enc->entries[i].key);
             continue;
         }
@@ -697,8 +746,10 @@ tp_result tp_encoder_reset(tp_encoder *enc)
 {
     if (!enc)
         return TP_ERR_INVALID_PARAM;
-    for (uint32_t i = 0; i < enc->count; i++)
+    for (uint32_t i = 0; i < enc->count; i++) {
+        value_free_copy(&enc->entries[i].val);
         free(enc->entries[i].key);
+    }
     free(enc->entries);
     enc->entries = NULL;
     enc->entries_cap = 0;

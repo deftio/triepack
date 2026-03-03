@@ -10,9 +10,20 @@ title: API Reference
 This is a practical guide to every public function in TriePack.
 For auto-generated docs with parameter types, build with `BUILD_DOCS=ON`.
 
+Use the tabs below to switch between C, C++, Python, and JavaScript APIs.
+
 ---
 
 ## Error Handling
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 Every C function returns `tp_result`. Check for `TP_OK` (0) on success.
 Use `tp_result_str()` to get a human-readable error message:
@@ -44,11 +55,83 @@ if (rc != TP_OK) {
 | `TP_ERR_JSON_DEPTH`       | -21   | Nesting exceeds limit                |
 | `TP_ERR_JSON_TYPE`        | -22   | Type mismatch on path lookup         |
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+The C++ wrappers use the same C error codes (`tp_result`). The RAII
+wrappers throw no exceptions -- check return values the same way:
+
+```cpp
+#include <triepack/triepack.hpp>
+
+triepack::Dict dict(data, size);
+// Constructor validates the buffer; check dict.handle() != nullptr
+```
+
+See the C tab for the full error code table.
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+The Python binding raises standard exceptions on error:
+
+```python
+import triepack
+
+try:
+    data = triepack.decode(buf)
+except ValueError as e:
+    print(f"decode failed: {e}")  # corrupt, bad magic, etc.
+except TypeError as e:
+    print(f"bad argument: {e}")   # wrong type passed
+```
+
+| C Error Code          | Python Exception   |
+|-----------------------|--------------------|
+| `TP_ERR_BAD_MAGIC`    | `ValueError`       |
+| `TP_ERR_CORRUPT`      | `ValueError`       |
+| `TP_ERR_TRUNCATED`    | `ValueError`       |
+| `TP_ERR_INVALID_PARAM`| `TypeError`        |
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+The JavaScript binding throws `Error` on failure:
+
+```javascript
+const triepack = require('triepack');
+
+try {
+    const data = triepack.decode(buf);
+} catch (e) {
+    console.error('decode failed:', e.message);
+}
+```
+
+| C Error Code          | JS Exception       |
+|-----------------------|--------------------|
+| `TP_ERR_BAD_MAGIC`    | `Error`            |
+| `TP_ERR_CORRUPT`      | `Error`            |
+| `TP_ERR_TRUNCATED`    | `Error`            |
+| `TP_ERR_INVALID_PARAM`| `TypeError`        |
+
+</div>
+</div>
+
 ---
 
-## Values (`triepack/triepack_common.h`)
+## Values
 
-### Value Types
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
+
+### Value Types (`triepack/triepack_common.h`)
 
 TriePack values are tagged unions. The `type` field tells you which union
 member to read:
@@ -141,9 +224,112 @@ tp_encoder_add(enc, "active", &v);
 tp_encoder_add(enc, "flag", NULL);
 ```
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### Value Types
+
+The C++ wrappers use the same `tp_value` struct from the C API. See the
+C tab for the full type list and construction helpers.
+
+```cpp
+#include <triepack/triepack.hpp>
+
+triepack::Encoder enc;
+enc.insert("count", 42);
+enc.insert("greeting", "hello world");
+```
+
+The `insert()` method accepts native C++ types and constructs the
+appropriate `tp_value` internally.
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+### Value Types
+
+Python values map to native types automatically:
+
+| TriePack Type | Python Type   |
+|---------------|---------------|
+| `TP_NULL`     | `None`        |
+| `TP_BOOL`     | `bool`        |
+| `TP_INT`      | `int`         |
+| `TP_UINT`     | `int`         |
+| `TP_FLOAT32`  | `float`       |
+| `TP_FLOAT64`  | `float`       |
+| `TP_STRING`   | `str`         |
+| `TP_BLOB`     | `bytes`       |
+
+```python
+import triepack
+
+data = {
+    "count": 42,
+    "greeting": "hello world",
+    "active": True,
+    "pi": 3.14159,
+    "nothing": None,
+}
+
+buf = triepack.encode(data)
+result = triepack.decode(buf)
+# result == data
+```
+
+No manual value construction needed -- pass a Python `dict` directly.
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+### Value Types
+
+JavaScript values map to native types automatically:
+
+| TriePack Type | JS Type       |
+|---------------|---------------|
+| `TP_NULL`     | `null`        |
+| `TP_BOOL`     | `boolean`     |
+| `TP_INT`      | `number`      |
+| `TP_UINT`     | `number`      |
+| `TP_FLOAT32`  | `number`      |
+| `TP_FLOAT64`  | `number`      |
+| `TP_STRING`   | `string`      |
+| `TP_BLOB`     | `Uint8Array`  |
+
+```javascript
+const triepack = require('triepack');
+
+const data = {
+    count: 42,
+    greeting: "hello world",
+    active: true,
+    pi: 3.14159,
+    nothing: null,
+};
+
+const buf = triepack.encode(data);
+const result = triepack.decode(buf);
+// result deep-equals data
+```
+
+No manual value construction needed -- pass a plain object directly.
+
+</div>
+</div>
+
 ---
 
-## Encoder (`triepack/triepack.h`)
+## Encoder
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 The encoder collects key-value pairs and builds a compressed `.trp` blob.
 
@@ -238,9 +424,116 @@ tp_result tp_encoder_destroy(tp_encoder **enc);
 ```
 Frees the encoder and sets `*enc = NULL`.
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### `triepack::Encoder`
+
+RAII wrapper around `tp_encoder`. Include `<triepack/triepack.hpp>`.
+
+```cpp
+#include <triepack/triepack.hpp>
+
+triepack::Encoder enc;
+enc.insert("apple", 42);
+enc.insert("banana", 17);
+
+const uint8_t *data;
+size_t size;
+int rc = enc.encode(&data, &size);
+// data points to the encoded .trp blob
+// data is valid until enc is destroyed or encode() is called again
+```
+
+| Method | Description |
+|--------|-------------|
+| `Encoder()` | Construct with default options |
+| `void insert(const char *key, int32_t value)` | Add a key-value pair |
+| `int encode(const uint8_t **data, size_t *size)` | Build the trie, receive pointer to blob |
+| `tp_encoder *handle()` | Access the underlying C handle |
+
+Move semantics are supported:
+
+```cpp
+triepack::Encoder enc1;
+enc1.insert("key", 1);
+
+triepack::Encoder enc2 = std::move(enc1);
+// enc1 is now empty (handle() == nullptr)
+```
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+### `triepack.encode(data)`
+
+The Python encoder is a single function call. Pass a `dict` with string
+keys and supported value types:
+
+```python
+import triepack
+
+data = {
+    "apple": 42,
+    "banana": 17,
+    "cherry": "red",
+    "active": True,
+}
+
+buf = triepack.encode(data)
+# buf is a bytes object containing the .trp data
+```
+
+**Parameters:**
+- `data` (`dict`): String keys mapping to `None`, `bool`, `int`, `float`, `str`, or `bytes`.
+
+**Returns:** `bytes` -- the encoded `.trp` blob.
+
+**Raises:** `TypeError` if keys are not strings or values have unsupported types.
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+### `triepack.encode(data)`
+
+The JavaScript encoder is a single function call. Pass a plain object:
+
+```javascript
+const triepack = require('triepack');
+
+const data = {
+    apple: 42,
+    banana: 17,
+    cherry: "red",
+    active: true,
+};
+
+const buf = triepack.encode(data);
+// buf is a Uint8Array containing the .trp data
+```
+
+**Parameters:**
+- `data` (`Object`): String keys mapping to `null`, `boolean`, `number`, `string`, or `Uint8Array`.
+
+**Returns:** `Uint8Array` -- the encoded `.trp` blob.
+
+**Throws:** `TypeError` if keys are not strings or values have unsupported types.
+
+</div>
+</div>
+
 ---
 
-## Dictionary (`triepack/triepack.h`)
+## Dictionary (Decoder)
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 The dictionary reader provides read-only access to a compiled `.trp` blob.
 
@@ -350,9 +643,106 @@ The `tp_dict_info` struct:
 | `compact_mode`          | `bool`           | Whether compact mode is used    |
 | `total_bytes`           | `size_t`         | Total encoded size in bytes     |
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### `triepack::Dict`
+
+RAII wrapper around `tp_dict`. Include `<triepack/triepack.hpp>`.
+
+```cpp
+#include <triepack/triepack.hpp>
+
+triepack::Dict dict(data, size);
+
+int32_t val;
+if (dict.lookup("apple", &val)) {
+    // val == 42
+}
+
+size_t n = dict.size();  // number of keys
+```
+
+| Method | Description |
+|--------|-------------|
+| `Dict(const uint8_t *data, size_t size)` | Open a `.trp` blob |
+| `bool lookup(const char *key, int32_t *val)` | Look up key, return true if found |
+| `size_t size()` | Number of entries |
+| `tp_dict *handle()` | Access the underlying C handle |
+
+Move semantics are supported.
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+### `triepack.decode(buf)`
+
+Decodes a `.trp` buffer and returns a Python `dict`:
+
+```python
+import triepack
+
+buf = open("data.trp", "rb").read()
+data = triepack.decode(buf)
+
+# data is a plain dict
+print(data["name"])     # "Alice"
+print(data["count"])    # 42
+print(len(data))        # number of keys
+```
+
+**Parameters:**
+- `buf` (`bytes`): A `.trp` encoded blob.
+
+**Returns:** `dict` -- keys are strings, values are native Python types.
+
+**Raises:** `ValueError` on corrupt data, bad magic, or truncated input.
+
+There is no separate "open" step or manual memory management.
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+### `triepack.decode(buf)`
+
+Decodes a `.trp` buffer and returns a plain object:
+
+```javascript
+const triepack = require('triepack');
+const fs = require('fs');
+
+const buf = fs.readFileSync('data.trp');
+const data = triepack.decode(buf);
+
+console.log(data.name);   // "Alice"
+console.log(data.count);  // 42
+console.log(Object.keys(data).length);  // number of keys
+```
+
+**Parameters:**
+- `buf` (`Uint8Array` or `Buffer`): A `.trp` encoded blob.
+
+**Returns:** `Object` -- keys are strings, values are native JS types.
+
+**Throws:** `Error` on corrupt data, bad magic, or truncated input.
+
+There is no separate "open" step or manual memory management.
+
+</div>
+</div>
+
 ---
 
-## Iterator (`triepack/triepack.h`)
+## Iterator
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 Iterators traverse dictionary entries without allocating result arrays.
 
@@ -397,9 +787,69 @@ while (tp_iter_next(it, &key, &key_len, &val) == TP_OK) {
 tp_iter_destroy(&it);
 ```
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### `triepack::Iterator`
+
+RAII wrapper around `tp_iterator`.
+
+```cpp
+triepack::Iterator it(dict);
+while (it.next()) {
+    printf("%s -> %d\n", it.key(), it.value());
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `Iterator(const Dict &dict)` | Create iterator over dict |
+| `bool next()` | Advance; returns false when done |
+| `const char *key()` | Current key |
+| `int32_t value()` | Current value |
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+**Not applicable.** The Python `decode()` function returns a plain `dict`,
+so you iterate with standard Python:
+
+```python
+data = triepack.decode(buf)
+
+for key, value in sorted(data.items()):
+    print(f"{key} = {value}")
+```
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+**Not applicable.** The JavaScript `decode()` function returns a plain
+object, so you iterate with standard JS:
+
+```javascript
+const data = triepack.decode(buf);
+
+for (const [key, value] of Object.entries(data).sort()) {
+    console.log(`${key} = ${value}`);
+}
+```
+
+</div>
+</div>
+
 ---
 
-## Search (`triepack/triepack.h`)
+## Search
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 ### Prefix Search
 
@@ -425,9 +875,61 @@ tp_result tp_iter_get_distance(const tp_iterator *it, uint8_t *dist);
 Gets the edit distance for the current iterator position. Only valid
 for iterators created by `tp_dict_find_fuzzy()`.
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+The C++ wrappers use the same C search functions via the underlying handle:
+
+```cpp
+tp_iterator *it = NULL;
+tp_dict_find_prefix(dict.handle(), "app", &it);
+// ... use tp_iter_next(it, ...) ...
+tp_iter_destroy(&it);
+```
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+**C/C++ only.** Search is not exposed in the Python binding. Use
+standard Python filtering on the decoded dict:
+
+```python
+data = triepack.decode(buf)
+
+# Prefix search
+matches = {k: v for k, v in data.items() if k.startswith("app")}
+```
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+**C/C++ only.** Search is not exposed in the JavaScript binding. Use
+standard JS filtering on the decoded object:
+
+```javascript
+const data = triepack.decode(buf);
+
+// Prefix search
+const matches = Object.fromEntries(
+    Object.entries(data).filter(([k]) => k.startsWith("app"))
+);
+```
+
+</div>
+</div>
+
 ---
 
-## Bitstream (`triepack/triepack_bitstream.h`)
+## Bitstream
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 Low-level arbitrary-width bit field I/O. You rarely need this directly --
 the encoder and dictionary use it internally -- but it's available for
@@ -519,7 +1021,7 @@ Reads `n` bits (1-64) as an unsigned value.
 
 ```c
 uint64_t val;
-tp_bs_read_bits(r, 5, &val);  /* reads 5 bits → val */
+tp_bs_read_bits(r, 5, &val);  /* reads 5 bits -> val */
 ```
 
 ```c
@@ -786,9 +1288,57 @@ tp_result tp_bs_copy_bits(tp_bitstream_reader *r, tp_bitstream_writer *w,
 ```
 Copies `n_bits` from reader to writer.
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### `triepack::BitstreamReader` / `triepack::BitstreamWriter`
+
+RAII wrappers around the C bitstream API. Include `<triepack/bitstream.hpp>`.
+
+```cpp
+#include <triepack/bitstream.hpp>
+
+// Writer
+triepack::BitstreamWriter w(1024);
+w.write_bits(0x15, 5);
+w.write_bits(0x03, 3);
+
+// Reader from writer
+triepack::BitstreamReader r = w.to_reader();
+uint64_t val;
+r.read_bits(5, &val);  // val == 0x15
+```
+
+See the C tab for the full list of operations -- the C++ wrappers
+provide matching method names.
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+**Internal.** The bitstream layer is not part of the Python public API.
+Use `triepack.encode()` and `triepack.decode()` instead.
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+**Internal.** The bitstream layer is not part of the JavaScript public API.
+Use `triepack.encode()` and `triepack.decode()` instead.
+
+</div>
+</div>
+
 ---
 
-## JSON (`triepack/triepack_json.h`)
+## JSON
+
+<div class="tp-tabs">
+<div class="tp-tab-bar">
+  <button class="tp-tab-btn active" data-lang="c">C</button>
+  <button class="tp-tab-btn" data-lang="cpp">C++</button>
+  <button class="tp-tab-btn" data-lang="python">Python</button>
+  <button class="tp-tab-btn" data-lang="js">JavaScript</button>
+</div>
+<div class="tp-tab-panel active" data-lang="c" markdown="1">
 
 The JSON library encodes JSON documents into `.trp` format using
 flattened dot-path keys. JSON objects become dictionaries with keys like
@@ -887,6 +1437,76 @@ tp_result tp_json_iterate(const tp_json *j, tp_iterator **out);
 ```
 Returns an iterator over the top-level entries.
 
+</div>
+<div class="tp-tab-panel" data-lang="cpp" markdown="1">
+
+### `triepack::Json`
+
+The C++ JSON wrapper (in development) will provide RAII access to the
+JSON encode/decode functions. For now, use the C API directly:
+
+```cpp
+#include <triepack/triepack_json.h>
+
+uint8_t *buf = nullptr;
+size_t buf_len = 0;
+tp_result rc = tp_json_encode(json_str, json_len, &buf, &buf_len);
+if (rc == TP_OK) {
+    // ... use buf ...
+    free(buf);
+}
+```
+
+</div>
+<div class="tp-tab-panel" data-lang="python" markdown="1">
+
+**Not applicable.** The Python binding uses `triepack.encode()` /
+`triepack.decode()` for all data, including JSON-like structures.
+Pass a nested `dict` to encode structured data:
+
+```python
+import triepack
+
+data = {
+    "name": "Alice",
+    "address.city": "Portland",
+    "scores[0]": 95,
+    "scores[1]": 87,
+}
+
+buf = triepack.encode(data)
+result = triepack.decode(buf)
+```
+
+For full JSON support (automatic flattening/unflattening of nested
+structures), use the C or C++ JSON API.
+
+</div>
+<div class="tp-tab-panel" data-lang="js" markdown="1">
+
+**Not applicable.** The JavaScript binding uses `triepack.encode()` /
+`triepack.decode()` for all data. Pass a plain object:
+
+```javascript
+const triepack = require('triepack');
+
+const data = {
+    name: "Alice",
+    "address.city": "Portland",
+    "scores[0]": 95,
+    "scores[1]": 87,
+};
+
+const buf = triepack.encode(data);
+const result = triepack.decode(buf);
+```
+
+For full JSON support (automatic flattening/unflattening of nested
+structures), use the C or C++ JSON API.
+
+</div>
+</div>
+
 ---
 
 ## C++ Wrappers (`triepack::` namespace)
@@ -894,65 +1514,6 @@ Returns an iterator over the top-level entries.
 RAII wrappers around the C API. Include `<triepack/triepack.hpp>` for
 core wrappers and `<triepack/bitstream.hpp>` for bitstream wrappers.
 All wrappers are non-copyable and movable.
-
-### `triepack::Encoder`
-
-```cpp
-#include <triepack/triepack.hpp>
-
-triepack::Encoder enc;
-enc.insert("apple", 42);
-enc.insert("banana", 17);
-
-const uint8_t *data;
-size_t size;
-int rc = enc.encode(&data, &size);
-// data points to the encoded .trp blob
-// data is valid until enc is destroyed or encode() is called again
-```
-
-| Method | Description |
-|--------|-------------|
-| `Encoder()` | Construct with default options |
-| `void insert(const char *key, int32_t value)` | Add a key-value pair |
-| `int encode(const uint8_t **data, size_t *size)` | Build the trie, receive pointer to blob |
-| `tp_encoder *handle()` | Access the underlying C handle |
-
-### `triepack::Dict`
-
-```cpp
-triepack::Dict dict(data, size);
-
-int32_t val;
-if (dict.lookup("apple", &val)) {
-    // val == 42
-}
-
-size_t n = dict.size();  // number of keys
-```
-
-| Method | Description |
-|--------|-------------|
-| `Dict(const uint8_t *data, size_t size)` | Open a `.trp` blob |
-| `bool lookup(const char *key, int32_t *val)` | Look up key, return true if found |
-| `size_t size()` | Number of entries |
-| `tp_dict *handle()` | Access the underlying C handle |
-
-### `triepack::Iterator`
-
-```cpp
-triepack::Iterator it(dict);
-while (it.next()) {
-    printf("%s -> %d\n", it.key(), it.value());
-}
-```
-
-| Method | Description |
-|--------|-------------|
-| `Iterator(const Dict &dict)` | Create iterator over dict |
-| `bool next()` | Advance; returns false when done |
-| `const char *key()` | Current key |
-| `int32_t value()` | Current value |
 
 ### Move Semantics
 
@@ -966,3 +1527,5 @@ triepack::Encoder enc2 = std::move(enc1);
 // enc1 is now empty (handle() == nullptr)
 // enc2 owns the encoder
 ```
+
+See the C++ tabs in each section above for per-class details.

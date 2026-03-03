@@ -339,6 +339,54 @@ void test_utf8_unexpected_continuation(void)
     tp_bs_reader_destroy(&r);
 }
 
+/* ── UTF-8 codepoint > 0x10FFFF ─────────────────────────────────────── */
+
+void test_utf8_write_way_too_large(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_write_utf8(w, 0x200000));
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_write_utf8(w, 0xFFFFFFFF));
+    tp_bs_writer_destroy(&w);
+}
+
+/* ── UTF-8 invalid continuation byte (non 10xxxxxx) ─────────────────── */
+
+void test_utf8_invalid_continuation_3byte(void)
+{
+    /* 3-byte start (0xE4) followed by valid cont then invalid cont */
+    uint8_t data[] = {0xE4, 0xB8, 0x20}; /* last byte is space, not continuation */
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, data, 24);
+    uint32_t cp;
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_read_utf8(r, &cp));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_utf8_invalid_continuation_4byte(void)
+{
+    /* 4-byte start (0xF0) followed by valid conts then invalid */
+    uint8_t data[] = {0xF0, 0x9F, 0x98, 0x20};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, data, 32);
+    uint32_t cp;
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_read_utf8(r, &cp));
+    tp_bs_reader_destroy(&r);
+}
+
+/* ── UTF-8 surrogate codepoint rejection ────────────────────────────── */
+
+void test_utf8_write_all_surrogates(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    /* D800, DC00, DFFF are all surrogates */
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_write_utf8(w, 0xD800));
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_write_utf8(w, 0xDC00));
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_UTF8, tp_bs_write_utf8(w, 0xDFFF));
+    tp_bs_writer_destroy(&w);
+}
+
 /* ── NULL params ────────────────────────────────────────────────────── */
 
 void test_symbol_null_params(void)
@@ -383,6 +431,11 @@ int main(void)
     RUN_TEST(test_utf8_bad_continuation);
     RUN_TEST(test_utf8_bad_lead_byte);
     RUN_TEST(test_utf8_unexpected_continuation);
+    /* Additional edge cases */
+    RUN_TEST(test_utf8_write_way_too_large);
+    RUN_TEST(test_utf8_invalid_continuation_3byte);
+    RUN_TEST(test_utf8_invalid_continuation_4byte);
+    RUN_TEST(test_utf8_write_all_surrogates);
     /* NULL params */
     RUN_TEST(test_symbol_null_params);
     return UNITY_END();

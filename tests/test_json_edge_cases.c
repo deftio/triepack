@@ -571,6 +571,54 @@ void test_all_escape_sequences(void)
     free(buf);
 }
 
+/* ── Trailing garbage after valid JSON ────────────────────────────── */
+
+void test_trailing_garbage(void)
+{
+    /* JSON encoder parses valid JSON prefix and succeeds */
+    const char *json = "{}garbage";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    /* The encoder accepts the valid prefix — this is by design */
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    free(buf);
+}
+
+/* ── Deeply nested arrays ────────────────────────────────────────── */
+
+void test_deep_nested_arrays(void)
+{
+    char json[1024];
+    size_t pos = 0;
+    int depth = 40;
+
+    for (int i = 0; i < depth; i++) {
+        json[pos++] = '[';
+    }
+    json[pos++] = '1';
+    for (int i = 0; i < depth; i++) {
+        json[pos++] = ']';
+    }
+    json[pos] = '\0';
+
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, pos, &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_DEPTH, rc);
+}
+
+/* ── Truncated string mid-parse ──────────────────────────────────── */
+
+void test_truncated_string(void)
+{
+    const char *json = "{\"key\":\"unterminated";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -612,5 +660,8 @@ int main(void)
     RUN_TEST(test_decode_pretty_null_len);
     RUN_TEST(test_array_mixed_types);
     RUN_TEST(test_all_escape_sequences);
+    RUN_TEST(test_trailing_garbage);
+    RUN_TEST(test_deep_nested_arrays);
+    RUN_TEST(test_truncated_string);
     return UNITY_END();
 }

@@ -317,30 +317,15 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         /* Check if already in segments list */
         bool dup = false;
         for (size_t s = 0; s < num_segments; s++) {
-            if (segments[s].seg_len == seg_len &&
-                memcmp(entries[i].key + pos,
-                       entries[segments[s].seg_start].key + segments[s].seg_start, seg_len) == 0) {
-                /* This comparison is wrong for tracking; use stored offset */
+            const flat_entry *se = &entries[segments[s].seg_start];
+            size_t sp = prefix_len;
+            if (sp < se->key_len && se->key[sp] == '.')
+                sp++;
+            bool si = false;
+            size_t sl = next_segment(se->key, se->key_len, sp, &si);
+            if (sl == seg_len && memcmp(se->key + sp, entries[i].key + pos, seg_len) == 0) {
                 dup = true;
                 break;
-            }
-        }
-
-        /* Actually, track by storing entry index and segment offset */
-        if (!dup) {
-            /* Simpler dedup: check segment text */
-            dup = false;
-            for (size_t s = 0; s < num_segments; s++) {
-                const flat_entry *se = &entries[segments[s].seg_start];
-                size_t sp = prefix_len;
-                if (sp < se->key_len && se->key[sp] == '.')
-                    sp++;
-                bool si = false;
-                size_t sl = next_segment(se->key, se->key_len, sp, &si);
-                if (sl == seg_len && memcmp(se->key + sp, entries[i].key + pos, seg_len) == 0) {
-                    dup = true;
-                    break;
-                }
             }
         }
 

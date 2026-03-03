@@ -106,3 +106,53 @@ pre {
 .site-footer {
   border-top: 2px solid #e8e8e8;
 }
+
+/* ── Language tabs ──────────────────────────────────────────────────── */
+
+.tp-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e8e8e8;
+  margin-top: 1.5em;
+  margin-bottom: 0;
+}
+
+.tp-tab-btn {
+  padding: 6px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: none;
+  font-size: 0.9em;
+  color: #666;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: -2px;
+}
+
+.tp-tab-btn.active {
+  border-color: #e8e8e8;
+  border-bottom: 2px solid #fff;
+  color: #111;
+  font-weight: 600;
+}
+
+.tp-tab-btn:hover {
+  color: #111;
+}
+
+.tp-tab-panel {
+  display: none;
+}
+
+.tp-tab-panel.active {
+  display: block;
+}
+
+/* Graceful degradation: no JS = all panels visible */
+body:not(.tp-js-enabled) .tp-tab-panel {
+  display: block;
+}
+
+body:not(.tp-js-enabled) .tp-tab-bar {
+  display: none;
+}

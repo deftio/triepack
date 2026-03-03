@@ -80,7 +80,7 @@ tp_result tp_bs_write_varint_s(tp_bitstream_writer *w, int64_t value)
     if (!w)
         return TP_ERR_INVALID_PARAM;
 
-    /* Zigzag encode */
-    uint64_t raw = (uint64_t)((value << 1) ^ (value >> 63));
+    /* Zigzag encode: cast to unsigned before left shift to avoid UB */
+    uint64_t raw = ((uint64_t)value << 1) ^ (uint64_t)(value >> 63);
     return tp_bs_write_varint_u(w, raw);
 }

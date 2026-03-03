@@ -442,7 +442,48 @@ tp_json_close(&j);
 
 ---
 
-## 9. Comparison with Other Formats
+## 9. Alignment and Embedded Use
+
+When deploying TriePack on embedded systems or in ROM, memory alignment
+is a practical concern. Here is the current state:
+
+- **Output buffer alignment.** The buffer returned by `tp_encoder_build()`
+  is `malloc()`'d, which guarantees `max_align_t` alignment (typically 8
+  or 16 bytes). This satisfies any integer or pointer alignment requirement.
+
+- **Header alignment.** The 32-byte header is naturally int-aligned (32
+  bytes = 8 x 4-byte words). All header fields are read through the
+  bitstream API, not via direct struct casts, so unaligned-access faults
+  cannot occur from header reads.
+
+- **Data section.** After the header, data is bit-packed (no alignment
+  guarantees) in the default `TP_ADDR_BIT` mode. For `TP_ADDR_BYTE` mode,
+  all fields start on byte boundaries. No padding is added between the
+  header and data section -- this maximizes compression.
+
+- **Static / ROM placement.** When embedding a `.trp` file in ROM or a
+  statically allocated array, ensure the buffer starts on a 4-byte
+  boundary:
+
+  ```c
+  /* GCC / Clang */
+  static const uint8_t dict_data[]
+      __attribute__((aligned(4))) = { /* .trp bytes */ };
+
+  /* Or use a linker script to place it in an aligned section */
+  ```
+
+- **CRC footer.** The 4-byte CRC-32 footer is byte-aligned (the writer
+  calls `tp_bs_writer_align_to_byte()` before writing it).
+
+No internal padding between sections is planned -- the current design
+prioritizes compression density. If a future use case requires word-aligned
+access to the data section (e.g., DMA transfers), optional alignment padding
+can be added as a format extension.
+
+---
+
+## 10. Comparison with Other Formats
 
 | Feature | TriePack | JSON | MessagePack | Protocol Buffers | SQLite |
 |---------|----------|------|-------------|-----------------|--------|
@@ -460,6 +501,32 @@ It is not a general-purpose serialization format (use MessagePack or
 Protocol Buffers for that) and does not support in-place mutation (use
 SQLite for read-write workloads). Its sweet spot is static or rarely-
 updated dictionaries where compact size and fast lookup matter.
+
+---
+
+## 11. Tools
+
+### CLI Inspector (`trp`)
+
+The `trp` command-line tool inspects `.trp` files without writing any code.
+Build it from the `tools/` directory:
+
+```
+trp info   <file>            Show header metadata
+trp list   <file>            List all keys with types and values
+trp get    <file> <key>      Look up a single key
+trp dump   <file>            Hex dump of header + structure summary
+trp search <file> <prefix>   Prefix search
+trp json   <file>            Decode as JSON, pretty-print
+```
+
+### Web Inspector (planned)
+
+A browser-based tool for inspecting `.trp` files is planned as a future
+enhancement. The JavaScript binding already supports full encode/decode,
+making this a natural fit -- either as a pure client-side drag-and-drop
+page or a lightweight server-side tool. This is separate from the CLI
+tool and is tracked as a future enhancement.
 
 ---
 
