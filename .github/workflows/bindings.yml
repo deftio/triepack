@@ -23,7 +23,7 @@ jobs:
 
       - name: Install and test
         run: |
-          pip install -e bindings/python
+          pip install -e "bindings/python[test]"
           pytest bindings/python/tests
 
   typescript:
@@ -43,7 +43,7 @@ jobs:
       - name: Install and test
         run: |
           cd bindings/typescript
-          npm ci
+          npm install
           npm test
 
   javascript:
