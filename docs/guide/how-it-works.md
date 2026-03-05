@@ -632,8 +632,8 @@ are illustrative (Apple M-series, single-threaded, `-O2`).
 
 ### Dictionary Compression
 
-Two word lists were tested: 10,000 real English words from `common_words_10k.txt`
-(natural distribution) and 10,000 generated words with shared prefixes/suffixes
+Two word lists were tested: 10,000 real English words from [`common_words_10k.txt`](https://github.com/deftio/triepack/blob/main/tests/data/common_words_10k.txt)
+(natural distribution, 82 KB) and 10,000 generated words with shared prefixes/suffixes
 (simulating API keys, config paths, or i18n keys).
 
 **10,000 English words** (71,824 raw key bytes)
@@ -680,7 +680,7 @@ values, consider keys-only membership checks when values aren't needed.
 
 ### JSON Compression
 
-**Large document: 200-product catalog** (`benchmark_100k.json`, 202 KB)
+**Large document: 200-product catalog** ([`benchmark_100k.json`](https://github.com/deftio/triepack/blob/main/tests/data/benchmark_100k.json), 202 KB)
 
 | Metric | Value |
 |--------|-------|
@@ -734,7 +734,7 @@ cmake --build build
 ./build/examples/compaction_benchmark
 ```
 
-The benchmark tool in `tools/run_benchmarks.c` measures both dictionary
+The benchmark tool in [`tools/run_benchmarks.c`](https://github.com/deftio/triepack/blob/main/tools/run_benchmarks.c) measures both dictionary
 and JSON compression against the static test data files:
 
 ```bash

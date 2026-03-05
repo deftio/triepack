@@ -255,8 +255,8 @@ Each binding tests both directions:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `tests/data/common_words_10k.txt` | 82 KB | 10,000 unique English words for trie compression benchmarks |
-| `tests/data/benchmark_100k.json` | 202 KB | Synthetic product catalog (200 items, nested JSON, all types) |
+| [`tests/data/common_words_10k.txt`](https://github.com/deftio/triepack/blob/main/tests/data/common_words_10k.txt) | 82 KB | 10,000 unique English words for trie compression benchmarks |
+| [`tests/data/benchmark_100k.json`](https://github.com/deftio/triepack/blob/main/tests/data/benchmark_100k.json) | 202 KB | Synthetic product catalog (200 items, nested JSON, all types) |
 
 ## Adding a New Test
 
