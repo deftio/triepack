@@ -1,7 +1,7 @@
 # triepack v1.0.7
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
-[![Coverage Report](https://github.com/deftio/triepack/actions/workflows/coverage.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/coverage.yml)
+[![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-blue.svg)](LICENSE.txt)
 
 A compressed trie-based dictionary format for fast, compact key-value storage.

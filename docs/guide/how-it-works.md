@@ -512,12 +512,17 @@ The `trp` command-line tool inspects `.trp` files without writing any code.
 Build it from the `tools/` directory:
 
 ```
-trp info   <file>            Show header metadata
-trp list   <file>            List all keys with types and values
-trp get    <file> <key>      Look up a single key
-trp dump   <file>            Hex dump of header + structure summary
-trp search <file> <prefix>   Prefix search
-trp json   <file>            Decode as JSON, pretty-print
+Inspection:
+  trp info     <file>            Show header metadata
+  trp list     <file>            List all keys with types and values
+  trp get      <file> <key>      Look up a single key
+  trp dump     <file>            Hex dump of header + structure summary
+  trp search   <file> <prefix>   Prefix search
+  trp validate <file>            Validate integrity (magic + checksum)
+
+Conversion:
+  trp encode   <input.json> [-o output.trp]   JSON -> TriePack
+  trp decode   <input.trp>  [-o output.json]  TriePack -> JSON [--pretty]
 ```
 
 ### Web Inspector (planned)
@@ -616,6 +621,128 @@ No object, no cursor, no heap. Safe for interrupt handlers.
 
 For the complete bitstream reference, see the
 [Bitstream Specification](../internals/bitstream-spec.md).
+
+---
+
+## 13. Performance Benchmarks
+
+The following benchmarks were measured using the project's static test data
+files. Compression ratios are deterministic and reproducible; timing numbers
+are illustrative (Apple M-series, single-threaded, `-O2`).
+
+### Dictionary Compression
+
+Two word lists were tested: 10,000 real English words from `common_words_10k.txt`
+(natural distribution) and 10,000 generated words with shared prefixes/suffixes
+(simulating API keys, config paths, or i18n keys).
+
+**10,000 English words** (71,824 raw key bytes)
+
+| Mode | Encoded size | Compression | Bits/key | bps |
+|------|-------------|-------------|----------|-----|
+| Keys only | 45,054 B | 1.59x | 36.0 | 5 |
+| Keys + integer values | 90,451 B | 0.79x | 72.4 | 5 |
+
+**10,000 generated words with shared prefixes** (117,556 raw key bytes)
+
+| Mode | Encoded size | Compression | Bits/key | bps |
+|------|-------------|-------------|----------|-----|
+| Keys only | 44,552 B | 2.64x | 35.6 | 5 |
+| Keys + integer values | 89,774 B | 1.31x | 71.8 | 5 |
+
+Key observations:
+
+- **Prefix sharing matters.** Words with common prefixes (un-, re-, pre-,
+  -tion, -ing) compress 2.64x vs. 1.59x for natural English words. API
+  endpoint paths, configuration keys, and i18n keys typically share prefixes
+  heavily and will see compression closer to the 2.64x figure.
+
+- **Keys-only mode is very compact.** Without values, the trie stores only
+  key structure at ~36 bits per key. This is ideal for spell-check
+  dictionaries, bloom filter alternatives, and membership-test sets.
+
+- **Values add overhead.** Each value carries a 4-bit type tag plus its
+  VarInt-encoded payload. For small integer values, this roughly doubles the
+  encoded size.
+
+### Lookup Speed
+
+| Dataset | Keys | Lookup (keys-only) | Lookup (keys+values) |
+|---------|------|--------------------|---------------------|
+| 10K English words | 10,000 | 3.8 us/key | 551 us/key |
+| 10K generated words | 10,000 | 3.7 us/key | N/A |
+
+Keys-only lookups are fast (~3.8 us) because the decoder walks the trie
+with skip pointers, examining only the key path. Key+value lookups are
+slower because the value store is sequential: looking up value index N
+requires skipping N-1 preceding values. For large dictionaries with
+values, consider keys-only membership checks when values aren't needed.
+
+### JSON Compression
+
+**Large document: 200-product catalog** (`benchmark_100k.json`, 202 KB)
+
+| Metric | Value |
+|--------|-------|
+| JSON input | 202,408 bytes |
+| Encoded .trp | 134,287 bytes |
+| Compression | 66.3% of JSON |
+| Flattened keys | 5,044 |
+| Bits per symbol | 6 |
+| Encode time | 14 ms |
+| Single path lookup | ~1 us |
+
+The catalog contains 200 products with nested objects (manufacturer,
+dimensions, reviews), arrays, strings, numbers, and booleans. The .trp
+format achieves 34% savings primarily from key prefix sharing -- repeated
+field names like `products[N].name`, `products[N].price` share the
+`products[` prefix across all 200 entries.
+
+**Small JSON documents**
+
+| Document | JSON | .trp | Ratio | Keys |
+|----------|------|------|-------|------|
+| Empty object `{}` | 2 B | 50 B | 2500% | 1 |
+| Simple config (3 fields) | 45 B | 96 B | 213% | 4 |
+| Nested object (2 levels) | 59 B | 103 B | 175% | 4 |
+| Array of 4 strings | 42 B | 113 B | 269% | 5 |
+| Mixed types (5 fields) | 61 B | 106 B | 174% | 6 |
+| App config (18 fields) | 376 B | 397 B | 106% | 18 |
+
+For small documents, .trp files are **larger** than JSON because of fixed
+overhead: 32-byte header, symbol table, CRC-32 footer, and root-type
+metadata. The crossover point where .trp becomes smaller than JSON is
+approximately **400-500 bytes** of input JSON, depending on key structure.
+
+**When TriePack beats JSON:** Documents with many keys sharing common
+prefixes (repeated field names in arrays of objects, deeply nested
+configuration, i18n key hierarchies). The 200-product catalog saves 34%
+because `products[0].manufacturer.name` through `products[199].manufacturer.name`
+share the prefix path.
+
+**When JSON is smaller:** Tiny documents with few keys and no shared
+prefixes. For <500 bytes of JSON with unique keys, the header overhead
+dominates. Use plain JSON for these cases.
+
+### Running the Benchmarks
+
+The compaction benchmark is built as part of the example suite:
+
+```bash
+cmake -B build -DBUILD_EXAMPLES=ON
+cmake --build build
+./build/examples/compaction_benchmark
+```
+
+The benchmark tool in `tools/run_benchmarks.c` measures both dictionary
+and JSON compression against the static test data files:
+
+```bash
+gcc -O2 -o run_benchmarks tools/run_benchmarks.c \
+  -Iinclude -Lbuild/src/json -Lbuild/src/core -Lbuild/src/bitstream \
+  -ltriepack_json -ltriepack_core -ltriepack_bitstream
+./run_benchmarks tests/data
+```
 
 ---
 

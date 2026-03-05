@@ -68,6 +68,16 @@ jobs:
           mkdir -p docs/coverage
           cp -r build-cov/coverage/* docs/coverage/
 
+      - name: Generate coverage badge
+        run: |
+          COV_PCT=$(lcov --summary build-cov/lcov.info 2>&1 | grep 'lines' | sed 's/.*: \([0-9.]*\)%.*/\1/')
+          COV_INT=${COV_PCT%.*}
+          if [ "$COV_INT" -ge 90 ]; then COLOR="brightgreen"
+          elif [ "$COV_INT" -ge 75 ]; then COLOR="green"
+          elif [ "$COV_INT" -ge 60 ]; then COLOR="yellow"
+          else COLOR="red"; fi
+          printf '{"schemaVersion":1,"label":"C coverage","message":"%s%%","color":"%s"}\n' "$COV_PCT" "$COLOR" > docs/coverage-badge.json
+
       - name: Generate releases page from CHANGELOG
         run: |
           # Build docs/releases.md from CHANGELOG.md with Jekyll front matter
@@ -93,7 +103,7 @@ jobs:
             echo '```bash'
             echo 'git clone https://github.com/${{ github.repository }}.git'
             echo 'cd triepack'
-            echo 'git checkout v1.0.0'
+            echo "git checkout v$(grep 'project(triepack VERSION' CMakeLists.txt | sed 's/.*VERSION \([0-9.]*\).*/\1/')"
             echo 'cmake -B build -DCMAKE_BUILD_TYPE=Release'
             echo 'cmake --build build'
             echo 'sudo cmake --install build'

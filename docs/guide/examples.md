@@ -7,6 +7,17 @@ title: Examples
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->
 
+## Contents
+
+| Language | Section |
+|----------|---------|
+| [C](#example-programs) | 6 example programs with source and expected output |
+| [C++](#cpp_usage) | RAII wrappers, move semantics, encode/decode lifecycle |
+| [Python](#python-examples) | Pure-Python binding: encode, decode, JSON, file I/O |
+| [JavaScript](#javascript-examples) | Pure-JS binding: encode, decode, JSON, Node.js file I/O |
+
+---
+
 Example programs are built when `BUILD_EXAMPLES=ON` (the default). After
 building, the executables are in `build/examples/`.
 
