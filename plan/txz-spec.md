@@ -265,8 +265,10 @@ In **bit mode** (original TXZ behavior), symbols, control codes, VarInts, skip d
 ### 3.1 Overall Layout
 
 ```
-+------------------------+  byte-aligned (bootstrap)
-| File Header            |
++------------------------+  byte-aligned, FROZEN (never changes)
+| File Header (32 bytes) |
++------------------------+  byte-aligned (present when HAS_EXTENSIONS flag set)
+| Extension Directory    |  self-describing list of (tag, offset, size)
 +------------------------+  <-- data stream begins here
 | Trie Config            |  \
 +- - - - - - - - - - - - +   |  post-header metadata
@@ -279,6 +281,8 @@ In **bit mode** (original TXZ behavior), symbols, control codes, VarInts, skip d
 | Key Prefix Trie        |   |
 +------------------------+   |
 | Value Trie / Store     |   |
++------------------------+   |
+| Value Suffix Table     |   |  (optional, when value trie has suffix sharing)
 +------------------------+  /
 +------------------------+  byte-aligned (fixed footer)
 | Integrity Check        |
@@ -289,11 +293,13 @@ The key trie consists of two parts: the **Key Prefix Trie** (stems) and the **Ke
 
 When the symbol table is shared (header flag), both key and value tries use the same symbol-to-character mapping -- useful when keys and values draw from the same character set. When not shared, the value trie has its own symbol config.
 
-The File Header is byte-aligned so it can be read without a bit-reader. Everything between the header and the integrity footer is a packed data stream. The integrity footer is byte-aligned (padded to the next byte boundary after the stream ends).
+The File Header is byte-aligned so it can be read without a bit-reader. The Extension Directory (if present) is also byte-aligned and immediately follows the header. Everything after the extension directory is the packed data stream. The integrity footer is byte-aligned (padded to the next byte boundary after the stream ends).
 
-### 3.2 File Header (fixed size: 32 bytes, byte-aligned)
+**Data stream start:** When `HAS_EXTENSIONS` is clear, the data stream begins at byte 32 (immediately after the header). When `HAS_EXTENSIONS` is set, the data stream begins at byte `32 + extension_directory_size`. The `data_stream_start` field in the header (bytes 28-31) gives the byte offset where the data stream begins, removing any ambiguity.
 
-The header is the only byte-aligned structure. It bootstraps the bit-stream reader.
+### 3.2 File Header (fixed size: 32 bytes, byte-aligned, FROZEN)
+
+The header is exactly 32 bytes and **will never change size or layout**. It bootstraps the reader and tells it where to find everything else. All future format extensions use the Extension Directory (Section 3.2.1) rather than modifying the header.
 
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
@@ -306,9 +312,11 @@ The header is the only byte-aligned structure. It bootstraps the bit-stream read
 | 16 | 4 | value_store_offset | Bit offset to Value Store |
 | 20 | 4 | suffix_table_offset | Bit offset to Suffix Table (0 if none) |
 | 24 | 4 | total_data_bits | Total length of the data stream in bits |
-| 28 | 4 | reserved | Reserved, must be 0 |
+| 28 | 4 | data_stream_start | Byte offset from file start to data stream (0 or 32 = legacy, >32 = extension directory present) |
 
-The data stream begins immediately after the header (byte offset 32). All `*_offset` fields are **bit offsets** relative to this starting point, regardless of the section's addressing mode. The reader converts bit offsets to byte/symbol positions as needed based on the declared mode. Using bit offsets universally ensures the header format is mode-independent.
+All `*_offset` fields (trie_data_offset, value_store_offset, suffix_table_offset) are **bit offsets** relative to `data_stream_start`, regardless of the section's addressing mode. The reader converts bit offsets to byte/symbol positions as needed based on the declared mode. Using bit offsets universally ensures the header format is mode-independent.
+
+**`data_stream_start` (bytes 28-31):** For legacy files (format version 1.0), this field is 0 and the data stream begins at byte 32. For files with an extension directory, this field gives the byte offset where the data stream begins (i.e., `32 + size_of_extension_directory`). Decoders MUST treat a value of 0 as 32 for backward compatibility.
 
 **Flags (bit field):**
 
@@ -322,7 +330,134 @@ The data stream begins immediately after the header (byte offset 32). All `*_off
 | 6-7 | value_addr_mode: 00=bit, 01=byte, 10=symbol-fixed, 11=reserved |
 | 8-9 | symbol_encoding: 00=fixed-width, 01=huffman, 10=multi-width, 11=reserved |
 | 10 | shared_symbols: key trie and value trie share the same symbol table |
-| 11-15 | reserved |
+| 11 | has_extensions: extension directory present after header (see Section 3.2.1) |
+| 12-15 | reserved, must be 0 |
+
+**Header freeze guarantee:** This 32-byte layout is the permanent contract. Decoders for any version of the format parse these 32 bytes identically. All future features are discovered via the extension directory, not by adding header fields.
+
+### 3.2.1 Extension Directory (byte-aligned, self-describing)
+
+The extension directory is present when flag bit 11 (`has_extensions`) is set. It begins at byte 32 (immediately after the header) and is byte-aligned throughout. It describes additional data stream sections beyond the three defined in the base header (key trie, value store, suffix table).
+
+**Design principle:** Unknown extension tags are safe to skip. A decoder that encounters a tag it does not recognize ignores it and continues. This allows format evolution without version bumps for backward-compatible additions, and enables vendor-specific extensions without polluting the core spec.
+
+**Directory format:**
+
+| Field | Size | Description |
+|-------|------|-------------|
+| num_extensions | uint16 | Number of extension entries (0-65535) |
+| entries[] | 10 bytes each | Array of `num_extensions` extension entries |
+
+Each extension entry:
+
+| Field | Size | Description |
+|-------|------|-------------|
+| tag | uint16 | Extension type identifier (see tag registry below) |
+| offset | uint32 | Bit offset from data stream start to this section |
+| size | uint32 | Size of this section in bits (0 = section is empty/placeholder) |
+
+**Total directory size:** `2 + (num_extensions * 10)` bytes.
+
+The `data_stream_start` header field (bytes 28-31) MUST equal `32 + 2 + (num_extensions * 10)`, i.e., the data stream begins immediately after the last extension entry.
+
+**Byte order:** All multi-byte fields in the extension directory use the same byte order as the file header (little-endian).
+
+**Tag Registry:**
+
+Tags are partitioned into ranges:
+
+| Range | Purpose |
+|-------|---------|
+| 0x0000 | Reserved (invalid) |
+| 0x0001 - 0x00FF | **Core tags** -- defined by this spec |
+| 0x0100 - 0x0FFF | **Reserved** -- future spec use |
+| 0x1000 - 0x7FFF | **Vendor tags** -- third-party extensions, safe to skip |
+| 0x8000 - 0xFFFF | **Required tags** -- decoder MUST understand or reject the file |
+
+**Core tags (0x0001 - 0x00FF):**
+
+| Tag | Name | Description |
+|-----|------|-------------|
+| 0x0001 | `EXT_VALUE_TRIE` | Value trie: compressed trie for string/blob values (replaces linear value store for trie-eligible values). Section contains its own trie config + symbol table + trie data. |
+| 0x0002 | `EXT_VALUE_SUFFIX` | Value suffix table: suffix sharing for the value trie. Format matches Section 3.5. |
+| 0x0003 | `EXT_KEY_SUFFIX_V2` | Extended key suffix table (future: DAWG-style merged suffix subtrees). |
+| 0x0004 | `EXT_HUFFMAN_TABLE` | Standalone Huffman symbol table (when shared between key and value tries). |
+| 0x0005 | `EXT_FUZZY_INDEX` | Fuzzy search index: precomputed edit-distance structure for d<=2 queries. |
+| 0x0006 | `EXT_BLOOM_FILTER` | Bloom filter for fast negative lookups (key does not exist). |
+| 0x0007 | `EXT_METADATA` | Arbitrary key-value metadata (creation date, encoder version, etc.). Stored as a nested TXZ dict. |
+
+**Required tag semantics (0x8000+):**
+
+Tags in the required range signal that the section is essential for correct decoding. A decoder that encounters a required tag it does not recognize MUST reject the file with a clear error message rather than silently producing incorrect output. This is the mechanism for introducing breaking format changes without bumping the major version.
+
+| Tag | Name | Description |
+|-----|------|-------------|
+| 0x8001 | `EXT_VALUE_TRIE_REQUIRED` | Like `EXT_VALUE_TRIE`, but the linear value store in the base header is absent -- decoder MUST use the value trie. |
+
+**Decoder algorithm:**
+
+```
+read 32-byte header
+if has_extensions flag is set:
+    read num_extensions (uint16 at byte 32)
+    for i in 0..num_extensions:
+        read tag, offset, size (10 bytes each)
+        if tag in known_tags:
+            record (tag, offset, size) for later use
+        elif tag >= 0x8000:
+            REJECT: "unsupported required extension 0x{tag:04X}"
+        else:
+            SKIP: unknown optional tag, ignore
+    seek to data_stream_start
+else:
+    data stream starts at byte 32
+
+parse trie config, key trie, value store as usual
+if EXT_VALUE_TRIE recorded:
+    seek to its offset, decode value trie
+    use value trie for string/blob lookups instead of linear value store
+```
+
+**Ordering:** Extension entries in the directory MAY appear in any order. The decoder searches for tags it needs. Entries SHOULD be ordered by offset for cache-friendly sequential reading, but this is not required.
+
+**Duplicate tags:** Each tag MUST appear at most once in the directory. A decoder encountering duplicate tags SHOULD use the first occurrence and ignore subsequent ones.
+
+### 3.2.2 Versioning and Compatibility Contract
+
+The combination of `version_major`, `version_minor`, flags, and the extension directory tag ranges provides a layered compatibility model:
+
+**Major version (breaking changes):**
+- A change in `version_major` means the header layout, trie encoding, or value encoding has changed incompatibly.
+- A decoder MUST reject files with a major version it does not support.
+- The 32-byte header layout is frozen, so major version bumps should be extremely rare.
+
+**Minor version (backward-compatible additions):**
+- A change in `version_minor` means new optional features are available.
+- A decoder for version 1.0 CAN read a version 1.1 file by ignoring unknown optional extensions.
+- A decoder MUST still reject files with unknown required extensions (tag >= 0x8000), regardless of minor version.
+
+**Extension tags (feature-level granularity):**
+- New features are expressed as extension tags, not version bumps.
+- Optional tags (0x0001-0x7FFF): skip if unknown. File is still usable with reduced functionality.
+- Required tags (0x8000-0xFFFF): reject if unknown. File cannot be correctly decoded without this feature.
+
+**Compatibility matrix:**
+
+| File has | Decoder knows | Result |
+|----------|---------------|--------|
+| No extensions | Any decoder | OK (base format) |
+| Optional extension | Old decoder | OK (extension ignored, base data used) |
+| Optional extension | New decoder | OK (extension data used) |
+| Required extension | Old decoder | REJECT (clear error) |
+| Required extension | New decoder | OK |
+| Unknown major version | Any decoder | REJECT |
+
+**When to use optional vs. required extensions:**
+
+- **Optional (`EXT_VALUE_TRIE`, 0x0001):** The encoder writes BOTH a linear value store (at `value_store_offset`) AND a value trie (in the extension). Old decoders use the linear store. New decoders use the value trie for better compression awareness. The file is larger (contains both), but backward-compatible.
+- **Required (`EXT_VALUE_TRIE_REQUIRED`, 0x8001):** The encoder writes ONLY the value trie. No linear fallback. Smaller file, but old decoders cannot read it. Use when file size matters more than backward compatibility.
+
+This gives the encoder (and the user) explicit control over the compatibility/size tradeoff.
 
 ### 3.3 Trie Config
 
@@ -495,10 +630,21 @@ function lookup(prefix_trie, suffix_trie, key):
 
 Values are stored in a **separate structure** from the key trie. The key trie's END_VAL terminals reference values by index into this section. Two forms are supported:
 
-- **Value store** (simple): a sequential array of typed values, referenced by index. Fast to build, no compression of values against each other.
-- **Value trie** (compressed): string values that share prefixes/suffixes are stored in their own compressed trie (same format as the key trie). The `txz-json` library uses this when it detects significant sharing among string values. Non-string values (ints, floats, bools, blobs) remain in a flat store section.
+- **Value store** (simple, base format): a sequential array of typed values, referenced by index. Fast to build, no compression of values against each other. Located at `value_store_offset` in the header. Always present in backward-compatible files.
+- **Value trie** (compressed, via extension directory): string/blob values that share prefixes/suffixes are stored in their own compressed trie (same format as the key trie). Signaled by the `EXT_VALUE_TRIE` (0x0001, optional) or `EXT_VALUE_TRIE_REQUIRED` (0x8001, required) extension tag (see Section 3.2.1). Non-string values (null, bool, int, uint, float32, float64) remain inline -- they are too small to benefit from trie compression.
+
+**Adaptive strategy:** The encoder analyzes values at build time and decides whether a value trie is worthwhile. The heuristic considers:
+
+- Number of string/blob values (few strings = no benefit)
+- Degree of prefix/suffix sharing among string values (unique strings = no benefit)
+- Fixed overhead of a value trie config + symbol table vs. savings from sharing
+- Caller preference (API option to force linear-only or force value trie)
+
+When the value trie is used with the optional tag (0x0001), the encoder writes BOTH the linear value store and the value trie. Old decoders use the linear store; new decoders use the value trie. When file size matters more than backward compatibility, the encoder uses the required tag (0x8001) and omits the linear store.
 
 When the header flag `shared_symbols` is set, the value trie shares the symbol table with the key trie. Otherwise, the value trie has its own symbol config (allowing different character sets or bit widths for keys vs. values).
+
+The value trie may also have its own suffix table, signaled by the `EXT_VALUE_SUFFIX` (0x0002) extension tag.
 
 Packing follows the `value_addr_mode` declared in the header flags.
 
@@ -736,6 +882,7 @@ This is version 1.0 -- a clean break. No backward compatibility with the origina
 | Integrity | SHA-256 of whole file | Selectable: CRC-32, SHA-256, or xxHash64 | **Changed** |
 | Versioning | None | Major/minor version in header | **New** |
 | Key/value separation | Keys and values interleaved in one trie | Two separate tries (key trie + value trie), optionally shared symbol table | **Changed** |
+| Extensibility | None | Extension directory with tagged sections; 32-byte header is frozen forever | **New** |
 | JSON support | Not applicable | Separate `txz-json` library using TXZ under the hood | **New** |
 | Implementation | C with C++ wrapper | C with C++ wrapper, 100% test coverage | **Kept** |
 | Streaming | Mentioned in notes | Deferred | -- |
@@ -762,7 +909,7 @@ These ideas from the original notes are acknowledged but deferred from this spec
 
 3. **Maximum nesting depth**: Should there be a spec-defined limit on nested dict depth for ROM/embedded safety? (e.g. 32 levels)
 
-4. **Value trie vs. value store**: When should string values be compressed into a value trie (expensive to build, better compression) vs. stored as a flat value store (simple, fast)? Should this be encoder heuristic or caller-specified?
+4. ~~**Value trie vs. value store**~~: **RESOLVED** (Section 3.2.1). The encoder decides adaptively. It can write a linear value store only (base format, maximum compatibility), a linear store + value trie extension (backward-compatible, larger), or a value trie only via a required extension (smallest, requires new decoder). The choice is encoder heuristic based on estimated compression savings, with an API option for the caller to force a specific strategy.
 
 5. **Update/append semantics**: The current spec is build-once, read-many. Mutation is decode + modify + re-encode (Section 7). Is this sufficient for all 1.0 use cases?
 
