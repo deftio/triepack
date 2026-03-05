@@ -49,22 +49,7 @@ function encode(data) {
         return a.keyBytes.length - b.keyBytes.length;
     });
 
-    // Dedup (keep last)
-    const deduped = [];
-    for (let i = 0; i < entries.length; i++) {
-        if (i + 1 < entries.length) {
-            const a = entries[i].keyBytes;
-            const b = entries[i + 1].keyBytes;
-            if (a.length === b.length) {
-                let same = true;
-                for (let j = 0; j < a.length; j++) {
-                    if (a[j] !== b[j]) { same = false; break; }
-                }
-                if (same) continue; // skip duplicate, keep later one
-            }
-        }
-        deduped.push(entries[i]);
-    }
+    const deduped = entries; // object keys are unique; no dedup needed
 
     // Determine if any entries have non-null values
     let hasValues = false;
@@ -225,8 +210,6 @@ function encode(data) {
 
 // Compute subtree size in bits (dry run) — mirrors trie_subtree_size()
 function trieSubtreeSize(ctx, start, end, prefixLen, valueIdx) {
-    if (start >= end) return 0;
-
     const { deduped, bps, hasValues } = ctx;
     let bits = 0;
 
@@ -304,9 +287,7 @@ function trieSubtreeSize(ctx, start, end, prefixLen, valueIdx) {
             childI++;
             cs = ce;
         }
-    } else if (!hasTerminal && childCount === 1) {
-        bits += trieSubtreeSize(ctx, childrenStart, end, common + 1, valueIdx);
-    } else if (!hasTerminal && childCount > 1) {
+    } else { // !hasTerminal, childCount > 1
         bits += bps; // BRANCH
         bits += varUintBits(childCount);
 
@@ -335,8 +316,6 @@ function trieSubtreeSize(ctx, start, end, prefixLen, valueIdx) {
 
 // Write the trie subtree — mirrors trie_write()
 function trieWrite(ctx, w, start, end, prefixLen, valueIdx) {
-    if (start >= end) return;
-
     const { deduped, bps, symbolMap, ctrlCodes, hasValues } = ctx;
 
     // Find common prefix beyond prefixLen
@@ -391,9 +370,6 @@ function trieWrite(ctx, w, start, end, prefixLen, valueIdx) {
     }
 
     if (childCount === 0) {
-        return;
-    } else if (childCount === 1 && !hasTerminal) {
-        trieWrite(ctx, w, childrenStart, end, common + 1, valueIdx);
         return;
     }
 

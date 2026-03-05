@@ -380,13 +380,11 @@ and reconstructs them on decode.
 
 ### Guides
 
-- [Getting Started](guide/getting-started.md) -- install, build, first program
-- [Building](guide/building.md) -- build options, cross-compilation, 32-bit
-- [API Reference](guide/api-reference.md) -- every public function with usage examples
-- [Bitstream Guide](guide/bitstream-guide.md) -- sub-byte integers, sign extension, and packed bit fields
-- [How It Works](guide/how-it-works.md) -- trie encoding, lookup, and value store explained
-- [Examples](guide/examples.md) -- six runnable example programs
-- [Testing](guide/testing.md) -- running tests, coverage, adding new tests
+- [Getting Started](guide/getting-started) -- install, build, tutorial walkthrough
+- [How It Works](guide/how-it-works) -- trie encoding, lookup, bitstream primer
+- [API Reference](guide/api-reference) -- every public function with usage examples
+- [Examples](guide/examples) -- six runnable example programs
+- [Building & Testing](guide/building) -- build options, cross-compilation, test suite
 
 ### Internals
 

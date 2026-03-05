@@ -186,3 +186,137 @@ def test_long_shared_prefix():
     buf = triepack.encode(data)
     result = triepack.decode(buf)
     assert result == data
+
+
+def test_decode_non_bytes():
+    with pytest.raises(TypeError):
+        triepack.decode("not bytes")
+
+
+def test_decode_bad_version():
+    buf = bytearray(triepack.encode({"a": 1}))
+    buf[4] = 2
+    from triepack.crc32 import crc32
+
+    crc_data = buf[:-4]
+    new_crc = crc32(bytes(crc_data))
+    buf[-4] = (new_crc >> 24) & 0xFF
+    buf[-3] = (new_crc >> 16) & 0xFF
+    buf[-2] = (new_crc >> 8) & 0xFF
+    buf[-1] = new_crc & 0xFF
+    with pytest.raises(ValueError, match="version"):
+        triepack.decode(bytes(buf))
+
+
+def test_prefix_key_keys_only():
+    """Keys-only mode with prefix key: triggers CTRL_END + CTRL_BRANCH."""
+    data = {"a": None, "ab": None, "ac": None}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert set(result.keys()) == {"a", "ab", "ac"}
+    for v in result.values():
+        assert v is None
+
+
+def test_prefix_key_with_values():
+    """Has-values mode with prefix key: triggers CTRL_END_VAL + CTRL_BRANCH."""
+    data = {"a": 1, "ab": 2, "ac": 3}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_terminal_with_children_nonlast():
+    """Terminal-with-children subtree as non-last child in branch."""
+    data = {"a": 1, "ab": 2, "b": 3}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_terminal_with_children_null_value():
+    """Terminal-with-children where terminal has null value."""
+    data = {"a": None, "ab": 2, "b": 3}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_null_value_in_mixed_dict():
+    """Explicit None alongside non-None values."""
+    data = {"alpha": None, "beta": 42}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_subtree_multi_entry_groups():
+    """Terminal-with-children subtree as non-last child, with 2+ children
+    and multi-entry child groups, covering subtree size inner loop."""
+    data = {"a": 1, "aba": 2, "abb": 3, "ac": 4, "b": 5}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_non_terminal_multi_entry_children():
+    """Non-terminal subtree as non-last child with multi-entry child group."""
+    data = {"aba": 1, "abb": 2, "ac": 3, "b": 4}
+    buf = triepack.encode(data)
+    result = triepack.decode(buf)
+    assert result == data
+
+
+def test_decoder_eof_during_dfs():
+    """Truncated trie data triggers EOF check in dfs_walk."""
+    from triepack.bitstream import BitWriter as BW
+    from triepack.crc32 import crc32
+    from triepack.encoder import TP_MAGIC, TP_VERSION_MAJOR, TP_VERSION_MINOR
+    from triepack.varint import write_var_uint
+
+    w = BW()
+    for b in TP_MAGIC:
+        w.write_u8(b)
+    w.write_u8(TP_VERSION_MAJOR)
+    w.write_u8(TP_VERSION_MINOR)
+    w.write_u16(0)  # flags: no values
+    w.write_u32(1)  # num_keys = 1
+    w.write_u32(0)  # trie_data_offset placeholder
+    w.write_u32(0)  # value_store_offset placeholder
+    w.write_u32(0)  # suffix
+    w.write_u32(0)  # total_data_bits
+    w.write_u32(0)  # reserved
+
+    data_start = w.position
+    bps = 4
+    w.write_bits(bps, 4)
+    total_symbols = 7  # 6 control + 1 regular
+    w.write_bits(total_symbols, 8)
+    for c in range(6):
+        w.write_bits(c, bps)
+    write_var_uint(w, ord("a"))
+
+    # Point trie_data_offset far past the actual data
+    trie_data_offset = 99999
+    value_store_offset = trie_data_offset
+
+    w.align_to_byte()
+    buf = bytearray(w.to_bytes())
+
+    def patch_u32(b, off, val):
+        b[off] = (val >> 24) & 0xFF
+        b[off + 1] = (val >> 16) & 0xFF
+        b[off + 2] = (val >> 8) & 0xFF
+        b[off + 3] = val & 0xFF
+
+    patch_u32(buf, 12, trie_data_offset)
+    patch_u32(buf, 16, value_store_offset)
+
+    crc_val = crc32(bytes(buf))
+    buf.append((crc_val >> 24) & 0xFF)
+    buf.append((crc_val >> 16) & 0xFF)
+    buf.append((crc_val >> 8) & 0xFF)
+    buf.append(crc_val & 0xFF)
+
+    result = triepack.decode(bytes(buf))
+    assert isinstance(result, dict)

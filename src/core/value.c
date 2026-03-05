@@ -13,10 +13,11 @@ tp_result tp_value_encode(tp_bitstream_writer *w, const tp_value *val)
     if (!w || !val)
         return TP_ERR_INVALID_PARAM;
 
+    /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     /* Write 4-bit type tag */
     tp_result rc = tp_bs_write_bits(w, (uint64_t)val->type, 4);
     if (rc != TP_OK)
-        return rc;
+        return rc; /* LCOV_EXCL_LINE */
 
     switch (val->type) {
     case TP_NULL:
@@ -45,11 +46,11 @@ tp_result tp_value_encode(tp_bitstream_writer *w, const tp_value *val)
     case TP_STRING: {
         rc = tp_bs_write_varint_u(w, val->data.string_val.str_len);
         if (rc != TP_OK)
-            return rc;
+            return rc; /* LCOV_EXCL_LINE */
         /* Align to byte boundary before writing raw string data */
         rc = tp_bs_writer_align_to_byte(w);
         if (rc != TP_OK)
-            return rc;
+            return rc; /* LCOV_EXCL_LINE */
         rc = tp_bs_write_bytes(w, (const uint8_t *)val->data.string_val.str,
                                val->data.string_val.str_len);
         break;
@@ -57,11 +58,11 @@ tp_result tp_value_encode(tp_bitstream_writer *w, const tp_value *val)
     case TP_BLOB: {
         rc = tp_bs_write_varint_u(w, val->data.blob_val.len);
         if (rc != TP_OK)
-            return rc;
+            return rc; /* LCOV_EXCL_LINE */
         /* Align to byte boundary before writing raw blob data */
         rc = tp_bs_writer_align_to_byte(w);
         if (rc != TP_OK)
-            return rc;
+            return rc; /* LCOV_EXCL_LINE */
         rc = tp_bs_write_bytes(w, val->data.blob_val.data, val->data.blob_val.len);
         break;
     }

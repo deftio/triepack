@@ -1,127 +1,11 @@
 ---
 layout: default
-title: Getting Started
----
-
-# Getting Started with TriePack
-
-<!-- Copyright (c) 2026 M. A. Chatterjee -->
-
-## What is TriePack?
-
-TriePack is a compressed trie-based dictionary format implemented as a C
-library. It encodes key-value data into a compact, ROM-friendly binary
-representation (`.trp` files) using prefix sharing and bit-level packing.
-The encoded output supports direct read access without full decompression.
-
-## Quick Install
-
-```bash
-git clone https://github.com/deftio/triepack.git
-cd triepack
-cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-To install system-wide:
-
-```bash
-cmake --install build --prefix /usr/local
-```
-
-## Basic Usage (C API)
-
-The typical workflow is: create an encoder, insert key-value pairs, build
-the compressed blob, then query it with the dictionary reader.
-
-```c
-#include "triepack/triepack.h"
-#include <stdio.h>
-#include <stdlib.h>
-
-int main(void) {
-    /* --- Encode --- */
-    tp_encoder *enc = NULL;
-    tp_encoder_create(&enc);
-
-    tp_value v;
-    v = tp_value_string("world");
-    tp_encoder_add(enc, "hello", &v);
-
-    v = tp_value_int(42);
-    tp_encoder_add(enc, "count", &v);
-
-    /* Keys-only entry (set membership) */
-    tp_encoder_add(enc, "flag", NULL);
-
-    uint8_t *buf = NULL;
-    size_t len = 0;
-    tp_encoder_build(enc, &buf, &len);
-
-    /* --- Decode / Query --- */
-    tp_dict *dict = NULL;
-    tp_dict_open(&dict, buf, len);
-
-    tp_value val;
-    if (tp_dict_lookup(dict, "hello", &val) == TP_OK) {
-        printf("hello => %.*s\n",
-               (int)val.data.string_val.str_len,
-               val.data.string_val.str);
-    }
-
-    if (tp_dict_lookup(dict, "count", &val) == TP_OK) {
-        printf("count => %lld\n", (long long)val.data.int_val);
-    }
-
-    bool found = false;
-    tp_dict_contains(dict, "flag", &found);
-    printf("flag exists: %s\n", found ? "yes" : "no");
-
-    tp_dict_close(&dict);
-    tp_encoder_destroy(&enc);
-    free(buf);
-    return 0;
-}
-```
-
-## Linking
-
-With CMake's `find_package`:
-
-```cmake
-find_package(triepack REQUIRED)
-target_link_libraries(myapp PRIVATE triepack::triepack)
-```
-
-Or link directly against the library targets:
-
-```cmake
-target_link_libraries(myapp PRIVATE triepack_core)
-```
-
-## Library Stack
-
-```
-triepack_json          (JSON encode/decode)
-    |
-triepack_core          (trie codec: encoder, dictionary, iterator)
-    |
-triepack_bitstream     (bit-level I/O, VarInt, UTF-8)
-```
-
-Each layer can be used independently.
-
-## Next Steps
-
-- [How It Works](how-it-works) -- trie encoding, lookup, and value store explained
-- [Building](building) -- build options, cross-compilation, and testing
-- [API Reference](api-reference) -- full function listing with usage examples
-- [Examples](examples) -- six runnable example programs
-
+title: Tutorial
 ---
 
 # Tutorial: JSON Round-Trip
+
+<!-- Copyright (c) 2026 M. A. Chatterjee -->
 
 This walkthrough encodes a JSON object into the `.trp` binary format,
 decodes it back, and verifies the result. Choose your language:
@@ -143,7 +27,9 @@ body:not(.tp-js-enabled) .tp-tab-panel { display: block; }
 body:not(.tp-js-enabled) .tp-tab-bar { display: none; }
 </style>
 
-### What We Will Build
+---
+
+## What We Will Build
 
 We will take this JSON:
 
@@ -164,22 +50,21 @@ and:
 
 ---
 
-### Step-by-Step
+## Step-by-Step
 
 <div class="tp-tabs">
 <div class="tp-tab-bar">
   <button class="tp-tab-btn active" data-lang="c">C</button>
   <button class="tp-tab-btn" data-lang="cpp">C++</button>
-  <button class="tp-tab-btn" data-lang="python">Python</button>
   <button class="tp-tab-btn" data-lang="js">JavaScript</button>
 </div>
 
 <!-- ───────────────── C ───────────────── -->
 <div class="tp-tab-panel active" data-lang="c" markdown="1">
 
-#### C (using `triepack_json`)
+### C (using `triepack_json`)
 
-**1. Include and set up**
+#### 1. Include and set up
 
 ```c
 #include "triepack/triepack_json.h"
@@ -195,7 +80,7 @@ int main(void)
     size_t json_len = strlen(json);
 ```
 
-**2. Encode JSON to `.trp`**
+#### 2. Encode JSON to `.trp`
 
 `tp_json_encode` parses the JSON string, builds a compressed trie, and
 writes the binary blob into a `malloc`-allocated buffer:
@@ -212,7 +97,7 @@ writes the binary blob into a `malloc`-allocated buffer:
     printf("Encoded %zu JSON bytes -> %zu .trp bytes\n", json_len, buf_len);
 ```
 
-**3. Decode `.trp` back to JSON**
+#### 3. Decode `.trp` back to JSON
 
 ```c
     char  *out_json = NULL;
@@ -227,7 +112,7 @@ writes the binary blob into a `malloc`-allocated buffer:
     printf("Decoded: %s\n", out_json);
 ```
 
-**4. DOM-style key lookup**
+#### 4. DOM-style key lookup
 
 Without decoding the entire blob, you can look up individual keys:
 
@@ -248,7 +133,7 @@ Without decoding the entire blob, you can look up individual keys:
     }
 ```
 
-**5. Clean up**
+#### 5. Clean up
 
 ```c
     free(out_json);
@@ -258,7 +143,7 @@ Without decoding the entire blob, you can look up individual keys:
 }
 ```
 
-**Build and run**
+#### Build and run
 
 ```bash
 cmake -B build -DBUILD_JSON=ON
@@ -279,12 +164,12 @@ gcc -o my_demo my_demo.c \
 <!-- ───────────────── C++ ───────────────── -->
 <div class="tp-tab-panel" data-lang="cpp" markdown="1">
 
-#### C++ (using `triepack::Json`)
+### C++ (using `triepack::Json`)
 
 The C++ wrapper provides RAII lifetime management. No manual `free()`
 calls needed.
 
-**1. Include and set up**
+#### 1. Include and set up
 
 ```cpp
 #include "triepack/json.hpp"
@@ -304,7 +189,7 @@ int main()
         "\"stable\":true,\"license\":\"BSD-2-Clause\"}";
 ```
 
-**2. Encode**
+#### 2. Encode
 
 ```cpp
     triepack::Json codec;
@@ -321,7 +206,7 @@ int main()
                 std::strlen(json), buf_len);
 ```
 
-**3. Decode**
+#### 3. Decode
 
 ```cpp
     const char *out_json = nullptr;
@@ -333,7 +218,7 @@ int main()
     std::printf("Decoded: %s\n", out_json);
 ```
 
-**4. Pretty-print (via C API)**
+#### 4. Pretty-print (via C API)
 
 ```cpp
     char  *pretty = nullptr;
@@ -345,13 +230,13 @@ int main()
     }
 ```
 
-**5. Done**
+#### 5. Done
 
 The `triepack::Json` destructor cleans up automatically when `codec`
 goes out of scope. The `out_json` string returned by `decode` is owned
 by the codec instance and freed with it.
 
-**Build**
+#### Build
 
 ```cmake
 add_executable(my_demo my_demo.cpp)
@@ -360,91 +245,22 @@ target_link_libraries(my_demo PRIVATE triepack_wrapper triepack_json)
 
 </div>
 
-<!-- ───────────────── Python ───────────────── -->
-<div class="tp-tab-panel" data-lang="python" markdown="1">
-
-#### Python
-
-The Python binding is a pure-Python implementation. No C extension or
-FFI required.
-
-**1. Install**
-
-```bash
-cd bindings/python
-pip install -e .
-```
-
-**2. Encode**
-
-```python
-from triepack import encode, decode
-
-data = {
-    "project": "triepack",
-    "version": 1,
-    "stable": True,
-    "license": "BSD-2-Clause"
-}
-
-buf = encode(data)
-print(f"Encoded -> {len(buf)} bytes")
-```
-
-`encode()` takes a dict and returns `bytes` containing the `.trp` binary.
-
-**3. Decode**
-
-```python
-result = decode(buf)
-print("Decoded:", result)
-# {'license': 'BSD-2-Clause', 'project': 'triepack', 'stable': True, 'version': 1}
-```
-
-`decode()` takes `bytes` or `bytearray` and returns a dict. Keys are
-sorted alphabetically (trie order).
-
-**4. Write to file and read back**
-
-```python
-# Save to disk
-with open("demo.trp", "wb") as f:
-    f.write(buf)
-
-# Read back
-with open("demo.trp", "rb") as f:
-    loaded = decode(f.read())
-print("From file:", loaded)
-```
-
-The `.trp` file is byte-for-byte identical to what the C and JavaScript
-implementations produce.
-
-**5. Verify round-trip**
-
-```python
-assert result == data
-print("Round-trip OK")
-```
-
-</div>
-
 <!-- ───────────────── JavaScript ───────────────── -->
 <div class="tp-tab-panel" data-lang="js" markdown="1">
 
-#### JavaScript (Node.js)
+### JavaScript (Node.js)
 
 The JavaScript binding is a pure-JS implementation that reads and writes
 the same `.trp` binary format. No native dependencies.
 
-**1. Install**
+#### 1. Install
 
 ```bash
 cd bindings/javascript
 npm install
 ```
 
-**2. Encode**
+#### 2. Encode
 
 ```js
 const { encode, decode } = require('./src/index');
@@ -463,7 +279,7 @@ console.log(`Encoded -> ${buf.length} bytes`);
 `encode()` takes a plain object and returns a `Uint8Array` containing
 the `.trp` binary.
 
-**3. Decode**
+#### 3. Decode
 
 ```js
 const result = decode(buf);
@@ -474,7 +290,7 @@ console.log("Decoded:", result);
 `decode()` takes a `Uint8Array` and returns a plain object. Keys are
 sorted alphabetically (trie order).
 
-**4. Write to file and read back**
+#### 4. Write to file and read back
 
 ```js
 const fs = require('fs');
@@ -491,7 +307,7 @@ The `.trp` file is byte-for-byte identical to what the C library
 produces. You can encode in JavaScript and decode in C (or Python), or
 vice versa.
 
-**5. Verify round-trip**
+#### 5. Verify round-trip
 
 ```js
 const assert = require('assert');
@@ -504,7 +320,7 @@ console.log("Round-trip OK");
 
 ---
 
-### What Happened Under the Hood
+## What Happened Under the Hood
 
 1. **Parse** -- the JSON string is parsed into key-value pairs
 2. **Sort** -- keys are sorted alphabetically
@@ -516,7 +332,9 @@ console.log("Round-trip OK");
 The resulting `.trp` blob is typically **40--60% smaller** than the
 original JSON for structured data with shared key prefixes.
 
-### Key Differences from JSON
+---
+
+## Key Differences from JSON
 
 | Feature            | JSON                   | TriePack (.trp)             |
 |--------------------|------------------------|-----------------------------|
@@ -527,3 +345,11 @@ original JSON for structured data with shared key prefixes.
 | Compression        | None                   | Shared-prefix trie          |
 | Integrity          | None                   | CRC-32 checksum             |
 | Human-readable     | Yes                    | No (use `trp decode`)       |
+
+---
+
+## Next Steps
+
+- [Examples](examples) -- more programs covering all value types, ROM lookup, prefix search
+- [API Reference](api-reference) -- complete function reference for all languages
+- [How It Works](how-it-works) -- deep dive into the trie compression algorithm

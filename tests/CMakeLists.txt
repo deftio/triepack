@@ -53,6 +53,7 @@ if(BUILD_JSON)
     triepack_add_c_test(test_json_dom          test_json_dom.c          triepack_json)
     triepack_add_c_test(test_json_edge_cases   test_json_edge_cases.c   triepack_json)
     triepack_add_c_test(test_json_decode       test_json_decode.c       triepack_json)
+    target_include_directories(test_json_decode PRIVATE ${CMAKE_SOURCE_DIR}/src/core)
 endif()
 
 # Cross-language fixture tests

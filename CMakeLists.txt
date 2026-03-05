@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(triepack VERSION 1.0.6 LANGUAGES C CXX)
+project(triepack VERSION 1.0.7 LANGUAGES C CXX)
 
 # ── Options ──────────────────────────────────────────────────────────────
 option(BUILD_TESTS    "Build test suite"           ON)

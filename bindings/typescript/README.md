@@ -1,10 +1,11 @@
 # triepack — TypeScript
 
-Native TypeScript implementation of the Triepack `.trp` binary format.
+Type-safe TypeScript wrapper around the JavaScript Triepack implementation.
+Provides full encode/decode of the `.trp` binary format with exported types.
 
 ## Status
 
-Not yet implemented.
+Implemented (wraps the JavaScript binding with TypeScript types).
 
 ## Build
 

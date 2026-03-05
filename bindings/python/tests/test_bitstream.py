@@ -118,3 +118,67 @@ def test_is_aligned():
     assert r.is_aligned()
     r.read_bit()
     assert not r.is_aligned()
+
+
+def test_write_bits_zero_n():
+    w = BitWriter()
+    with pytest.raises(ValueError):
+        w.write_bits(0, 0)
+
+
+def test_write_bits_over_64():
+    w = BitWriter()
+    with pytest.raises(ValueError):
+        w.write_bits(0, 65)
+
+
+def test_read_bits_zero_n():
+    r = BitReader(b"\x00")
+    with pytest.raises(ValueError):
+        r.read_bits(0)
+
+
+def test_read_bits_over_64():
+    r = BitReader(b"\x00")
+    with pytest.raises(ValueError):
+        r.read_bits(65)
+
+
+def test_reader_from_list():
+    r = BitReader([0xAB])
+    assert r.read_u8() == 0xAB
+
+
+def test_advance():
+    r = BitReader(b"\xFF\x42")
+    r.advance(8)
+    assert r.read_u8() == 0x42
+
+
+def test_read_bit_eof():
+    r = BitReader(b"\xFF")
+    for _ in range(8):
+        r.read_bit()
+    with pytest.raises(EOFError):
+        r.read_bit()
+
+
+def test_read_u64():
+    w = BitWriter()
+    w.write_u64(0xDEADBEEF, 0xCAFEBABE)
+    r = BitReader(w.to_bytes())
+    assert r.read_u64() == 0xDEADBEEFCAFEBABE
+
+
+def test_get_buffer():
+    w = BitWriter()
+    w.write_u8(0x42)
+    buf = w.get_buffer()
+    assert buf[0] == 0x42
+
+
+def test_ensure_large_growth():
+    """A single large write from a tiny buffer triggers the doubling loop."""
+    w = BitWriter(initial_cap=1)
+    w.write_bits(0xFFFFFFFFFFFFFFFF, 64)
+    assert len(w.to_bytes()) == 8

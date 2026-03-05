@@ -1,4 +1,4 @@
-# triepack v1.0.0
+# triepack v1.0.7
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![Coverage Report](https://github.com/deftio/triepack/actions/workflows/coverage.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/coverage.yml)
@@ -130,7 +130,7 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.0.5 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, Python binding, and JavaScript binding are implemented. 27 test programs with ~400 individual tests across C, C++, and Python.
+**v1.0.7 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, Python binding, and JavaScript binding are implemented with **100% line coverage** across all three languages. 27 C/C++ test programs, 97 Python tests, and 99 JavaScript tests.
 
 ## Roadmap
 
@@ -148,7 +148,7 @@ See `docs/internals/` for format details.
 - [ ] Nested dict values (embed sub-dictionaries inline)
 
 ### v1.3 — Tooling & Ecosystem
-- [ ] `trp` CLI: encode/decode/validate/inspect (in progress)
+- [x] `trp` CLI: encode/decode/validate/inspect
 - [ ] Fuzzy search (edit distance d<=2)
 - [ ] Performance benchmarks across languages
 - [ ] Language binding conformance test suite

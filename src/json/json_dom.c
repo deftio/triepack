@@ -18,15 +18,18 @@ tp_result tp_json_open(tp_json **out, const uint8_t *buf, size_t buf_len)
     if (!out || !buf)
         return TP_ERR_INVALID_PARAM;
 
+    /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_json *j = calloc(1, sizeof(*j));
     if (!j)
-        return TP_ERR_ALLOC;
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     /* Make our own copy of the buffer so the caller doesn't need to keep it alive */
     j->buf_owned = malloc(buf_len);
     if (!j->buf_owned) {
+        /* LCOV_EXCL_START */
         free(j);
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
     memcpy(j->buf_owned, buf, buf_len);
     j->buf_len = buf_len;

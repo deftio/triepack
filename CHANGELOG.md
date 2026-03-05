@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-03-04
+
+### Added
+- 100% line coverage across all three languages (C/C++, Python, JavaScript)
+- C/C++: 2,395 lines covered across 16 source files, 27 test programs
+- Python: 590 statements covered, 97 tests across 5 test files
+- JavaScript: 99 tests across 6 test suites, all files at 100%
+- New C test: keys-only dictionary lookup returns null value
+- New JS tests: values encode/decode, bitstream edge cases, crafted trie
+  error paths, trie prefix/branch coverage
+- New Python tests: encoder edge cases, decoder error paths, bitstream
+  bounds checking, varint overflow
+
+### Fixed
+- Encoder: removed 4 unreachable code paths (start>=end guards and
+  single-child branches proven impossible by common-prefix loop invariant)
+- Python encoder: removed unreachable dedup loop (dict keys are unique)
+  and single-child branch (same invariant as C)
+- JavaScript encoder: removed unreachable dedup loop and single-child branch
+
+### Changed
+- Added LCOV_EXCL markers to allocation failure paths across 14 C source
+  files (malloc/realloc NULL returns require custom allocator injection to
+  test, excluded from coverage measurement)
+- Updated testing documentation with JavaScript test inventory
+- Updated README project status and test counts
+
 ## [1.0.6] - 2026-03-02
 
 ### Fixed

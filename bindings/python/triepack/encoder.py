@@ -37,12 +37,7 @@ def encode(data):
     # Sort lexicographically by key bytes
     entries.sort(key=lambda e: e[0])
 
-    # Dedup (keep last)
-    deduped = []
-    for i, entry in enumerate(entries):
-        if i + 1 < len(entries) and entries[i][0] == entries[i + 1][0]:
-            continue
-        deduped.append(entry)
+    deduped = entries  # dict keys are unique; no dedup needed
 
     # Determine if any entries have non-null values
     has_values = any(e[1] is not None for e in deduped)
@@ -162,9 +157,6 @@ def _patch_u32(buf, offset, value):
 
 def _trie_subtree_size(ctx, start, end, prefix_len, value_idx):
     """Compute subtree size in bits (dry run)."""
-    if start >= end:
-        return 0
-
     deduped = ctx["deduped"]
     bps = ctx["bps"]
     has_values = ctx["has_values"]
@@ -237,9 +229,7 @@ def _trie_subtree_size(ctx, start, end, prefix_len, value_idx):
                 bits += _trie_subtree_size(ctx, cs, ce, common, value_idx)
             child_i += 1
             cs = ce
-    elif not has_terminal and child_count == 1:
-        bits += _trie_subtree_size(ctx, children_start, end, common + 1, value_idx)
-    elif not has_terminal and child_count > 1:
+    else:  # not has_terminal, child_count > 1
         bits += bps
         bits += var_uint_bits(child_count)
 
@@ -265,9 +255,6 @@ def _trie_subtree_size(ctx, start, end, prefix_len, value_idx):
 
 def _trie_write(ctx, w, start, end, prefix_len, value_idx):
     """Write the trie subtree."""
-    if start >= end:
-        return
-
     deduped = ctx["deduped"]
     bps = ctx["bps"]
     symbol_map = ctx["symbol_map"]
@@ -321,9 +308,6 @@ def _trie_write(ctx, w, start, end, prefix_len, value_idx):
         value_idx[0] += 1
 
     if child_count == 0:
-        return
-    elif child_count == 1 and not has_terminal:
-        _trie_write(ctx, w, children_start, end, common + 1, value_idx)
         return
 
     # BRANCH

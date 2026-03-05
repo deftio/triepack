@@ -357,6 +357,473 @@ void test_value_roundtrip_blob(void)
     tp_bs_writer_destroy(&w);
 }
 
+/* ── Header read at various truncation points ──────────────────────── */
+
+void test_header_read_truncated_0_bytes(void)
+{
+    uint8_t buf[1] = {0};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 0);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_1_byte(void)
+{
+    uint8_t buf[1] = {TP_MAGIC_0};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 1 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_2_bytes(void)
+{
+    uint8_t buf[2] = {TP_MAGIC_0, TP_MAGIC_1};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 2 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_3_bytes(void)
+{
+    uint8_t buf[3] = {TP_MAGIC_0, TP_MAGIC_1, TP_MAGIC_2};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 3 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_4_bytes(void)
+{
+    /* Valid magic, but no version bytes */
+    uint8_t buf[4] = {TP_MAGIC_0, TP_MAGIC_1, TP_MAGIC_2, TP_MAGIC_3};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 4 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_5_bytes(void)
+{
+    /* Valid magic + major version, but no minor version */
+    uint8_t buf[5] = {TP_MAGIC_0, TP_MAGIC_1, TP_MAGIC_2, TP_MAGIC_3, TP_FORMAT_VERSION_MAJOR};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 5 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_8_bytes(void)
+{
+    /* Valid magic + version + flags, but no num_keys */
+    uint8_t buf[8] = {TP_MAGIC_0,
+                      TP_MAGIC_1,
+                      TP_MAGIC_2,
+                      TP_MAGIC_3,
+                      TP_FORMAT_VERSION_MAJOR,
+                      TP_FORMAT_VERSION_MINOR,
+                      0,
+                      0};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 8 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_12_bytes(void)
+{
+    uint8_t buf[12];
+    memset(buf, 0, sizeof(buf));
+    buf[0] = TP_MAGIC_0;
+    buf[1] = TP_MAGIC_1;
+    buf[2] = TP_MAGIC_2;
+    buf[3] = TP_MAGIC_3;
+    buf[4] = TP_FORMAT_VERSION_MAJOR;
+    buf[5] = TP_FORMAT_VERSION_MINOR;
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 12 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_16_bytes(void)
+{
+    uint8_t buf[16];
+    memset(buf, 0, sizeof(buf));
+    buf[0] = TP_MAGIC_0;
+    buf[1] = TP_MAGIC_1;
+    buf[2] = TP_MAGIC_2;
+    buf[3] = TP_MAGIC_3;
+    buf[4] = TP_FORMAT_VERSION_MAJOR;
+    buf[5] = TP_FORMAT_VERSION_MINOR;
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 16 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_20_bytes(void)
+{
+    uint8_t buf[20];
+    memset(buf, 0, sizeof(buf));
+    buf[0] = TP_MAGIC_0;
+    buf[1] = TP_MAGIC_1;
+    buf[2] = TP_MAGIC_2;
+    buf[3] = TP_MAGIC_3;
+    buf[4] = TP_FORMAT_VERSION_MAJOR;
+    buf[5] = TP_FORMAT_VERSION_MINOR;
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 20 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_24_bytes(void)
+{
+    uint8_t buf[24];
+    memset(buf, 0, sizeof(buf));
+    buf[0] = TP_MAGIC_0;
+    buf[1] = TP_MAGIC_1;
+    buf[2] = TP_MAGIC_2;
+    buf[3] = TP_MAGIC_3;
+    buf[4] = TP_FORMAT_VERSION_MAJOR;
+    buf[5] = TP_FORMAT_VERSION_MINOR;
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 24 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+void test_header_read_truncated_28_bytes(void)
+{
+    uint8_t buf[28];
+    memset(buf, 0, sizeof(buf));
+    buf[0] = TP_MAGIC_0;
+    buf[1] = TP_MAGIC_1;
+    buf[2] = TP_MAGIC_2;
+    buf[3] = TP_MAGIC_3;
+    buf[4] = TP_FORMAT_VERSION_MAJOR;
+    buf[5] = TP_FORMAT_VERSION_MINOR;
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 28 * 8);
+    tp_header h;
+    TEST_ASSERT_NOT_EQUAL(TP_OK, tp_header_read(r, &h));
+    tp_bs_reader_destroy(&r);
+}
+
+/* ── Value decode with NULL base_buf ───────────────────────────────── */
+
+void test_value_decode_string_null_base(void)
+{
+    tp_value v = tp_value_string("hello");
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_value_encode(w, &v);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_writer_to_reader(w, &r);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, out.type);
+    /* With NULL base, str pointer should be NULL */
+    TEST_ASSERT_NULL(out.data.string_val.str);
+    TEST_ASSERT_EQUAL_INT(5, out.data.string_val.str_len);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_blob_null_base(void)
+{
+    uint8_t blob_data[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    tp_value v = tp_value_blob(blob_data, 4);
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_value_encode(w, &v);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_writer_to_reader(w, &r);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_BLOB, out.type);
+    /* With NULL base, data pointer should be NULL */
+    TEST_ASSERT_NULL(out.data.blob_val.data);
+    TEST_ASSERT_EQUAL_INT(4, out.data.blob_val.len);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+/* ── Value decode unknown type tag ─────────────────────────────────── */
+
+void test_value_decode_array_tag_error(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    /* Write an ARRAY type tag (value 8) */
+    tp_bs_write_bits(w, TP_ARRAY, 4);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_writer_to_reader(w, &r);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_dict_tag_error(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    /* Write a DICT type tag (value 9) */
+    tp_bs_write_bits(w, TP_DICT, 4);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_writer_to_reader(w, &r);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_INVALID_PARAM, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+/* ── Value decode truncated ────────────────────────────────────────── */
+
+void test_value_decode_truncated_type_tag(void)
+{
+    /* Only 2 bits available, need 4 for type tag */
+    uint8_t buf[1] = {0};
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, buf, 2);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+}
+
+void test_value_decode_truncated_bool(void)
+{
+    /* Write bool type tag (1) in 4 bits, but no bit for the value */
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_BOOL, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4); /* only 4 bits */
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_int(void)
+{
+    /* Write int type tag (2) in 4 bits, but no varint data */
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_INT, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_uint(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_UINT, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_float32(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_FLOAT32, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_float64(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_FLOAT64, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_string_len(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_STRING, 4);
+    /* No length varint follows */
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_truncated_blob_len(void)
+{
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_BLOB, 4);
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 4);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, NULL);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+/* ── Value decode string/blob align-to-byte failure ─────────────────── */
+
+void test_value_decode_string_align_eof(void)
+{
+    /* Write STRING tag (4 bits) + varint length 0 (8 bits) = 12 bits.
+       Reader has only 12 bits, so align_to_byte (to bit 16) will fail. */
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_STRING, 4);
+    tp_bs_write_bits(w, 5, 8); /* varint 5 (no continuation bit) */
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 12); /* only 12 bits: enough for tag+varint, not align */
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, wbuf);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
+void test_value_decode_blob_align_eof(void)
+{
+    /* Write BLOB tag (4 bits) + varint length 0 (8 bits) = 12 bits. */
+    tp_bitstream_writer *w = NULL;
+    tp_bs_writer_create(&w, 0, 0);
+    tp_bs_write_bits(w, TP_BLOB, 4);
+    tp_bs_write_bits(w, 5, 8); /* varint 5 */
+
+    const uint8_t *wbuf;
+    uint64_t wbl;
+    tp_bs_writer_get_buffer(w, &wbuf, &wbl);
+
+    tp_bitstream_reader *r = NULL;
+    tp_bs_reader_create(&r, wbuf, 12);
+
+    tp_value out;
+    tp_result rc = tp_value_decode(r, &out, wbuf);
+    TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
+
+    tp_bs_reader_destroy(&r);
+    tp_bs_writer_destroy(&w);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -365,8 +832,20 @@ int main(void)
     RUN_TEST(test_header_write_null_header);
     RUN_TEST(test_header_read_null_reader);
     RUN_TEST(test_header_read_null_header);
-    /* Header truncated */
+    /* Header truncated at every field boundary */
     RUN_TEST(test_header_read_truncated);
+    RUN_TEST(test_header_read_truncated_0_bytes);
+    RUN_TEST(test_header_read_truncated_1_byte);
+    RUN_TEST(test_header_read_truncated_2_bytes);
+    RUN_TEST(test_header_read_truncated_3_bytes);
+    RUN_TEST(test_header_read_truncated_4_bytes);
+    RUN_TEST(test_header_read_truncated_5_bytes);
+    RUN_TEST(test_header_read_truncated_8_bytes);
+    RUN_TEST(test_header_read_truncated_12_bytes);
+    RUN_TEST(test_header_read_truncated_16_bytes);
+    RUN_TEST(test_header_read_truncated_20_bytes);
+    RUN_TEST(test_header_read_truncated_24_bytes);
+    RUN_TEST(test_header_read_truncated_28_bytes);
     /* Header round-trip */
     RUN_TEST(test_header_roundtrip);
     /* Value NULL params */
@@ -389,5 +868,23 @@ int main(void)
     RUN_TEST(test_value_roundtrip_float64);
     RUN_TEST(test_value_roundtrip_string);
     RUN_TEST(test_value_roundtrip_blob);
+    /* Value decode with NULL base */
+    RUN_TEST(test_value_decode_string_null_base);
+    RUN_TEST(test_value_decode_blob_null_base);
+    /* Value decode unknown type tags */
+    RUN_TEST(test_value_decode_array_tag_error);
+    RUN_TEST(test_value_decode_dict_tag_error);
+    /* Value decode truncated data */
+    RUN_TEST(test_value_decode_truncated_type_tag);
+    RUN_TEST(test_value_decode_truncated_bool);
+    RUN_TEST(test_value_decode_truncated_int);
+    RUN_TEST(test_value_decode_truncated_uint);
+    RUN_TEST(test_value_decode_truncated_float32);
+    RUN_TEST(test_value_decode_truncated_float64);
+    RUN_TEST(test_value_decode_truncated_string_len);
+    RUN_TEST(test_value_decode_truncated_blob_len);
+    /* Value decode align errors */
+    RUN_TEST(test_value_decode_string_align_eof);
+    RUN_TEST(test_value_decode_blob_align_eof);
     return UNITY_END();
 }

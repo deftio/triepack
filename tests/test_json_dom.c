@@ -224,6 +224,48 @@ void test_open_corrupted_buffer(void)
     TEST_ASSERT_NOT_EQUAL(TP_OK, rc);
 }
 
+/* ── Root type stored as INT (covers the TP_INT branch in json_dom.c) ── */
+
+void test_root_type_via_int_metadata(void)
+{
+    /* Build a .trp manually with root type stored as TP_INT instead of TP_UINT */
+    tp_encoder *enc = NULL;
+    tp_encoder_create(&enc);
+
+    tp_value v = tp_value_int(42);
+    tp_encoder_add(enc, "x", &v);
+
+    /* Store root type as INT (not UINT) to cover the else-if branch
+       TP_JSON_META_ROOT = "\x01root", TP_JSON_ROOT_ARRAY = 2 */
+    tp_value root_meta = tp_value_int(2);
+    tp_encoder_add(enc, "\x01root", &root_meta);
+
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_encoder_build(enc, &buf, &buf_len);
+    tp_encoder_destroy(&enc);
+
+    tp_json *j = NULL;
+    tp_result rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value_type type;
+    rc = tp_json_root_type(j, &type);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_ARRAY, type);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── Close with already-null pointer ───────────────────────────────── */
+
+void test_close_already_null(void)
+{
+    tp_json *j = NULL;
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_json_close(&j));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -240,6 +282,8 @@ int main(void)
     RUN_TEST(test_iterate_basic);
     RUN_TEST(test_root_type_array);
     RUN_TEST(test_open_corrupted_buffer);
+    RUN_TEST(test_root_type_via_int_metadata);
+    RUN_TEST(test_close_already_null);
 
     free(g_buf);
     return UNITY_END();

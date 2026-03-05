@@ -117,3 +117,12 @@ def test_negative_uint_raises():
     w = BitWriter()
     with pytest.raises(ValueError):
         write_var_uint(w, -1)
+
+
+def test_varint_read_overflow():
+    w = BitWriter()
+    for _ in range(11):
+        w.write_u8(0x80)
+    r = BitReader(w.to_bytes())
+    with pytest.raises(OverflowError):
+        read_var_uint(r)

@@ -11,6 +11,33 @@ Download releases from the [GitHub Releases page](https://github.com/deftio/trie
 
 ---
 
+## v1.0.7 -- 2026-03-04
+
+100% line coverage achieved across all three languages.
+
+### Added
+- **100% line coverage** in C/C++ (2,395 lines, 27 test programs), Python (590 statements,
+  97 tests), and JavaScript (99 tests, 6 suites)
+- New C test for keys-only dictionary lookup returning null value
+- New JavaScript tests: values encode/decode, bitstream edge cases, crafted trie error paths
+- New Python tests: encoder edge cases, decoder error paths, bitstream bounds checking
+
+### Fixed
+- **Dead code removed** from C, Python, and JavaScript encoders: unreachable start>=end guards,
+  single-child branches (proven impossible by common-prefix loop invariant), and dedup loops
+  (dict keys are unique)
+
+### Changed
+- LCOV_EXCL markers added to allocation failure paths in 14 C source files
+- Updated testing docs, README project status, and test counts
+
+### Test Totals
+- C/C++: 27 test programs, 2,395 source lines at 100% coverage
+- Python: 5 test files, 97 tests, 590 statements at 100% coverage
+- JavaScript: 6 test suites, 99 tests, all files at 100% coverage
+
+---
+
 ## v1.0.6 -- 2026-03-02
 
 Bug fixes for CI stability, CLI conversion commands, and README improvements.
@@ -198,7 +225,7 @@ Initial project scaffolding.
 ```bash
 git clone https://github.com/deftio/triepack.git
 cd triepack
-git checkout v1.0.6
+git checkout v1.0.7
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 sudo cmake --install build

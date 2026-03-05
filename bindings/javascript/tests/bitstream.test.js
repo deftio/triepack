@@ -54,6 +54,39 @@ describe('BitWriter', () => {
         const r = new BitReader(w.toUint8Array());
         expect(r.readU32()).toBe(0xDEADBEEF);
     });
+
+    test('getBuffer returns internal buffer', () => {
+        const w = new BitWriter();
+        w.writeU8(0x42);
+        const buf = w.getBuffer();
+        expect(buf[0]).toBe(0x42);
+    });
+
+    test('writeU64BE and readU64BE roundtrip', () => {
+        const w = new BitWriter();
+        w.writeU64BE(0x00000001, 0x00000002);
+        const r = new BitReader(w.toUint8Array());
+        expect(r.readU64BE()).toBe(0x100000002);
+    });
+
+    test('writeBits rejects n=0', () => {
+        const w = new BitWriter();
+        expect(() => w.writeBits(0, 0)).toThrow();
+    });
+
+    test('writeBits rejects n>32', () => {
+        const w = new BitWriter();
+        expect(() => w.writeBits(0, 33)).toThrow();
+    });
+
+    test('ensure large growth triggers doubling loop', () => {
+        const w = new BitWriter(1);
+        w.writeU32(0xDEADBEEF);
+        const buf = w.toUint8Array();
+        expect(buf.length).toBe(4);
+        const r = new BitReader(buf);
+        expect(r.readU32()).toBe(0xDEADBEEF);
+    });
 });
 
 describe('BitReader', () => {
@@ -112,5 +145,28 @@ describe('BitReader', () => {
         expect(r.remaining).toBe(16);
         r.readBits(5);
         expect(r.remaining).toBe(11);
+    });
+
+    test('readBits rejects n=0', () => {
+        const r = new BitReader(new Uint8Array([0x00]));
+        expect(() => r.readBits(0)).toThrow();
+    });
+
+    test('readBits rejects n>32', () => {
+        const r = new BitReader(new Uint8Array([0x00]));
+        expect(() => r.readBits(33)).toThrow();
+    });
+
+    test('readBit throws at EOF', () => {
+        const r = new BitReader(new Uint8Array([0xFF]));
+        for (let i = 0; i < 8; i++) r.readBit();
+        expect(() => r.readBit()).toThrow('EOF');
+    });
+
+    test('isAligned', () => {
+        const r = new BitReader(new Uint8Array([0xFF]));
+        expect(r.isAligned()).toBe(true);
+        r.readBit();
+        expect(r.isAligned()).toBe(false);
     });
 });

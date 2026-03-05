@@ -90,3 +90,17 @@ describe('VarInt (zigzag)', () => {
         }
     });
 });
+
+describe('VarInt error handling', () => {
+    test('readVarUint overflow throws', () => {
+        const w = new BitWriter();
+        for (let i = 0; i < 11; i++) w.writeU8(0x80);
+        const r = new BitReader(w.toUint8Array());
+        expect(() => readVarUint(r)).toThrow('overflow');
+    });
+
+    test('writeVarUint rejects negative', () => {
+        const w = new BitWriter();
+        expect(() => writeVarUint(w, -1)).toThrow();
+    });
+});

@@ -1,5 +1,5 @@
 title: TriePack
-version: "1.0.6"
+version: "1.0.7"
 description: Compressed trie-based dictionary format for fast, compact key-value storage
 theme: minima
 baseurl: "/triepack"
@@ -11,12 +11,11 @@ github:
 header_pages:
   - index.md
   - guide/getting-started.md
-  - guide/building.md
   - guide/how-it-works.md
   - guide/api-reference.md
-  - guide/bitstream-guide.md
   - guide/examples.md
-  - guide/testing.md
+  - guide/building.md
+  - builds.md
   - releases.md
 
 exclude:

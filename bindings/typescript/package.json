@@ -1,7 +1,7 @@
 {
   "name": "triepack",
   "version": "0.1.0",
-  "description": "Native TypeScript implementation of the Triepack .trp binary format",
+  "description": "TypeScript wrapper for the Triepack .trp binary format (delegates to JS implementation)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -12,7 +12,8 @@
     "typescript": "^5.0.0",
     "jest": "^29.0.0",
     "ts-jest": "^29.0.0",
-    "@types/jest": "^29.0.0"
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0"
   },
   "jest": {
     "preset": "ts-jest",

@@ -530,9 +530,98 @@ tool and is tracked as a future enhancement.
 
 ---
 
+---
+
+## 12. Bitstream Primer: Arbitrary-Width Bit Fields
+
+Most programming works with bytes (8 bits), words (16/32/64 bits), and
+the standard integer types built on them. TriePack's bitstream library
+operates at a lower level: it reads and writes integers of **any width
+from 1 to 64 bits**, packed tightly with no wasted space between fields.
+
+### Why Sub-Byte Integers?
+
+Consider storing the letters a-z in a trie. With 26 letters + 6 control
+codes = 32 symbols, each symbol needs exactly 5 bits (because 2^5 = 32).
+Using a full byte per symbol wastes 3 bits -- a 37.5% overhead.
+
+For 10,000 keys averaging 8 characters each:
+
+```
+Full bytes:  10,000 x 8 x 8 = 640,000 bits
+5-bit packed: 10,000 x 8 x 5 = 400,000 bits  (37.5% smaller)
+```
+
+### Writing and Reading Packed Fields
+
+```c
+// Write two values into a single byte
+tp_bs_write_bits(w, 21, 5);   // 21 = 10101 (5 bits)
+tp_bs_write_bits(w,  3, 3);   //  3 = 011   (3 bits)
+// Result: byte = 10101011 = 0xAB
+```
+
+The library handles byte-boundary crossing automatically:
+
+```c
+tp_bs_write_bits(w, 21, 5);   // 10101 → bits 0-4 of byte 0
+tp_bs_write_bits(w, 97, 7);   // 1100001 → spans bytes 0-1
+```
+
+Reading is the reverse:
+
+```c
+uint64_t val;
+tp_bs_read_bits(r, 5, &val);   // reads 5 bits → val = 21
+tp_bs_read_bits(r, 7, &val);   // reads 7 bits → val = 97
+```
+
+### Signed Fields and Sign Extension
+
+For signed values, the MSB is the sign bit. Reading a 5-bit signed field
+containing -3 (bit pattern `11101`):
+
+```c
+int64_t val;
+tp_bs_read_bits_signed(r, 5, &val);   // reads 11101 → val = -3
+```
+
+The library sign-extends the narrow field to `int64_t` automatically.
+
+### VarInt Encoding
+
+For values with unpredictable range, TriePack uses LEB128 VarInt encoding
+(7 data bits + 1 continuation bit per byte). Small values take fewer bytes:
+
+| Value range | VarInt bytes |
+|------------|-------------|
+| 0 -- 127 | 1 |
+| 128 -- 16,383 | 2 |
+| 16,384 -- 2,097,151 | 3 |
+
+For signed integers, **zigzag encoding** maps small negatives to small
+positives before LEB128: -1 becomes 1, 1 becomes 2, -2 becomes 3, etc.
+
+### ROM-Safe Stateless Functions
+
+For embedded systems, stateless functions read from raw `const uint8_t *`
+pointers with no reader object:
+
+```c
+uint64_t val;
+tp_bs_read_bits_at(rom_data, bit_offset, 5, &val);
+```
+
+No object, no cursor, no heap. Safe for interrupt handlers.
+
+For the complete bitstream reference, see the
+[Bitstream Specification](../internals/bitstream-spec.md).
+
+---
+
 ## Next Steps
 
-- [Getting Started](getting-started.md) -- build, install, write your first program
-- [API Reference](api-reference.md) -- every function with usage examples
-- [Binary Format Specification](../internals/format-spec.md) -- byte-level format details
-- [Examples](examples.md) -- six runnable programs demonstrating different use cases
+- [Getting Started](getting-started) -- build, install, tutorial walkthrough
+- [API Reference](api-reference) -- every function with usage examples
+- [Binary Format Specification](../internals/format-spec) -- byte-level format details
+- [Examples](examples) -- six runnable programs demonstrating different use cases

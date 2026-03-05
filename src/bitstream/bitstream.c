@@ -144,9 +144,10 @@ tp_result tp_bs_reader_create(tp_bitstream_reader **out, const uint8_t *buf, uin
     if (!out)
         return TP_ERR_INVALID_PARAM;
 
+    /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_bitstream_reader *r = calloc(1, sizeof(*r));
     if (!r)
-        return TP_ERR_ALLOC;
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     r->buf = buf;
     r->bit_len = bit_len;
@@ -165,15 +166,17 @@ tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out, const uint8_t *buf
     size_t byte_len = (size_t)((bit_len + 7) / 8);
     uint8_t *copy = malloc(byte_len);
     if (!copy && byte_len > 0)
-        return TP_ERR_ALLOC;
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     if (buf && byte_len > 0)
         memcpy(copy, buf, byte_len);
 
     tp_bitstream_reader *r = calloc(1, sizeof(*r));
     if (!r) {
+        /* LCOV_EXCL_START */
         free(copy);
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
 
     r->buf = copy;
@@ -215,15 +218,17 @@ tp_result tp_bs_writer_create(tp_bitstream_writer **out, size_t initial_cap, siz
 
     tp_bitstream_writer *w = calloc(1, sizeof(*w));
     if (!w)
-        return TP_ERR_ALLOC;
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     w->cap = initial_cap > 0 ? initial_cap : DEFAULT_WRITER_CAP;
     w->growth = growth;
     w->pos = 0;
     w->buf = calloc(1, w->cap);
     if (!w->buf) {
+        /* LCOV_EXCL_START */
         free(w);
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
 
     *out = w;
@@ -331,9 +336,11 @@ tp_result tp_bs_writer_detach_buffer(tp_bitstream_writer *w, uint8_t **buf, size
     /* Reset writer to empty state */
     w->buf = calloc(1, w->cap);
     if (!w->buf) {
+        /* LCOV_EXCL_START */
         w->cap = 0;
         w->pos = 0;
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
     w->pos = 0;
     return TP_OK;

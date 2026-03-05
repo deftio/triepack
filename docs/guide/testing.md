@@ -7,8 +7,9 @@ title: Testing
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->
 
-TriePack has comprehensive test suites across C, C++, and Python, with
-cross-language fixture validation ensuring binary compatibility.
+TriePack has comprehensive test suites across C, C++, Python, and JavaScript,
+with cross-language fixture validation ensuring binary compatibility. All three
+language implementations maintain **100% line coverage**.
 
 ## Running C/C++ Tests
 
@@ -34,19 +35,28 @@ pip install -e ".[test]"
 pytest -v
 ```
 
+## Running JavaScript Tests
+
+```bash
+cd bindings/javascript
+npm ci
+npm test
+```
+
 ## Test Summary
 
-| Suite | Test Programs / Files | Total Tests |
-|-------|----------------------|-------------|
-| C Bitstream | 6 | ~100 |
-| C Core | 6 | ~80 |
-| C JSON | 4 | ~100 |
-| C Cross-Language | 1 | 14 |
-| C++ Wrappers | 3 | ~30 |
-| Examples (smoke) | 7 | 7 |
-| **C/C++ Total** | **27** | **~330** |
-| Python | 5 | 70 |
-| **Grand Total** | **32** | **~400** |
+| Suite | Test Programs / Files | Total Tests | Line Coverage |
+|-------|----------------------|-------------|---------------|
+| C Bitstream | 6 | ~100 | 100% |
+| C Core | 6 | ~80 | 100% |
+| C JSON | 4 | ~100 | 100% |
+| C Cross-Language | 1 | 14 | 100% |
+| C++ Wrappers | 3 | ~30 | 100% |
+| Examples (smoke) | 7 | 7 | — |
+| **C/C++ Total** | **27** | **~330** | **100%** |
+| Python | 5 | 97 | 100% |
+| JavaScript | 6 | 99 | 100% |
+| **Grand Total** | **38** | **~526** | **100%** |
 
 ## C/C++ Test Organization
 
@@ -120,11 +130,27 @@ The Python binding is a pure-Python native implementation (no FFI).
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `test_crc32.py` | 5 | CRC-32 known-answer tests including `"123456789"` -> `0xCBF43926` |
-| `test_bitstream.py` | 12 | `BitWriter`/`BitReader` bit-level and byte-level operations |
-| `test_varint.py` | 13 | VarInt unsigned/signed round-trips, zigzag mapping, encoding sizes |
-| `test_triepack.py` | 23 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling |
+| `test_bitstream.py` | 19 | `BitWriter`/`BitReader` bit-level and byte-level operations, edge cases |
+| `test_varint.py` | 16 | VarInt unsigned/signed round-trips, zigzag mapping, encoding sizes, overflow |
+| `test_triepack.py` | 36 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling, edge cases |
+| `test_values.py` | 7 | Value encode/decode for all types: null, bool, int, uint, float32, float64, string, blob |
 | `test_fixtures.py` | 14 | 7 decode tests + 7 **byte-for-byte** encode match against C-generated `.trp` fixture files |
-| **Total** | **70** | |
+| **Total** | **97** | |
+
+## JavaScript Test Organization
+
+JavaScript tests live in `bindings/javascript/tests/` and use [Jest](https://jestjs.io/).
+The JavaScript binding is a pure-JS native implementation (no FFI).
+
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `triepack.test.js` | 30 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, crafted trie error paths |
+| `bitstream.test.js` | 21 | `BitWriter`/`BitReader` bit-level and byte-level operations, u64, growth, EOF |
+| `varint.test.js` | 9 | VarInt unsigned/signed round-trips, overflow, negative rejection |
+| `values.test.js` | 7 | Value encode/decode: null, undefined, bool, float32, unknown tag |
+| `crc32.test.js` | 8 | CRC-32 known-answer tests, empty input, incremental |
+| `fixtures.test.js` | 24 | 7 decode + 7 encode match + 7 cross-read + 3 error tests |
+| **Total** | **99** | |
 
 ### Cross-Language Fixture Tests
 
@@ -192,5 +218,16 @@ brew install lcov
 
 ## Coverage Target
 
-The project targets **100% line coverage** for the core library. Coverage
-gaps in example programs and platform-specific fallbacks are acceptable.
+The project maintains **100% line coverage** across all three language
+implementations:
+
+| Language | Lines/Statements | Coverage |
+|----------|-----------------|----------|
+| C/C++ | 2,395 lines | 100% |
+| Python | 590 statements | 100% |
+| JavaScript | all files | 100% |
+
+Allocation failure paths (malloc/realloc returning NULL) are excluded from
+coverage measurement via `LCOV_EXCL` markers since they require custom
+allocator injection to test. Coverage gaps in example programs and
+platform-specific fallbacks are acceptable.

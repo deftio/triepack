@@ -619,6 +619,204 @@ void test_truncated_string(void)
     TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
 }
 
+/* ── Backslash at end of string (covers json_encode.c line 119) ───── */
+
+void test_backslash_at_end_of_input(void)
+{
+    const char *json = "{\"a\":\"\\";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Truncated \u escape (covers json_encode.c line 145) ──────────── */
+
+void test_truncated_unicode_escape(void)
+{
+    const char *json = "{\"a\":\"\\u00\"}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Lowercase hex in \u escape (covers json_encode.c line 153) ───── */
+
+void test_unicode_lowercase_hex(void)
+{
+    /* \u00ab = U+00AB (LEFT-POINTING DOUBLE ANGLE QUOTATION MARK) */
+    const char *json = "{\"x\":\"\\u00ab\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+    /* U+00AB is 2-byte UTF-8 */
+    TEST_ASSERT_EQUAL_INT(2, val.data.string_val.str_len);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── Bad hex digit in \u escape (covers json_encode.c line 157) ───── */
+
+void test_unicode_bad_hex_digit(void)
+{
+    const char *json = "{\"a\":\"\\u00gz\"}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Surrogate pair lowercase hex (covers json_encode.c line 171) ─── */
+
+void test_surrogate_lowercase_hex(void)
+{
+    /* Same emoji but with lowercase hex in both surrogates */
+    const char *json = "{\"x\":\"\\ud83d\\ude00\"}";
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_json *j = NULL;
+    rc = tp_json_open(&j, buf, buf_len);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+
+    tp_value val;
+    rc = tp_json_lookup_path(j, "x", &val);
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    TEST_ASSERT_EQUAL_INT(TP_STRING, val.type);
+    TEST_ASSERT_EQUAL_INT(4, val.data.string_val.str_len);
+
+    tp_json_close(&j);
+    free(buf);
+}
+
+/* ── Bad hex in low surrogate (covers json_encode.c line 175) ──────── */
+
+void test_surrogate_bad_low_hex(void)
+{
+    const char *json = "{\"a\":\"\\uD800\\uDg00\"}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Negative sign with no digits (covers json_encode.c line 236) ─── */
+
+void test_number_negative_no_digit(void)
+{
+    const char *json = "{\"a\":-}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Decimal point with no fractional digit (json_encode.c line 245) ─ */
+
+void test_number_decimal_no_digit(void)
+{
+    const char *json = "{\"a\":1.}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Exponent sign with no digit (covers json_encode.c line 257) ──── */
+
+void test_number_exponent_sign_no_digit(void)
+{
+    const char *json = "{\"a\":1e+}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Exponent with no digit (covers json_encode.c line 257) ─────── */
+
+void test_number_exponent_no_digit(void)
+{
+    const char *json = "{\"a\":1e}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Very long number (covers json_encode.c line 266) ──────────────── */
+
+void test_number_very_long(void)
+{
+    /* Build a number with 70+ digits to trigger the clamping path */
+    char json[256];
+    strcpy(json, "{\"x\":");
+    size_t pos = 5;
+    for (int i = 0; i < 70; i++)
+        json[pos++] = '1';
+    json[pos++] = '}';
+    json[pos] = '\0';
+
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    tp_result rc = tp_json_encode(json, pos, &buf, &buf_len);
+    /* Should succeed (the number is truncated but still parseable) */
+    TEST_ASSERT_EQUAL_INT(TP_OK, rc);
+    free(buf);
+}
+
+/* ── Unknown value character (covers json_encode.c line 433) ───────── */
+
+void test_unknown_value_character(void)
+{
+    const char *json = "{\"a\":@}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Unicode \u with fewer than 4 hex digits remaining (json_encode.c:145) */
+
+void test_unicode_escape_too_short(void)
+{
+    /* Pass truncated length so \u has fewer than 4 chars remaining.
+       String: {"a":"\u00"} (12 chars). Pass len=10 so after \u,
+       pos(8) + 4 = 12 > 10, triggering json_encode.c line 145. */
+    const char *json = "{\"a\":\"\\u00\"}";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, 10, &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
+/* ── Missing value in object (json_encode.c:385) ──────────────────── */
+
+void test_missing_value_in_object(void)
+{
+    /* Input truncated right after colon — parse_value sees
+       p->pos >= p->len (json_encode.c line 385) */
+    const char *json = "{\"a\":";
+    uint8_t *buf = NULL;
+    size_t len = 0;
+    tp_result rc = tp_json_encode(json, strlen(json), &buf, &len);
+    TEST_ASSERT_EQUAL_INT(TP_ERR_JSON_SYNTAX, rc);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -663,5 +861,20 @@ int main(void)
     RUN_TEST(test_trailing_garbage);
     RUN_TEST(test_deep_nested_arrays);
     RUN_TEST(test_truncated_string);
+    /* Encode edge-case coverage */
+    RUN_TEST(test_backslash_at_end_of_input);
+    RUN_TEST(test_truncated_unicode_escape);
+    RUN_TEST(test_unicode_lowercase_hex);
+    RUN_TEST(test_unicode_bad_hex_digit);
+    RUN_TEST(test_surrogate_lowercase_hex);
+    RUN_TEST(test_surrogate_bad_low_hex);
+    RUN_TEST(test_number_negative_no_digit);
+    RUN_TEST(test_number_decimal_no_digit);
+    RUN_TEST(test_number_exponent_sign_no_digit);
+    RUN_TEST(test_number_exponent_no_digit);
+    RUN_TEST(test_number_very_long);
+    RUN_TEST(test_unknown_value_character);
+    RUN_TEST(test_unicode_escape_too_short);
+    RUN_TEST(test_missing_value_in_object);
     return UNITY_END();
 }

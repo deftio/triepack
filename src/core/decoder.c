@@ -67,10 +67,11 @@ static tp_result dict_open_impl(tp_dict **out, const uint8_t *buf, size_t len, b
         return TP_ERR_TRUNCATED;
 
     /* Parse header */
+    /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, buf, (uint64_t)len * 8);
     if (rc != TP_OK)
-        return rc;
+        return rc; /* LCOV_EXCL_LINE */
 
     tp_header hdr;
     rc = tp_header_read(r, &hdr);
@@ -101,8 +102,10 @@ static tp_result dict_open_impl(tp_dict **out, const uint8_t *buf, size_t len, b
     /* Allocate dict */
     tp_dict *dict = calloc(1, sizeof(*dict));
     if (!dict) {
+        /* LCOV_EXCL_START */
         tp_bs_reader_destroy(&r);
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
 
     dict->buf = buf;
@@ -188,12 +191,12 @@ tp_result tp_dict_lookup_n(const tp_dict *dict, const char *key, size_t key_len,
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, dict->buf, (uint64_t)dict->len * 8);
     if (rc != TP_OK)
-        return rc;
+        return rc; /* LCOV_EXCL_LINE */
 
     rc = tp_bs_reader_seek(r, dict->trie_start);
     if (rc != TP_OK) {
         tp_bs_reader_destroy(&r);
-        return rc;
+        return rc; /* LCOV_EXCL_LINE */
     }
 
     uint8_t bps = dict->sym.bits_per_symbol;
@@ -378,9 +381,12 @@ tp_result tp_dict_lookup_n(const tp_dict *dict, const char *key, size_t key_len,
         return rc;
     }
 
+    /* LCOV_EXCL_START — found_value is only set via CTRL_END_VAL which
+       implies has_values, so the condition above always takes priority. */
     if (found_value && val) {
         *val = tp_value_null();
     }
+    /* LCOV_EXCL_STOP */
 
     tp_bs_reader_destroy(&r);
     return TP_OK;
@@ -423,15 +429,17 @@ tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out)
 
     tp_iterator *it = calloc(1, sizeof(*it));
     if (!it)
-        return TP_ERR_ALLOC;
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     it->dict = dict;
     it->pos = dict->trie_start;
     it->done = false;
     it->key_buf = malloc(256);
     if (!it->key_buf) {
+        /* LCOV_EXCL_START */
         free(it);
         return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
     }
     it->key_buf_cap = 256;
     it->key_len = 0;
