@@ -104,12 +104,12 @@ All bindings are native implementations that read/write the `.trp` format direct
 |----------|--------|-----------|
 | Python | Implemented | `bindings/python/` |
 | JavaScript | Implemented | `bindings/javascript/` |
-| TypeScript | Not yet implemented | `bindings/typescript/` |
-| Go | Not yet implemented | `bindings/go/` |
-| Swift | Not yet implemented | `bindings/swift/` |
-| Rust | Not yet implemented | `bindings/rust/` |
-| Kotlin | Not yet implemented | `bindings/kotlin/` |
-| Java | Not yet implemented | `bindings/java/` |
+| TypeScript | Implemented (wraps JS) | `bindings/typescript/` |
+| Go | Implemented | `bindings/go/` |
+| Swift | Implemented | `bindings/swift/` |
+| Rust | Implemented | `bindings/rust/` |
+| Kotlin | Implemented | `bindings/kotlin/` |
+| Java | Implemented | `bindings/java/` |
 
 ## File Format
 
@@ -132,17 +132,17 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.0.7 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, Python binding, and JavaScript binding are implemented with **100% line coverage** across all three languages. 27 C/C++ test programs, 97 Python tests, and 99 JavaScript tests.
+**v1.0.7 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. 27 C/C++ test programs, 97 Python tests, 99 JavaScript tests, 75 Rust tests, 27 Swift tests, plus Go, Kotlin, and Java test suites.
 
 ## Roadmap
 
 ### v1.1 — Client Libraries
-- [ ] TypeScript binding (native `.trp` reader/writer)
-- [ ] Go binding
-- [ ] Swift binding (with SPM package)
-- [ ] Rust binding (with crate on crates.io)
-- [ ] Kotlin binding
-- [ ] Java binding
+- [x] TypeScript binding (wraps JS implementation)
+- [x] Go binding
+- [x] Swift binding (with SPM package)
+- [x] Rust binding (with crate on crates.io)
+- [x] Kotlin binding
+- [x] Java binding
 - [ ] npm package for JavaScript/TypeScript
 - [ ] PyPI package for Python
 

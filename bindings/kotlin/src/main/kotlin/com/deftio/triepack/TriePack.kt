@@ -2,6 +2,7 @@
  * TriePack.kt
  *
  * Native Kotlin implementation of the TriePack (.trp) binary format.
+ * Public API: re-exports encode/decode and TpValue types.
  *
  * Copyright (c) 2026 M. A. Chatterjee
  * SPDX-License-Identifier: BSD-2-Clause
@@ -9,22 +10,8 @@
 
 package com.deftio.triepack
 
-/**
- * Encodes a map of key-value pairs into the .trp binary format.
- *
- * @param data The map to encode
- * @return The encoded .trp binary data
- */
-fun encode(data: Map<String, Any?>): ByteArray {
-    TODO("Not yet implemented")
-}
+const val VERSION = "0.1.0"
 
-/**
- * Decodes a .trp binary blob into a map of key-value pairs.
- *
- * @param data The .trp binary data to decode
- * @return The decoded key-value map
- */
-fun decode(data: ByteArray): Map<String, Any?> {
-    TODO("Not yet implemented")
-}
+// encode() and decode() are defined in Encoder.kt and Decoder.kt respectively.
+// TpValue is defined in Values.kt.
+// All are in the same package and thus accessible via this module.

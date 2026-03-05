@@ -3,16 +3,16 @@
 All bindings are **native implementations** that read and write the `.trp` binary format directly.
 They do not use FFI or call into the C library.
 
-| Language   | Directory                  | Status              |
-|------------|----------------------------|---------------------|
-| Python     | [python/](./python/)       | Implemented         |
-| TypeScript | [typescript/](./typescript/)| Implemented (wraps JS) |
-| JavaScript | [javascript/](./javascript/)| Implemented         |
-| Go         | [go/](./go/)               | Not yet implemented |
-| Swift      | [swift/](./swift/)         | Not yet implemented |
-| Rust       | [rust/](./rust/)           | Not yet implemented |
-| Kotlin     | [kotlin/](./kotlin/)       | Not yet implemented |
-| Java       | [java/](./java/)           | Not yet implemented |
+| Language   | Directory                  | Status              | Tests |
+|------------|----------------------------|---------------------|-------|
+| Python     | [python/](./python/)       | Implemented         | 97    |
+| JavaScript | [javascript/](./javascript/)| Implemented         | 99    |
+| TypeScript | [typescript/](./typescript/)| Implemented (wraps JS) | —  |
+| Go         | [go/](./go/)               | Implemented         | ~38   |
+| Rust       | [rust/](./rust/)           | Implemented         | 75    |
+| Swift      | [swift/](./swift/)         | Implemented         | 27    |
+| Kotlin     | [kotlin/](./kotlin/)       | Implemented         | ~41   |
+| Java       | [java/](./java/)           | Implemented         | ~42   |
 
 ## License
 

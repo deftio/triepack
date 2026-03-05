@@ -4,5 +4,5 @@
 name = "triepack"
 version = "0.1.0"
 edition = "2021"
-description = "Native Rust implementation of the Triepack .trp binary format"
+description = "Native Rust implementation of the TriePack .trp binary format"
 license = "BSD-2-Clause"

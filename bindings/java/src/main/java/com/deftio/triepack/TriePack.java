@@ -20,11 +20,11 @@ public class TriePack {
     /**
      * Encodes a map of key-value pairs into the .trp binary format.
      *
-     * @param data The map to encode
+     * @param data The map to encode (String keys, TpValue values)
      * @return The encoded .trp binary data
      */
-    public static byte[] encode(Map<String, Object> data) {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public static byte[] encode(Map<String, TpValue> data) {
+        return Encoder.encode(data);
     }
 
     /**
@@ -33,7 +33,7 @@ public class TriePack {
      * @param data The .trp binary data to decode
      * @return The decoded key-value map
      */
-    public static Map<String, Object> decode(byte[] data) {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public static Map<String, TpValue> decode(byte[] data) {
+        return Decoder.decode(data);
     }
 }

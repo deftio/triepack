@@ -5,6 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "Triepack",
+    products: [
+        .library(name: "Triepack", targets: ["Triepack"]),
+    ],
     targets: [
         .target(
             name: "Triepack",
@@ -13,7 +16,10 @@ let package = Package(
         .testTarget(
             name: "TriepackTests",
             dependencies: ["Triepack"],
-            path: "Tests/TriepackTests"
+            path: "Tests/TriepackTests",
+            resources: [
+                .copy("fixtures"),
+            ]
         ),
     ]
 )
