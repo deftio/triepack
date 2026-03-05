@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-04
+
+### Added
+- **Go binding** -- native Go implementation with ~38 tests (roundtrip + fixture)
+- **Rust binding** -- native Rust implementation with 75 tests (44 unit + 31 integration)
+- **Swift binding** -- native Swift implementation with 27 tests via SPM
+- **Kotlin binding** -- native Kotlin/JVM implementation with ~41 tests via Gradle
+- **Java binding** -- native Java implementation with ~42 tests via Gradle
+- All five bindings validate against 7 C-generated fixture files for byte-level
+  binary compatibility (both decode and byte-identical encode)
+- Usage examples for all five new languages in docs/guide/examples.md
+
+### Changed
+- README: all 8 bindings marked "Implemented", project status updated, v1.1
+  roadmap items checked off
+- bindings/README.md: updated status and test counts for all bindings
+- docs/guide/testing.md: added Go, Rust, Swift, Kotlin, Java test organization
+  sections; grand total now ~749 tests across 51 test files
+- docs/guide/examples.md: added contents table entries and usage examples for
+  all five new languages
+
 ## [1.0.7] - 2026-03-04
 
 ### Added

@@ -11,6 +11,37 @@ Download releases from the [GitHub Releases page](https://github.com/deftio/trie
 
 ---
 
+## v1.1.0 -- 2026-03-04
+
+Five new native language bindings with full cross-language binary compatibility.
+
+### Added
+- **Go binding** -- pure-Go `.trp` encoder/decoder (~38 tests, no external dependencies)
+- **Rust binding** -- pure-Rust `.trp` encoder/decoder (75 tests, no external dependencies)
+- **Swift binding** -- pure-Swift `.trp` encoder/decoder via SPM (27 tests)
+- **Kotlin binding** -- pure-Kotlin/JVM `.trp` encoder/decoder (~41 tests, Gradle/JUnit 5)
+- **Java binding** -- pure-Java `.trp` encoder/decoder (~42 tests, Gradle/JUnit 5)
+- All bindings produce **byte-identical** `.trp` output and validate against the 7
+  C-generated fixture files
+- Usage examples and test documentation for all five new languages
+
+### Changed
+- README and docs updated with new binding status, test counts, and examples
+- v1.1 roadmap items (Go, Rust, Swift, Kotlin, Java) marked complete
+
+### Test Totals
+- C/C++: 27 test programs, ~330 tests, 100% line coverage
+- Python: 97 tests, 100% line coverage
+- JavaScript: 99 tests, 100% line coverage
+- Rust: 75 tests
+- Swift: 27 tests
+- Go: ~38 tests
+- Kotlin: ~41 tests
+- Java: ~42 tests
+- **Grand total: ~749 tests across 8 languages**
+
+---
+
 ## v1.0.7 -- 2026-03-04
 
 100% line coverage achieved across all three languages.
@@ -225,7 +256,7 @@ Initial project scaffolding.
 ```bash
 git clone https://github.com/deftio/triepack.git
 cd triepack
-git checkout v1.0.7
+git checkout v1.1.0
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 sudo cmake --install build
