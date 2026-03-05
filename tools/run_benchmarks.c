@@ -39,9 +39,7 @@ static uint8_t *read_file(const char *path, size_t *out_len)
 
 static double now_ms(void)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+    return (double)clock() / ((double)CLOCKS_PER_SEC / 1000.0);
 }
 
 /* ── Word list benchmark ─────────────────────────────────────────────── */
