@@ -11,6 +11,8 @@ They do not use FFI or call into the C library.
 | Go         | [go/](./go/)               | Not yet implemented |
 | Swift      | [swift/](./swift/)         | Not yet implemented |
 | Rust       | [rust/](./rust/)           | Not yet implemented |
+| Kotlin     | [kotlin/](./kotlin/)       | Not yet implemented |
+| Java       | [java/](./java/)           | Not yet implemented |
 
 ## License
 

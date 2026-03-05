@@ -108,6 +108,8 @@ All bindings are native implementations that read/write the `.trp` format direct
 | Go | Not yet implemented | `bindings/go/` |
 | Swift | Not yet implemented | `bindings/swift/` |
 | Rust | Not yet implemented | `bindings/rust/` |
+| Kotlin | Not yet implemented | `bindings/kotlin/` |
+| Java | Not yet implemented | `bindings/java/` |
 
 ## File Format
 
@@ -139,6 +141,8 @@ See `docs/internals/` for format details.
 - [ ] Go binding
 - [ ] Swift binding (with SPM package)
 - [ ] Rust binding (with crate on crates.io)
+- [ ] Kotlin binding
+- [ ] Java binding
 - [ ] npm package for JavaScript/TypeScript
 - [ ] PyPI package for Python
 
