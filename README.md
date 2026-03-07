@@ -10,15 +10,32 @@ TriePack encodes dictionaries into a compact binary format (`.trp`) optimized fo
 
 ## Features
 
-- **Compact binary format** — compressed tries with suffix sharing
-- **Fast lookups** — O(key-length) point queries
+- **Compact binary format** — compressed tries with prefix sharing and bit-level packing
+- **Fast lookups** — O(key-length) point queries via skip pointers
 - **Prefix search** — iterate all keys matching a prefix
 - **Fuzzy search** — find keys within edit distance d<=2
 - **ROM-safe** — readers work directly on `const` buffers with zero allocation
 - **Typed values** — null, bool, int, uint, float, double, string, blob, array, nested dict
 - **JSON support** — encode/decode JSON documents to/from `.trp` format
-- **C99 core** — portable C library with C++11 wrappers
-- **32-bit and 64-bit** — works on both architectures
+- **10 languages** — C core with native implementations across 9 additional languages
+- **Small footprint** — C static library under 235 KB; bindings are 874-1,672 source lines each
+
+### Supported Languages
+
+All bindings are native implementations that read/write the `.trp` binary format directly (no FFI).
+
+| Language | Type | Source Lines | Binary/Library Size | Notes |
+|----------|------|-------------|---------------------|-------|
+| C | Core library | 4,169 | ~235 KB (static, 64-bit) | C99, 32-bit and 64-bit, ROM-safe |
+| C++ | Wrapper | 369 | ~51 KB (static) | C++11 RAII wrappers over C core |
+| Python | Binding | 874 | pure source | No dependencies |
+| JavaScript | Binding | 1,052 | pure source | Node.js and browser |
+| TypeScript | Binding | 49 | pure source | Type-safe wrapper over JS |
+| Go | Binding | 1,239 | pure source | No dependencies |
+| Rust | Binding | 1,672 | pure source | No dependencies, no `unsafe` |
+| Swift | Binding | 1,092 | pure source | SPM package |
+| Kotlin | Binding | 1,079 | pure source | Kotlin/JVM, Gradle |
+| Java | Binding | 1,485 | pure source | Java 11+, Gradle |
 
 ## Quick Start
 
