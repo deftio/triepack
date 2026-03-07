@@ -8,15 +8,17 @@ final class TriepackTests: XCTestCase {
     // MARK: - Fixture Helpers
 
     private func fixtureURL(_ name: String) -> URL {
-        // Try Bundle.module first (SPM resource bundle)
-        #if swift(>=5.3)
-        if let url = Bundle.module.url(forResource: name, withExtension: nil, subdirectory: "fixtures") {
-            return url
-        }
-        #endif
-        // Fallback: navigate from test file location to fixtures
+        // Navigate from this source file to the shared fixtures directory.
+        // Works with both local symlink and direct path resolution.
         let testFile = URL(fileURLWithPath: #filePath)
-        let fixturesDir = testFile.deletingLastPathComponent().appendingPathComponent("fixtures")
+        let fixturesDir = testFile
+            .deletingLastPathComponent()  // TriepackTests/
+            .deletingLastPathComponent()  // Tests/
+            .deletingLastPathComponent()  // swift/
+            .deletingLastPathComponent()  // bindings/
+            .deletingLastPathComponent()  // repo root
+            .appendingPathComponent("tests")
+            .appendingPathComponent("fixtures")
         return fixturesDir.appendingPathComponent(name)
     }
 

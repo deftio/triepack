@@ -16,10 +16,7 @@ let package = Package(
         .testTarget(
             name: "TriepackTests",
             dependencies: ["Triepack"],
-            path: "Tests/TriepackTests",
-            resources: [
-                .copy("fixtures"),
-            ]
+            path: "Tests/TriepackTests"
         ),
     ]
 )
