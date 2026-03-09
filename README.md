@@ -39,57 +39,163 @@ All bindings are native implementations that read/write the `.trp` binary format
 
 ## Quick Start
 
-```bash
-# Build
-cmake -B build -DBUILD_TESTS=ON
-cmake --build build
+### C / C++
 
-# Run tests
+```bash
+# Install
+git clone https://github.com/deftio/triepack.git
+cd triepack
+cmake -B build -DBUILD_TESTS=ON -DBUILD_JSON=ON
+cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-### C API
-
 ```c
 #include "triepack/triepack.h"
-#include <stdio.h>
-#include <stdlib.h>
 
-/* Encode */
 tp_encoder *enc = NULL;
 tp_encoder_create(&enc);
-
 tp_value v = tp_value_int(42);
 tp_encoder_add(enc, "hello", &v);
-
-v = tp_value_string("foo");
-tp_encoder_add(enc, "world", &v);
-
-uint8_t *buf = NULL;
-size_t len = 0;
+uint8_t *buf = NULL;  size_t len = 0;
 tp_encoder_build(enc, &buf, &len);
 
-/* Decode */
 tp_dict *dict = NULL;
 tp_dict_open(&dict, buf, len);
-
 tp_value val;
 if (tp_dict_lookup(dict, "hello", &val) == TP_OK)
     printf("hello -> %lld\n", (long long)val.data.int_val);
-
 tp_dict_close(&dict);
 tp_encoder_destroy(&enc);
 free(buf);
 ```
 
-### C++ API
+### Python
 
-```cpp
-#include <triepack/triepack.hpp>
-
-triepack::Encoder enc;
-// ... add entries, build, lookup via triepack::Dict
+```bash
+# Install (from source, PyPI package coming soon)
+cd bindings/python
+pip install -e .
 ```
+
+```python
+from triepack import encode, decode
+
+buf = encode({"hello": 42, "world": "foo"})
+result = decode(buf)
+print(result)  # {'hello': 42, 'world': 'foo'}
+```
+
+### JavaScript
+
+```bash
+# Install (from source, npm package coming soon)
+cd bindings/javascript
+npm install
+```
+
+```js
+const { encode, decode } = require('./src/index');
+
+const buf = encode({ hello: 42, world: 'foo' });
+const result = decode(buf);
+console.log(result);  // { hello: 42, world: 'foo' }
+```
+
+### TypeScript
+
+```bash
+cd bindings/typescript
+npm install
+```
+
+```ts
+import { encode, decode } from './src/index';
+
+const buf = encode({ hello: 42, world: 'foo' });
+const result = decode(buf);
+```
+
+### Go
+
+```bash
+# Copy bindings/go/ into your project
+cp -r bindings/go/triepack your_project/
+```
+
+```go
+data := map[string]interface{}{"hello": 42, "world": "foo"}
+buf, _ := triepack.Encode(data)
+result, _ := triepack.Decode(buf)
+```
+
+### Rust
+
+```bash
+# Add to Cargo.toml (from source, crates.io coming soon)
+# [dependencies]
+# triepack = { path = "bindings/rust" }
+```
+
+```rust
+use triepack::{encode, decode, Value};
+use std::collections::HashMap;
+
+let mut data = HashMap::new();
+data.insert("hello".into(), Value::UInt(42));
+let buf = encode(&data).unwrap();
+let result = decode(&buf).unwrap();
+```
+
+### Swift
+
+```bash
+# Add to Package.swift dependencies
+# .package(path: "bindings/swift")
+```
+
+```swift
+import Triepack
+
+let data: [String: TriepackValue] = ["hello": .uint(42)]
+let buf = try Triepack.encode(data)
+let result = try Triepack.decode(buf)
+```
+
+### Kotlin
+
+```bash
+# Add bindings/kotlin/ to your Gradle project
+cd bindings/kotlin
+./gradlew test
+```
+
+```kotlin
+import com.deftio.triepack.*
+
+val data = mapOf("hello" to TpValue.UInt(42))
+val buf = encode(data)
+val result = decode(buf)
+```
+
+### Java
+
+```bash
+# Add bindings/java/ to your Gradle project
+cd bindings/java
+./gradlew test
+```
+
+```java
+import com.deftio.triepack.*;
+
+Map<String, TpValue> data = new LinkedHashMap<>();
+data.put("hello", TpValue.ofUInt(42));
+byte[] buf = TriePack.encode(data);
+Map<String, TpValue> result = TriePack.decode(buf);
+```
+
+See [Examples](docs/guide/examples.md) for more detailed usage including JSON round-trips, file I/O, and cross-language interop.
 
 ## Library Stack
 
@@ -112,21 +218,6 @@ Each layer can be used independently. `triepack_wrapper` provides C++11 RAII wra
 | `BUILD_JSON` | ON | Build JSON library |
 | `BUILD_DOCS` | OFF | Build Doxygen documentation |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage instrumentation |
-
-## Language Bindings
-
-All bindings are native implementations that read/write the `.trp` format directly (no FFI).
-
-| Language | Status | Directory |
-|----------|--------|-----------|
-| Python | Implemented | `bindings/python/` |
-| JavaScript | Implemented | `bindings/javascript/` |
-| TypeScript | Implemented (wraps JS) | `bindings/typescript/` |
-| Go | Implemented | `bindings/go/` |
-| Swift | Implemented | `bindings/swift/` |
-| Rust | Implemented | `bindings/rust/` |
-| Kotlin | Implemented | `bindings/kotlin/` |
-| Java | Implemented | `bindings/java/` |
 
 ## File Format
 
