@@ -691,7 +691,7 @@ static void print_usage(void)
 
 static void print_version(void)
 {
-    printf("trp 1.0.0 (TriePack CLI inspector)\n");
+    printf("trp 1.1.0 (TriePack CLI inspector)\n");
 }
 
 /* ── Main ────────────────────────────────────────────────────────────── */
