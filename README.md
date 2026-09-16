@@ -12,8 +12,7 @@ TriePack encodes dictionaries into a compact binary format (`.trp`) optimized fo
 
 - **Compact binary format** — compressed tries with prefix sharing and bit-level packing
 - **Fast lookups** — O(key-length) point queries via skip pointers
-- **Prefix search** — iterate all keys matching a prefix
-- **Fuzzy search** — find keys within edit distance d<=2
+- **Prefix search** — iterate all keys matching a prefix, by descending the trie
 - **ROM-safe** — readers work directly on `const` buffers with zero allocation
 - **Typed values** — null, bool, int, uint, float, double, string, blob, array, nested dict
 - **JSON support** — encode/decode JSON documents to/from `.trp` format
@@ -244,11 +243,12 @@ See `docs/internals/` for format details.
 - [x] TypeScript binding (wraps JS implementation)
 - [x] Go binding
 - [x] Swift binding (with SPM package)
-- [x] Rust binding (with crate on crates.io)
+- [x] Rust binding
 - [x] Kotlin binding
 - [x] Java binding
-- [ ] npm package for JavaScript/TypeScript
-- [ ] PyPI package for Python
+- [x] npm package for JavaScript/TypeScript (ships bundled type declarations)
+- [ ] PyPI package for Python (metadata ready; publish workflow not wired up)
+- [ ] crates.io package for Rust
 
 ### v1.2 — Format Enhancements
 - [ ] Suffix table (shared ending compression)
