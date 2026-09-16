@@ -72,8 +72,8 @@ static long hex_decode(const char *tok, uint8_t *out, size_t out_cap)
     if (len % 2 != 0 || len / 2 > out_cap)
         return -1;
     for (size_t i = 0; i < len; i += 2)
-        out[i / 2] = (uint8_t)((hexval((unsigned char)tok[i]) << 4) |
-                               hexval((unsigned char)tok[i + 1]));
+        out[i / 2] =
+            (uint8_t)((hexval((unsigned char)tok[i]) << 4) | hexval((unsigned char)tok[i + 1]));
     return (long)(len / 2);
 }
 
@@ -102,13 +102,19 @@ typedef struct {
     size_t owned_count;
 } conf_case;
 
-static char g_root[512];
+/* Sized so every path below provably fits: g_root + a 256-byte case
+   name + the longest literal, which gcc checks with
+   -Wformat-truncation. */
+#define CONF_ROOT_MAX 512
+#define CONF_PATH_MAX (CONF_ROOT_MAX + 256 + 128)
+
+static char g_root[CONF_ROOT_MAX];
 
 static void find_root(void)
 {
     /* FIXTURE_DIR is the source tree; fall back to the working directory. */
     snprintf(g_root, sizeof(g_root), "%s", FIXTURE_DIR);
-    char probe[600];
+    char probe[CONF_PATH_MAX];
     snprintf(probe, sizeof(probe), "%s/tests/conformance/cases.txt", g_root);
     FILE *f = fopen(probe, "rb");
     if (f) {
@@ -196,8 +202,8 @@ static bool values_match(const tp_value *got, const tp_value *want)
     case TP_BLOB:
         return got->data.blob_val.len == want->data.blob_val.len &&
                (got->data.blob_val.len == 0 ||
-                memcmp(got->data.blob_val.data, want->data.blob_val.data,
-                       got->data.blob_val.len) == 0);
+                memcmp(got->data.blob_val.data, want->data.blob_val.data, got->data.blob_val.len) ==
+                    0);
     default:
         return false;
     }
@@ -207,7 +213,7 @@ static bool values_match(const tp_value *got, const tp_value *want)
 
 static void check_case(conf_case *c)
 {
-    char path[700];
+    char path[CONF_PATH_MAX];
     snprintf(path, sizeof(path), "%s/tests/conformance/fixtures/%s.trp", g_root, c->name);
 
     size_t len = 0;
@@ -256,7 +262,7 @@ static int g_cases_seen = 0;
 
 static void run_corpus(void)
 {
-    char path[600];
+    char path[CONF_PATH_MAX];
     snprintf(path, sizeof(path), "%s/tests/conformance/cases.txt", g_root);
     FILE *f = fopen(path, "rb");
     TEST_ASSERT_NOT_NULL_MESSAGE(f, "cannot open the conformance corpus");
@@ -395,7 +401,7 @@ static void test_conformance_rejects_malformed(void)
 {
     find_root();
     for (size_t i = 0; i < sizeof(MALFORMED) / sizeof(MALFORMED[0]); i++) {
-        char path[700];
+        char path[CONF_PATH_MAX];
         snprintf(path, sizeof(path), "%s/tests/conformance/malformed/%s", g_root, MALFORMED[i]);
 
         size_t len = 0;
