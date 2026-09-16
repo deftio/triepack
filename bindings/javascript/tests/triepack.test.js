@@ -298,6 +298,11 @@ describe('triepack encode/decode roundtrip', () => {
 
         // Write CTRL_SKIP (2) as first trie symbol — unexpected outside branch
         w.writeBits(2, 4);
+
+        // The trie ends where the (empty) value store begins; the decoder
+        // uses this to know how far the trie extends.
+        const valueStoreOffset = w.position - dataStart;
+
         w.alignToByte();
 
         const preBuf = w.toUint8Array();
@@ -309,9 +314,11 @@ describe('triepack encode/decode roundtrip', () => {
         result[13] = (trieDataOffset >>> 16) & 0xFF;
         result[14] = (trieDataOffset >>> 8) & 0xFF;
         result[15] = trieDataOffset & 0xFF;
-        // value_store_offset = trieDataOffset
-        result[16] = result[12]; result[17] = result[13];
-        result[18] = result[14]; result[19] = result[15];
+        // value_store_offset = end of the trie data written above
+        result[16] = (valueStoreOffset >>> 24) & 0xFF;
+        result[17] = (valueStoreOffset >>> 16) & 0xFF;
+        result[18] = (valueStoreOffset >>> 8) & 0xFF;
+        result[19] = valueStoreOffset & 0xFF;
 
         // CRC
         const crcData = result.subarray(0, result.length - 4);
@@ -369,5 +376,79 @@ describe('triepack encode/decode roundtrip', () => {
 
         const decoded = decode(result);
         expect(typeof decoded).toBe('object');
+    });
+
+    // Regression: issue #1 — the walker used to guess whether a BRANCH
+    // followed a terminal by peeking at the next bits. Past the last
+    // terminal those bits are the byte padding and the CRC, which for some
+    // key sets look exactly like a BRANCH code, sending the walker off the
+    // end of the buffer ("EOF"). The trie end comes from the header, so the
+    // walker must stop there instead of guessing.
+    describe('walk stops at the end of the trie (issue #1)', () => {
+        // Each of these key sets produced a trailing BRANCH-looking code and
+        // threw EOF before the fix.
+        const sets = [
+            ['eddb', 'h'],
+            ['aad', 'ebg', 'ec', 'ehhbf', 'h', 'hebad'],
+            ['aghed', 'bae', 'bfffa', 'cad', 'd', 'ebbhb', 'fa', 'feb'],
+            ['a', 'aad', 'bg', 'bgc', 'egba', 'gahad', 'ghehg', 'hbdab', 'hg'],
+        ];
+
+        test.each(sets.map(keys => [keys.join(','), keys]))(
+            'round-trips keys-only set %s',
+            (_name, keys) => {
+                const data = {};
+                keys.forEach(k => { data[k] = null; });
+                expect(decode(encode(data))).toEqual(data);
+            }
+        );
+
+        test.each(sets.map(keys => [keys.join(','), keys]))(
+            'round-trips valued set %s',
+            (_name, keys) => {
+                const data = {};
+                keys.forEach((k, i) => { data[k] = i; });
+                expect(decode(encode(data))).toEqual(data);
+            }
+        );
+
+        // Sweep: the trigger is set-dependent (the trailing bits have to land
+        // on the BRANCH code), so cover many small key sets deterministically.
+        test('round-trips 2000 generated key sets', () => {
+            let seed = 1;
+            const rnd = () => {
+                seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+                return seed / 0x7fffffff;
+            };
+            const alpha = 'abcdefgh';
+
+            for (let trial = 0; trial < 2000; trial++) {
+                const keys = new Set();
+                const n = 2 + Math.floor(rnd() * 12);
+                while (keys.size < n) {
+                    const len = 1 + Math.floor(rnd() * 5);
+                    let k = '';
+                    for (let i = 0; i < len; i++) k += alpha[Math.floor(rnd() * alpha.length)];
+                    keys.add(k);
+                }
+                const data = {};
+                [...keys].forEach(k => { data[k] = null; });
+                expect(decode(encode(data))).toEqual(data);
+            }
+        });
+
+        test('header declares exactly the bits the encoder wrote', () => {
+            const data = {};
+            ['eddb', 'h'].forEach(k => { data[k] = null; });
+            const buf = encode(data);
+            const valueStoreOffset =
+                ((buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19]) >>> 0;
+            const totalDataBits =
+                ((buf[24] << 24) | (buf[25] << 16) | (buf[26] << 8) | buf[27]) >>> 0;
+            // No values, so the trie is the whole data section, and the data
+            // section plus its byte padding and the 4-byte CRC is the buffer.
+            expect(valueStoreOffset).toBe(totalDataBits);
+            expect(buf.length).toBe(32 + Math.ceil(totalDataBits / 8) + 4);
+        });
     });
 });

@@ -198,6 +198,26 @@ subtree sizes. The encoder uses a two-pass approach:
 2. **Write pass** (`trie_write`): Actually writes the trie, using the
    dry-run pass to compute each SKIP distance on the fly.
 
+### 5.4 Subtree Extent
+
+The stream is not self-terminating: a subtree's last terminal (END or
+END_VAL) is not marked as such, because a terminal may also be followed by
+a BRANCH for the keys that extend it. A reader therefore cannot tell from
+the bits alone whether more symbols belong to the current subtree -- and
+must not guess by peeking at what follows, since past the trie's last
+terminal those bits are the byte padding and the CRC.
+
+Every subtree's extent is instead known from the enclosing structure:
+
+- a child preceded by a SKIP ends at `child_start + skip_distance`;
+- the last child of a BRANCH ends where its parent ends;
+- the root ends at `value_store_offset`, where the value store (or, when
+  there are no values, the byte padding and CRC) begins.
+
+A terminal is followed by a BRANCH exactly when the subtree has not yet
+reached its end. Lookup (section 8) is guided by the key and so never
+needs this, but any reader that enumerates keys does.
+
 ---
 
 ## 6. Value Store

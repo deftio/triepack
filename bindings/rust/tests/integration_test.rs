@@ -448,3 +448,61 @@ fn test_roundtrip_negative_ints() {
     assert_eq!(result.get("neg1"), Some(&Value::Int(-1)));
     assert_eq!(result.get("neg100"), Some(&Value::Int(-100)));
 }
+
+// ---------------------------------------------------------------------------
+// Regression: issue #1 -- walk must stop at the end of the trie
+//
+// The walker used to guess whether a BRANCH followed a terminal by peeking at
+// the next bits. Past the last terminal those bits are the byte padding and
+// the CRC, which for some key sets look exactly like a BRANCH code, sending
+// the walker off the end of the buffer. The trie end comes from the header,
+// so the walker must stop there.
+//
+// Each of these key sets produced a trailing BRANCH-looking code and failed
+// with Eof before the fix.
+// ---------------------------------------------------------------------------
+
+const TRAILING_BRANCH_KEY_SETS: &[&[&str]] = &[
+    &["eddb", "h"],
+    &["aad", "ebg", "ec", "ehhbf", "h", "hebad"],
+    &["aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"],
+    &["a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"],
+];
+
+#[test]
+fn test_walk_stops_at_trie_end_keys_only() {
+    for keys in TRAILING_BRANCH_KEY_SETS {
+        let mut data = HashMap::new();
+        for k in *keys {
+            data.insert(k.to_string(), Value::Null);
+        }
+        let result = decode(&encode(&data)).unwrap();
+        assert_eq!(result, data, "key set {:?}", keys);
+    }
+}
+
+#[test]
+fn test_walk_stops_at_trie_end_with_values() {
+    for keys in TRAILING_BRANCH_KEY_SETS {
+        let mut data = HashMap::new();
+        for (i, k) in keys.iter().enumerate() {
+            data.insert(k.to_string(), Value::UInt(i as u64));
+        }
+        let result = decode(&encode(&data)).unwrap();
+        assert_eq!(result, data, "key set {:?}", keys);
+    }
+}
+
+#[test]
+fn test_header_declares_exactly_the_bits_written() {
+    let mut data = HashMap::new();
+    data.insert("eddb".to_string(), Value::Null);
+    data.insert("h".to_string(), Value::Null);
+    let buf = encode(&data);
+    let value_store_offset = u32::from_be_bytes([buf[16], buf[17], buf[18], buf[19]]) as usize;
+    let total_data_bits = u32::from_be_bytes([buf[24], buf[25], buf[26], buf[27]]) as usize;
+    // No values, so the trie is the whole data section, and the data section
+    // plus its byte padding and the 4-byte CRC is the buffer.
+    assert_eq!(value_store_offset, total_data_bits);
+    assert_eq!(buf.len(), 32 + total_data_bits.div_ceil(8) + 4);
+}

@@ -267,4 +267,64 @@ final class TriepackTests: XCTestCase {
             XCTAssertEqual(decoded, val, "Signed VarInt roundtrip failed for \(val)")
         }
     }
+
+    // MARK: - Regression: issue #1 -- walk must stop at the end of the trie
+    //
+    // The walker used to guess whether a BRANCH followed a terminal by peeking
+    // at the next bits. Past the last terminal those bits are the byte padding
+    // and the CRC, which for some key sets look exactly like a BRANCH code,
+    // sending the walker off the end of the buffer. The trie end comes from
+    // the header, so the walker must stop there.
+    //
+    // Each of these key sets produced a trailing BRANCH-looking code and threw
+    // .eof before the fix.
+
+    private static let trailingBranchKeySets: [[String]] = [
+        ["eddb", "h"],
+        ["aad", "ebg", "ec", "ehhbf", "h", "hebad"],
+        ["aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"],
+        ["a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"],
+    ]
+
+    func testWalkStopsAtTrieEndKeysOnly() throws {
+        for keys in Self.trailingBranchKeySets {
+            var data: [String: TriepackValue] = [:]
+            for k in keys { data[k] = TriepackValue.null }
+            let result = try Triepack.decode(try Triepack.encode(data))
+            XCTAssertEqual(result.count, keys.count, "key set \(keys)")
+            for k in keys {
+                XCTAssertEqual(result[k], .null, "key \(k) in set \(keys)")
+            }
+        }
+    }
+
+    func testWalkStopsAtTrieEndWithValues() throws {
+        for keys in Self.trailingBranchKeySets {
+            var data: [String: TriepackValue] = [:]
+            for (i, k) in keys.enumerated() { data[k] = TriepackValue.uint(UInt64(i)) }
+            let result = try Triepack.decode(try Triepack.encode(data))
+            XCTAssertEqual(result.count, keys.count, "key set \(keys)")
+            for (i, k) in keys.enumerated() {
+                XCTAssertEqual(result[k], .uint(UInt64(i)), "key \(k) in set \(keys)")
+            }
+        }
+    }
+
+    func testHeaderDeclaresExactlyTheBitsWritten() throws {
+        let data: [String: TriepackValue] = ["eddb": .null, "h": .null]
+        let buf = try Triepack.encode(data)
+        func u32(_ off: Int) -> Int {
+            let b0 = Int(buf[off]) << 24
+            let b1 = Int(buf[off + 1]) << 16
+            let b2 = Int(buf[off + 2]) << 8
+            let b3 = Int(buf[off + 3])
+            return b0 | b1 | b2 | b3
+        }
+        let valueStoreOffset = u32(16)
+        let totalDataBits = u32(24)
+        // No values, so the trie is the whole data section, and the data
+        // section plus its byte padding and the 4-byte CRC is the buffer.
+        XCTAssertEqual(valueStoreOffset, totalDataBits)
+        XCTAssertEqual(buf.count, 32 + (totalDataBits + 7) / 8 + 4)
+    }
 }

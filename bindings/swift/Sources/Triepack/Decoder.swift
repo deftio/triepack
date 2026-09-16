@@ -94,14 +94,22 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
 
     let trieStart = dataStart + Int(trieDataOffset)
     let valueStart = dataStart + Int(valueStoreOffset)
+    // The trie occupies [trieStart, valueStart); the value store (when
+    // present), the byte padding and the CRC follow it.
+    let trieEnd = valueStart
 
     // DFS iteration
     var result: [(String, TriepackValue)] = []
     var keyStack: [UInt8] = []
 
-    func dfsWalk(_ r: BitReader) throws {
+    // Every subtree knows where it ends: a child with a SKIP ends at
+    // childStart + skipDist, the last child ends where its parent does, and
+    // the root ends at trieEnd. `end` is the only authority on whether more
+    // symbols belong to this subtree -- the bits that happen to follow are
+    // not, because past the last terminal they are padding and CRC.
+    func dfsWalk(_ r: BitReader, _ end: Int) throws {
         while true {
-            if r.position >= r.bitLen {
+            if r.position >= end {
                 return
             }
             let sym = Int(try r.readBits(bps))
@@ -109,15 +117,7 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
             if sym == ctrlCodes[ctrlEnd] {
                 let keyStr = String(bytes: keyStack, encoding: .utf8) ?? ""
                 result.append((keyStr, .null))
-
-                if r.position + bps <= r.bitLen {
-                    let nextSym = Int(try r.peekBits(bps))
-                    if nextSym == ctrlCodes[ctrlBranch] {
-                        _ = try r.readBits(bps)
-                        let childCount = Int(try VarInt.readUInt(r))
-                        try walkBranch(r, childCount)
-                    }
-                }
+                try walkBranchIfPresent(r, end)
                 return
             }
 
@@ -125,21 +125,13 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
                 _ = try VarInt.readUInt(r)  // value index
                 let keyStr = String(bytes: keyStack, encoding: .utf8) ?? ""
                 result.append((keyStr, .null))
-
-                if r.position + bps <= r.bitLen {
-                    let nextSym = Int(try r.peekBits(bps))
-                    if nextSym == ctrlCodes[ctrlBranch] {
-                        _ = try r.readBits(bps)
-                        let childCount = Int(try VarInt.readUInt(r))
-                        try walkBranch(r, childCount)
-                    }
-                }
+                try walkBranchIfPresent(r, end)
                 return
             }
 
             if sym == ctrlCodes[ctrlBranch] {
                 let childCount = Int(try VarInt.readUInt(r))
-                try walkBranch(r, childCount)
+                try walkBranch(r, childCount, end)
                 return
             }
 
@@ -149,7 +141,21 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
         }
     }
 
-    func walkBranch(_ r: BitReader, _ childCount: Int) throws {
+    // A terminal is followed by a BRANCH exactly when the subtree has not
+    // reached its end -- keys that share this terminal as a prefix.
+    func walkBranchIfPresent(_ r: BitReader, _ end: Int) throws {
+        if r.position >= end {
+            return
+        }
+        let sym = Int(try r.readBits(bps))
+        guard sym == ctrlCodes[ctrlBranch] else {
+            throw TriepackError.invalidData("Malformed trie: expected BRANCH after terminal")
+        }
+        let childCount = Int(try VarInt.readUInt(r))
+        try walkBranch(r, childCount, end)
+    }
+
+    func walkBranch(_ r: BitReader, _ childCount: Int, _ end: Int) throws {
         let savedKeyLen = keyStack.count
         for ci in 0..<childCount {
             let hasSkip = ci < childCount - 1
@@ -162,7 +168,7 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
 
             let childStartPos = r.position
             keyStack.removeSubrange(savedKeyLen...)
-            try dfsWalk(r)
+            try dfsWalk(r, hasSkip ? childStartPos + skipDist : end)
 
             if hasSkip {
                 r.seek(childStartPos + skipDist)
@@ -174,7 +180,7 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
     // Walk the trie
     reader.seek(trieStart)
     if numKeys > 0 {
-        try dfsWalk(reader)
+        try dfsWalk(reader, trieEnd)
     }
 
     // Build result dict (keys-only first pass)

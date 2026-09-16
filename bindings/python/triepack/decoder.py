@@ -89,52 +89,59 @@ def decode(buffer):
 
     trie_start = data_start + trie_data_offset
     value_start = data_start + value_store_offset
+    # The trie occupies [trie_start, value_start); the value store (when
+    # present), the byte padding and the CRC follow it.
+    trie_end = value_start
 
     # DFS iteration
     result = {}
     key_stack = []
 
-    def dfs_walk(r):
+    # Every subtree knows where it ends: a child with a SKIP ends at
+    # child_start + skip_dist, the last child ends where its parent does, and
+    # the root ends at trie_end. `end` is the only authority on whether more
+    # symbols belong to this subtree -- the bits that happen to follow are
+    # not, because past the last terminal they are padding and CRC.
+    def dfs_walk(r, end):
         while True:
-            if r.position >= r._bit_len:
+            if r.position >= end:
                 return
             sym = r.read_bits(bps)
 
             if sym == ctrl_codes[CTRL_END]:
                 key_str = bytes(key_stack).decode("utf-8")
                 result[key_str] = None
-
-                if r.position + bps <= r._bit_len:
-                    next_sym = r.peek_bits(bps)
-                    if next_sym == ctrl_codes[CTRL_BRANCH]:
-                        r.read_bits(bps)
-                        child_count = read_var_uint(r)
-                        walk_branch(r, child_count)
+                walk_branch_if_present(r, end)
                 return
 
             if sym == ctrl_codes[CTRL_END_VAL]:
                 read_var_uint(r)  # value index
                 key_str = bytes(key_stack).decode("utf-8")
                 result[key_str] = None
-
-                if r.position + bps <= r._bit_len:
-                    next_sym = r.peek_bits(bps)
-                    if next_sym == ctrl_codes[CTRL_BRANCH]:
-                        r.read_bits(bps)
-                        child_count = read_var_uint(r)
-                        walk_branch(r, child_count)
+                walk_branch_if_present(r, end)
                 return
 
             if sym == ctrl_codes[CTRL_BRANCH]:
                 child_count = read_var_uint(r)
-                walk_branch(r, child_count)
+                walk_branch(r, child_count, end)
                 return
 
             # Regular symbol
             byte_val = reverse_map[sym] if sym < 256 else 0
             key_stack.append(byte_val)
 
-    def walk_branch(r, child_count):
+    # A terminal is followed by a BRANCH exactly when the subtree has not
+    # reached its end -- keys that share this terminal as a prefix.
+    def walk_branch_if_present(r, end):
+        if r.position >= end:
+            return
+        sym = r.read_bits(bps)
+        if sym != ctrl_codes[CTRL_BRANCH]:
+            raise ValueError("Malformed trie: expected BRANCH after terminal")
+        child_count = read_var_uint(r)
+        walk_branch(r, child_count, end)
+
+    def walk_branch(r, child_count, end):
         saved_key_len = len(key_stack)
         for ci in range(child_count):
             has_skip = ci < child_count - 1
@@ -146,7 +153,7 @@ def decode(buffer):
 
             child_start_pos = r.position
             del key_stack[saved_key_len:]
-            dfs_walk(r)
+            dfs_walk(r, child_start_pos + skip_dist if has_skip else end)
 
             if has_skip:
                 r.seek(child_start_pos + skip_dist)
@@ -156,7 +163,7 @@ def decode(buffer):
     # Walk the trie
     reader.seek(trie_start)
     if num_keys > 0:
-        dfs_walk(reader)
+        dfs_walk(reader, trie_end)
 
     # Decode values
     if has_values:

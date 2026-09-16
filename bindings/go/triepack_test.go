@@ -525,3 +525,128 @@ func assertIntValue(t *testing.T, result map[string]interface{}, key string, exp
 		t.Fatalf("key '%s': expected int, got %T (%v)", key, v, v)
 	}
 }
+
+// Regression: issue #1 -- walk must stop at the end of the trie.
+//
+// The walker used to guess whether a BRANCH followed a terminal by peeking at
+// the next bits. Past the last terminal those bits are the byte padding and
+// the CRC, which for some key sets look exactly like a BRANCH code, sending
+// the walker off the end of the buffer. The trie end comes from the header,
+// so the walker must stop there.
+//
+// Each of these key sets produced a trailing BRANCH-looking code before the
+// fix.
+var trailingBranchKeySets = [][]string{
+	{"eddb", "h"},
+	{"aad", "ebg", "ec", "ehhbf", "h", "hebad"},
+	{"aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"},
+	{"a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"},
+}
+
+func TestWalkStopsAtTrieEndKeysOnly(t *testing.T) {
+	for _, keys := range trailingBranchKeySets {
+		data := make(map[string]interface{})
+		for _, k := range keys {
+			data[k] = nil
+		}
+		buf, err := Encode(data)
+		if err != nil {
+			t.Fatalf("Encode(%v) failed: %v", keys, err)
+		}
+		result, err := Decode(buf)
+		if err != nil {
+			t.Fatalf("Decode(%v) failed: %v", keys, err)
+		}
+		if len(result) != len(keys) {
+			t.Fatalf("key set %v: got %d keys, want %d", keys, len(result), len(keys))
+		}
+		for _, k := range keys {
+			if v, ok := result[k]; !ok || v != nil {
+				t.Fatalf("key set %v: key %q = %v (present: %v), want nil", keys, k, v, ok)
+			}
+		}
+	}
+}
+
+func TestWalkStopsAtTrieEndWithValues(t *testing.T) {
+	for _, keys := range trailingBranchKeySets {
+		data := make(map[string]interface{})
+		for i, k := range keys {
+			data[k] = uint64(i)
+		}
+		buf, err := Encode(data)
+		if err != nil {
+			t.Fatalf("Encode(%v) failed: %v", keys, err)
+		}
+		result, err := Decode(buf)
+		if err != nil {
+			t.Fatalf("Decode(%v) failed: %v", keys, err)
+		}
+		if len(result) != len(keys) {
+			t.Fatalf("key set %v: got %d keys, want %d", keys, len(result), len(keys))
+		}
+		for i, k := range keys {
+			assertIntValue(t, result, k, i)
+		}
+	}
+}
+
+func TestHeaderDeclaresExactlyTheBitsWritten(t *testing.T) {
+	buf, err := Encode(map[string]interface{}{"eddb": nil, "h": nil})
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+	u32 := func(off int) int {
+		return int(buf[off])<<24 | int(buf[off+1])<<16 | int(buf[off+2])<<8 | int(buf[off+3])
+	}
+	valueStoreOffset := u32(16)
+	totalDataBits := u32(24)
+	// No values, so the trie is the whole data section, and the data section
+	// plus its byte padding and the 4-byte CRC is the buffer.
+	if valueStoreOffset != totalDataBits {
+		t.Fatalf("value_store_offset %d != total_data_bits %d", valueStoreOffset, totalDataBits)
+	}
+	if want := 32 + (totalDataBits+7)/8 + 4; len(buf) != want {
+		t.Fatalf("buffer is %d bytes, want %d", len(buf), want)
+	}
+}
+
+// Go strings can hold arbitrary bytes, so unlike the UTF-8-only bindings this
+// one can reach the format's alphabet ceiling. Going over it used to produce a
+// buffer with a valid CRC that decoded to a single key.
+func TestAlphabetLimit(t *testing.T) {
+	build := func(n int) (map[string]interface{}, []byte, error) {
+		data := make(map[string]interface{}, n)
+		for i := 0; i < n; i++ {
+			data[string([]byte{byte(i), 'X'})] = nil
+		}
+		buf, err := Encode(data)
+		return data, buf, err
+	}
+
+	t.Run("at the limit", func(t *testing.T) {
+		data, buf, err := build(MaxAlphabetSize)
+		if err != nil {
+			t.Fatalf("encode failed at the limit: %v", err)
+		}
+		result, err := Decode(buf)
+		if err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		if len(result) != len(data) {
+			t.Fatalf("got %d keys, want %d", len(result), len(data))
+		}
+	})
+
+	for _, n := range []int{MaxAlphabetSize + 1, 252, 256} {
+		t.Run(fmt.Sprintf("over the limit/%d", n), func(t *testing.T) {
+			_, _, err := build(n)
+			if err == nil {
+				t.Fatal("encoded an alphabet the format cannot address")
+			}
+			if !strings.Contains(err.Error(), "too many distinct byte values") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}

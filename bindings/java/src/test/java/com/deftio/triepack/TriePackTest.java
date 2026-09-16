@@ -379,4 +379,73 @@ class TriePackTest {
         buf[crcDataLen + 3] = (byte) (newCrc & 0xFF);
         assertThrows(IllegalArgumentException.class, () -> TriePack.decode(buf));
     }
+
+    // ── Regression: issue #1 -- walk must stop at the end of the trie ──
+    //
+    // The walker used to guess whether a BRANCH followed a terminal by peeking
+    // at the next bits. Past the last terminal those bits are the byte padding
+    // and the CRC, which for some key sets look exactly like a BRANCH code,
+    // sending the walker off the end of the buffer. The trie end comes from
+    // the header, so the walker must stop there.
+    //
+    // Each of these key sets produced a trailing BRANCH-looking code before
+    // the fix.
+
+    private static final String[][] TRAILING_BRANCH_KEY_SETS = {
+        { "eddb", "h" },
+        { "aad", "ebg", "ec", "ehhbf", "h", "hebad" },
+        { "aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb" },
+        { "a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg" },
+    };
+
+    @Test
+    void testWalkStopsAtTrieEndKeysOnly() {
+        for (String[] keys : TRAILING_BRANCH_KEY_SETS) {
+            Map<String, TpValue> data = new LinkedHashMap<>();
+            for (String k : keys) {
+                data.put(k, TpValue.ofNull());
+            }
+            Map<String, TpValue> result = TriePack.decode(TriePack.encode(data));
+            assertEquals(keys.length, result.size());
+            for (String k : keys) {
+                assertNotNull(result.get(k), k);
+                assertEquals(TpValue.Type.NULL, result.get(k).getType(), k);
+            }
+        }
+    }
+
+    @Test
+    void testWalkStopsAtTrieEndWithValues() {
+        for (String[] keys : TRAILING_BRANCH_KEY_SETS) {
+            Map<String, TpValue> data = new LinkedHashMap<>();
+            for (int i = 0; i < keys.length; i++) {
+                data.put(keys[i], TpValue.ofUInt(i));
+            }
+            Map<String, TpValue> result = TriePack.decode(TriePack.encode(data));
+            assertEquals(keys.length, result.size());
+            for (int i = 0; i < keys.length; i++) {
+                assertNotNull(result.get(keys[i]), keys[i]);
+                assertEquals(i, result.get(keys[i]).uintValue(), keys[i]);
+            }
+        }
+    }
+
+    @Test
+    void testHeaderDeclaresExactlyTheBitsWritten() {
+        Map<String, TpValue> data = new LinkedHashMap<>();
+        data.put("eddb", TpValue.ofNull());
+        data.put("h", TpValue.ofNull());
+        byte[] buf = TriePack.encode(data);
+        int valueStoreOffset = u32(buf, 16);
+        int totalDataBits = u32(buf, 24);
+        // No values, so the trie is the whole data section, and the data
+        // section plus its byte padding and the 4-byte CRC is the buffer.
+        assertEquals(valueStoreOffset, totalDataBits);
+        assertEquals(32 + (totalDataBits + 7) / 8 + 4, buf.length);
+    }
+
+    private static int u32(byte[] buf, int off) {
+        return ((buf[off] & 0xFF) << 24) | ((buf[off + 1] & 0xFF) << 16)
+             | ((buf[off + 2] & 0xFF) << 8) | (buf[off + 3] & 0xFF);
+    }
 }
