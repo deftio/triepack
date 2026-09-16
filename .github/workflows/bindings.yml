@@ -127,6 +127,10 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
 
       - name: Test
         run: |
@@ -149,6 +153,10 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
 
       - name: Test
         run: |

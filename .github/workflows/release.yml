@@ -124,6 +124,10 @@ jobs:
       - name: Set up Gradle
         if: matrix.name == 'Java' || matrix.name == 'Kotlin'
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
 
       - name: Test
         working-directory: ${{ matrix.dir }}
