@@ -65,3 +65,7 @@ build-release/
 
 # scripts/test-jvm.sh downloads (JDK, JUnit, kotlinc)
 .jvm-toolchain/
+
+# Gradle
+.gradle/
+bindings/*/build/
