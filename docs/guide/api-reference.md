@@ -229,19 +229,47 @@ tp_encoder_add(enc, "flag", NULL);
 
 ### Value Types
 
-The C++ wrappers use the same `tp_value` struct from the C API. See the
-C tab for the full type list and construction helpers.
+`triepack::Value` is an owning tagged value covering all eight format types.
+Build one with a factory, read it with the matching accessor:
 
 ```cpp
 #include <triepack/triepack.hpp>
 
-triepack::Encoder enc;
-enc.insert("count", 42);
-enc.insert("greeting", "hello world");
+using triepack::Value;
+
+Value::null();
+Value::boolean(true);
+Value::integer(-42);            // signed tag
+Value::unsigned_integer(42);    // unsigned tag
+Value::float32(0.5f);
+Value::float64(3.14159);
+Value::string("hello world");
+Value::blob(bytes);             // std::vector<uint8_t>
 ```
 
-The `insert()` method accepts native C++ types and constructs the
-appropriate `tp_value` internally.
+`Int` and `UInt` are different tags on the wire. Other implementations pick
+`UInt` for anything non-negative, so matching that keeps encodings
+byte-identical across languages.
+
+Reading through the wrong accessor returns a zero-like default rather than
+reinterpreting the payload:
+
+```cpp
+Value v = Value::string("text");
+v.as_int();      // 0, not a reinterpreted pointer
+v.as_string();   // "text"
+```
+
+| Accessor | Returns |
+|----------|---------|
+| `type()` | `Type::Null` / `Bool` / `Int` / `UInt` / `Float32` / `Float64` / `String` / `Blob` |
+| `is_null()` | `true` for a null value |
+| `as_bool()`, `as_int()`, `as_uint()` | the scalar, or a zero default |
+| `as_float32()`, `as_float64()` | the float, or `0` |
+| `as_string()`, `as_blob()` | the payload by const reference, or empty |
+
+`operator==` compares type and payload; doubles compare by bit pattern, so
+`-0.0` differs from `0.0`.
 
 </div>
 <div class="tp-tab-panel" data-lang="python" markdown="1">
@@ -434,32 +462,51 @@ RAII wrapper around `tp_encoder`. Include `<triepack/triepack.hpp>`.
 ```cpp
 #include <triepack/triepack.hpp>
 
-triepack::Encoder enc;
-enc.insert("apple", 42);
-enc.insert("banana", 17);
+using triepack::Encoder;
+using triepack::Status;
+using triepack::Value;
 
-const uint8_t *data;
-size_t size;
-int rc = enc.encode(&data, &size);
-// data points to the encoded .trp blob
-// data is valid until enc is destroyed or encode() is called again
+Encoder enc;
+enc.add("apple", Value::unsigned_integer(42));
+enc.add("banana", Value::string("yellow"));
+
+std::vector<uint8_t> data;
+if (enc.build(data) != Status::Ok) { /* handle */ }
+// `data` owns the .trp bytes.
 ```
 
 | Method | Description |
 |--------|-------------|
 | `Encoder()` | Construct with default options |
-| `void insert(const char *key, int32_t value)` | Add a key-value pair |
-| `int encode(const uint8_t **data, size_t *size)` | Build the trie, receive pointer to blob |
+| `Status add(const std::string &key, const Value &)` | Add a key-value pair |
+| `Status add(const char *key, size_t len, const Value &)` | Add a key that may contain any byte |
+| `size_t count()` | Pairs added so far |
+| `Status build(std::vector<uint8_t> &out)` | Serialize into `out` |
+| `Status reset()` | Drop every pair, keep the encoder |
 | `tp_encoder *handle()` | Access the underlying C handle |
+
+`build()` writes into a vector the caller owns, so there is nothing to free.
 
 Move semantics are supported:
 
 ```cpp
-triepack::Encoder enc1;
-enc1.insert("key", 1);
+Encoder enc1;
+enc1.add("key", Value::unsigned_integer(1));
 
-triepack::Encoder enc2 = std::move(enc1);
+Encoder enc2 = std::move(enc1);
 // enc1 is now empty (handle() == nullptr)
+```
+
+### Status
+
+Every fallible call returns `triepack::Status`, whose values match the C
+API's `tp_result`. `triepack::message(status)` gives the same text as
+`tp_result_str`.
+
+```cpp
+Status rc = enc.build(data);
+if (rc != Status::Ok)
+    std::fprintf(stderr, "%s\n", triepack::message(rc));
 ```
 
 </div>
@@ -792,21 +839,37 @@ tp_iter_destroy(&it);
 
 ### `triepack::Iterator`
 
-RAII wrapper around `tp_iterator`.
+RAII wrapper around `tp_iterator`. Entries come out in lexicographic byte
+order, and the key and value are copied out, so they stay valid after the
+next `next()`.
 
 ```cpp
 triepack::Iterator it(dict);
-while (it.next()) {
-    printf("%s -> %d\n", it.key(), it.value());
-}
+while (it.next())
+    std::printf("%s -> %llu\n", it.key().c_str(),
+                (unsigned long long)it.value().as_uint());
+```
+
+Pass a prefix to walk only part of the dictionary. The iterator descends the
+trie to the prefix rather than scanning:
+
+```cpp
+triepack::Iterator it(dict, "app");   // apple, application, apply, ...
+while (it.next())
+    use(it.key(), it.value());
 ```
 
 | Method | Description |
 |--------|-------------|
-| `Iterator(const Dict &dict)` | Create iterator over dict |
-| `bool next()` | Advance; returns false when done |
-| `const char *key()` | Current key |
-| `int32_t value()` | Current value |
+| `Iterator(const Dict &dict)` | Iterate every key |
+| `Iterator(const Dict &dict, const std::string &prefix)` | Iterate keys with the prefix |
+| `bool next()` | Advance; returns false when done or on error |
+| `const std::string &key()` | Current key |
+| `const Value &value()` | Current value |
+| `Status status()` | `Ok` while entries remain, `Eof` at the end, or the error |
+| `Status reset()` | Restart from the beginning |
+
+The dictionary must outlive the iterator.
 
 </div>
 <div class="tp-tab-panel" data-lang="python" markdown="1">
@@ -866,8 +929,9 @@ in lexicographic order. Use `tp_iter_next()` to consume.
 tp_result tp_dict_find_fuzzy(const tp_dict *dict, const char *query,
                               uint8_t max_dist, tp_iterator **out);
 ```
-Returns an iterator over all keys within Levenshtein edit distance
-`max_dist` of `query`. Recommended: `max_dist <= 2` for performance.
+**Not implemented.** Returns `TP_ERR_UNSUPPORTED`. The signature is reserved
+for bounded Levenshtein search over the trie; until it exists the call says
+so rather than returning results it did not compute.
 
 ```c
 tp_result tp_iter_get_distance(const tp_iterator *it, uint8_t *dist);
@@ -878,14 +942,18 @@ for iterators created by `tp_dict_find_fuzzy()`.
 </div>
 <div class="tp-tab-panel" data-lang="cpp" markdown="1">
 
-The C++ wrappers use the same C search functions via the underlying handle:
+Prefix search is the two-argument `Iterator` constructor:
 
 ```cpp
-tp_iterator *it = NULL;
-tp_dict_find_prefix(dict.handle(), "app", &it);
-// ... use tp_iter_next(it, ...) ...
-tp_iter_destroy(&it);
+triepack::Iterator it(dict, "app");
+while (it.next())
+    std::printf("%s\n", it.key().c_str());
 ```
+
+A prefix no key has gives an iterator whose first `next()` returns false;
+an empty prefix walks the whole dictionary.
+
+Fuzzy search is not implemented; see the C tab.
 
 </div>
 <div class="tp-tab-panel" data-lang="python" markdown="1">
