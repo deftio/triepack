@@ -257,9 +257,23 @@ See `docs/internals/` for format details.
 
 ### v1.3 — Tooling & Ecosystem
 - [x] `trp` CLI: encode/decode/validate/inspect
+- [x] Language binding conformance test suite
 - [ ] Fuzzy search (edit distance d<=2)
 - [ ] Performance benchmarks across languages
-- [ ] Language binding conformance test suite
+
+## Contributing
+
+Bug reports and pull requests are welcome. See
+[CONTRIBUTING.md](.github/CONTRIBUTING.md) for how to build and test each
+target, and for what a change to the binary format has to satisfy — every
+implementation has to agree byte for byte, which the
+[conformance suite](tests/conformance/README.md) checks.
+
+Participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Security issues go through [SECURITY.md](SECURITY.md) rather than the public
+tracker.
+
+Releases are cut with `./scripts/make-release.sh`; see [RELEASE.md](RELEASE.md).
 
 ## License
 
