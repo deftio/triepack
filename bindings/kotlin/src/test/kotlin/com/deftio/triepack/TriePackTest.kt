@@ -21,7 +21,7 @@ class TriePackTest {
 
     @Test
     fun testVersion() {
-        assertEquals("1.1.0", VERSION)
+        assertEquals("1.2.0", VERSION)
     }
 
     @Test

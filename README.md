@@ -1,4 +1,4 @@
-# triepack v1.1.0
+# triepack v1.2.0
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)
@@ -235,7 +235,7 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.1.0 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. 27 C/C++ test programs, 97 Python tests, 99 JavaScript tests, 75 Rust tests, 27 Swift tests, plus Go, Kotlin, and Java test suites.
+**v1.2.0.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. All nine implementations run a [shared conformance suite](tests/conformance/README.md) that checks they decode the same fixtures to the same values and re-encode them byte for byte — about 1,500 tests across 56 files.
 
 ## Roadmap
 

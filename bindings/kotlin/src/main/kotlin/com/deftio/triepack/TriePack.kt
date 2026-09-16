@@ -10,7 +10,7 @@
 
 package com.deftio.triepack
 
-const val VERSION = "1.1.0"
+const val VERSION = "1.2.0"
 
 // encode() and decode() are defined in Encoder.kt and Decoder.kt respectively.
 // TpValue is defined in Values.kt.
