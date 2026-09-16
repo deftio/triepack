@@ -12,8 +12,6 @@ For auto-generated docs with parameter types, build with `BUILD_DOCS=ON`.
 
 Use the tabs below to switch between C, C++, Python, and JavaScript APIs.
 
----
-
 ## Error Handling
 
 <div class="tp-tabs">
@@ -117,8 +115,6 @@ try {
 
 </div>
 </div>
-
----
 
 ## Values
 
@@ -346,8 +342,6 @@ No manual value construction needed -- pass a plain object directly.
 </div>
 </div>
 
----
-
 ## Encoder
 
 <div class="tp-tabs">
@@ -569,8 +563,6 @@ const buf = triepack.encode(data);
 </div>
 </div>
 
----
-
 ## Dictionary (Decoder)
 
 <div class="tp-tabs">
@@ -700,11 +692,16 @@ RAII wrapper around `tp_dict`. Include `<triepack/triepack.hpp>`.
 ```cpp
 #include <triepack/triepack.hpp>
 
-triepack::Dict dict(data, size);
+using triepack::Dict;
+using triepack::Status;
+using triepack::Value;
 
-int32_t val;
-if (dict.lookup("apple", &val)) {
-    // val == 42
+Dict dict(data.data(), data.size());   // borrows the buffer
+if (!dict.is_open()) { /* dict.status() says why */ }
+
+Value v;
+if (dict.lookup("apple", v) == Status::Ok) {
+    // v.as_uint() == 42
 }
 
 size_t n = dict.size();  // number of keys
@@ -712,8 +709,12 @@ size_t n = dict.size();  // number of keys
 
 | Method | Description |
 |--------|-------------|
-| `Dict(const uint8_t *data, size_t size)` | Open a `.trp` blob |
-| `bool lookup(const char *key, int32_t *val)` | Look up key, return true if found |
+| `Dict()` / `Dict(const uint8_t *data, size_t size)` | Construct closed, or open a `.trp` blob |
+| `Status open(const uint8_t *data, size_t size)` | Open a buffer, replacing any held |
+| `Status status()` / `bool is_open()` | Outcome of the last open |
+| `Status lookup(const std::string &key, Value &out)` | Look up a key; `Status::NotFound` if absent |
+| `Status lookup(const char *key, size_t len, Value &out)` | Look up a key of arbitrary bytes |
+| `bool contains(const std::string &key)` | Whether the key is present |
 | `size_t size()` | Number of entries |
 | `tp_dict *handle()` | Access the underlying C handle |
 
@@ -777,8 +778,6 @@ There is no separate "open" step or manual memory management.
 
 </div>
 </div>
-
----
 
 ## Iterator
 
@@ -901,8 +900,6 @@ for (const [key, value] of Object.entries(data).sort()) {
 </div>
 </div>
 
----
-
 ## Search
 
 <div class="tp-tabs">
@@ -985,8 +982,6 @@ const matches = Object.fromEntries(
 
 </div>
 </div>
-
----
 
 ## Bitstream
 
@@ -1395,8 +1390,6 @@ Use `triepack.encode()` and `triepack.decode()` instead.
 </div>
 </div>
 
----
-
 ## JSON
 
 <div class="tp-tabs">
@@ -1575,8 +1568,6 @@ structures), use the C or C++ JSON API.
 </div>
 </div>
 
----
-
 ## C++ Wrappers (`triepack::` namespace)
 
 RAII wrappers around the C API. Include `<triepack/triepack.hpp>` for
@@ -1589,7 +1580,7 @@ All wrappers support move construction and move assignment:
 
 ```cpp
 triepack::Encoder enc1;
-enc1.insert("key", 1);
+enc1.add("key", triepack::Value::unsigned_integer(1));
 
 triepack::Encoder enc2 = std::move(enc1);
 // enc1 is now empty (handle() == nullptr)

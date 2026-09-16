@@ -119,8 +119,6 @@ Each layer can be used independently.
 - [API Reference](api-reference) -- full function listing with usage examples
 - [Examples](examples) -- six runnable example programs
 
----
-
 # Tutorial: JSON Round-Trip
 
 This walkthrough encodes a JSON object into the `.trp` binary format,
@@ -161,8 +159,6 @@ and:
 2. **Decode** it back to JSON
 3. **Look up** individual keys
 4. **Verify** the round-trip is lossless
-
----
 
 ### Step-by-Step
 
@@ -501,8 +497,6 @@ console.log("Round-trip OK");
 
 </div>
 </div>
-
----
 
 ### What Happened Under the Hood
 

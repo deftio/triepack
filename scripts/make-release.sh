@@ -403,7 +403,19 @@ else
     confirm "Merge the release PR into ${DEFAULT_BRANCH} (--${MERGE_STRATEGY})?" || die "declined"
 fi
 
-run_git gh pr merge "--${MERGE_STRATEGY}" --delete-branch
+# GitHub composes a squash message by concatenating every commit on the
+# branch, trailers included. Commits landing on the default branch carry the
+# maintainer's name alone — when triepack breaks, that is who gets called — so
+# the message is supplied explicitly with any Co-Authored-By trailers removed.
+if [[ "${MERGE_STRATEGY}" == "squash" && ${DRY_RUN} -eq 0 ]]; then
+    SQUASH_BODY="$(git log --reverse --format='%s%n%n%b' "origin/${DEFAULT_BRANCH}..HEAD" \
+                   | grep -v '^Co-Authored-By:' | cat -s)"
+    gh pr merge --squash --delete-branch \
+        --subject "$(gh pr view --json title --jq .title)" \
+        --body "${SQUASH_BODY}"
+else
+    run_git gh pr merge "--${MERGE_STRATEGY}" --delete-branch
+fi
 
 run_git git checkout "${DEFAULT_BRANCH}"
 run_git git pull --ff-only origin "${DEFAULT_BRANCH}"

@@ -16,8 +16,6 @@ The library descends from `dio_BitFile` (2001), which provided
 to pack/unpack integers of arbitrary bit width. Everything in this spec --
 byte reads, VarInts, symbols, UTF-8 -- is built on that core primitive.
 
----
-
 ## 1. Overview
 
 The bitstream library bridges between **packed bit fields** (storage format)
@@ -43,8 +41,6 @@ Key properties:
 
 All C functions use the `tp_bs_` prefix. Types: `tp_bitstream_reader`,
 `tp_bitstream_writer`.
-
----
 
 ## 2. Bit Numbering and Byte Layout
 
@@ -95,8 +91,6 @@ Byte 0: [1 0 1 0 1 | 0 1 1]
          5 bits       3 bits
        = 0xAB (10101011)
 ```
-
----
 
 ## 3. Fixed-Width Unsigned Integers
 
@@ -160,8 +154,6 @@ tp_result tp_bs_read_bits32(tp_bitstream_reader *r, unsigned int n, uint32_t *ou
 Convenience function for fields known to be ≤32 bits. Returns a `uint32_t`
 directly, avoiding the `uint64_t` intermediate. Recommended for 32-bit
 embedded targets.
-
----
 
 ## 4. Fixed-Width Signed Integers
 
@@ -238,8 +230,6 @@ n = 64: all 64 bits are read, no sign extension required
 using `tp_bs_write_bits()` if you mask manually -- the bit patterns are
 identical.  The sign extension happens only on read, so the same stream
 bytes can be interpreted as signed or unsigned.
-
----
 
 ## 5. VarInt -- Unsigned (LEB128)
 
@@ -324,8 +314,6 @@ Byte:    [C d6 d5 d4 d3 d2 d1 d0]
 
 Maximum: 10 bytes for `uint64_t` (defined as `TP_VARINT_MAX_GROUPS`).
 
----
-
 ## 6. VarInt -- Signed (Zigzag + LEB128)
 
 ```c
@@ -364,8 +352,6 @@ Without zigzag, -1 as a signed 64-bit integer is `0xFFFFFFFFFFFFFFFF`,
 which requires 10 LEB128 bytes. With zigzag, -1 maps to unsigned 1,
 which requires 1 byte. Small negative numbers are just as cheap as small
 positive numbers.
-
----
 
 ## 7. 32-Bit Platform Behavior
 
@@ -449,8 +435,6 @@ The project builds and passes all tests under `-m32` (32-bit mode) in CI.
 This is an Ubuntu GCC 32-bit job that compiles the entire library and
 test suite as 32-bit code.
 
----
-
 ## 8. Symbol Encoding
 
 ### Fixed-Width Symbols
@@ -484,8 +468,6 @@ The stream must be byte-aligned for UTF-8 operations. Validates:
 - Rejects surrogate pairs (U+D800..U+DFFF)
 - Supports full Unicode range U+0000..U+10FFFF
 
----
-
 ## 9. ROM-Safe Stateless Functions
 
 For zero-overhead access to data in ROM or flash, the library provides
@@ -512,8 +494,6 @@ These functions:
 This mirrors the original `ReadAsBitFileNBitQtyAt()` function from
 `dio_BitFile`, which was designed specifically for reading from ROM
 without allocating a BitFile object.
-
----
 
 ## 10. Buffer Management
 
@@ -580,8 +560,6 @@ tp_result tp_bs_reader_direct_ptr(tp_bitstream_reader *r,
 
 Returns a pointer directly into the reader's buffer (byte-aligned only).
 Used for zero-copy access to string and blob values.
-
----
 
 ## 11. Error Handling
 

@@ -10,7 +10,7 @@ const { encode, MAX_ALPHABET_SIZE } = require('./encoder');
 const { decode } = require('./decoder');
 
 // Kept in step with triepack-version.txt by scripts/sync_version.sh.
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 
 // Version of the on-disk .trp format this implementation writes. Distinct
 // from the library version: it changes only when the bytes change.

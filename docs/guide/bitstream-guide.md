@@ -17,8 +17,6 @@ worked with hardware registers, binary protocols, or compression formats,
 some of this will be familiar.  If not, read on -- the ideas are
 straightforward once you see them.
 
----
-
 ## 1. Why Sub-Byte Integers?
 
 Consider storing the letters a-z in a trie.  With 26 letters + 6 control
@@ -35,8 +33,6 @@ Full bytes:  10,000 x 8 x 8 = 640,000 bits
 The bitstream library lets you write `tp_bs_write_bits(w, symbol, 5)` and
 read `tp_bs_read_bits(r, 5, &val)` -- packing each symbol into exactly
 5 bits, no padding, no wasted space.
-
----
 
 ## 2. Bit Numbering: MSB First
 
@@ -56,8 +52,6 @@ Bit value:   1  0  1  0  0  1  0  1
 This is called **MSB-first** or **big-endian bit ordering**, and it
 matches network byte order.  The first bit written is the most
 significant bit of the value.
-
----
 
 ## 3. Writing Packed Bit Fields
 
@@ -109,8 +103,6 @@ Written across the boundary: byte 0 gets 110, byte 1 gets 0001
 The library handles boundary crossing automatically.  You never need to
 think about which byte you're in.
 
----
-
 ## 4. Reading Packed Bit Fields
 
 Reading is the reverse.  You specify how many bits to read, and the
@@ -141,8 +133,6 @@ tp_bs_read_bits_at(rom_data, 40, 5, &val);   // read 5 bits at bit 40
 ```
 
 No object, no cursor, no heap allocation.  Safe for interrupt handlers.
-
----
 
 ## 5. Unsigned vs. Signed: What Changes
 
@@ -212,8 +202,6 @@ After sign extension:          11111111 11111111 11111111 11111101  = -3 (signed
 This is what `tp_bs_read_bits_signed()` does automatically.  Sections 6
 and 7 below walk through the mechanics in detail.
 
----
-
 ## 6. Two's Complement at Arbitrary Widths
 
 Two's complement is how computers represent negative integers.  You
@@ -251,8 +239,6 @@ The same 5 bits, same bit pattern.  The only difference is
 **interpretation**: unsigned treats all bits as magnitude; signed treats
 the MSB as a sign bit and negates accordingly.
 
----
-
 ## 7. Sign Extension: From N Bits to 64 Bits
 
 When you read a signed 5-bit value of -3 (bit pattern 11101), the
@@ -287,8 +273,6 @@ As int64_t: 7  ✓
 
 Sign extension preserves the numeric value when moving from a narrow
 representation to a wider one.
-
----
 
 ## 8. Writing and Reading Signed Values
 
@@ -327,8 +311,6 @@ The bit pattern 11101 (5 bits) can be read as:
 The bits in the stream are identical.  Only the read function determines
 the interpretation.  This is the same as how `(uint8_t)0xFF` is 255 but
 `(int8_t)0xFF` is -1 -- same byte, different type.
-
----
 
 ## 9. Complete Worked Example
 
@@ -376,8 +358,6 @@ tp_bs_writer_destroy(&w);
 19 bits instead of 32 -- a 40% savings per reading.  Multiply by
 thousands of readings and the savings are significant, especially on
 embedded devices with limited flash.
-
----
 
 ## 10. VarInt: Variable-Width Integers
 
@@ -434,8 +414,6 @@ Original → Zigzag → VarInt bytes
 
 Small magnitudes (positive or negative) always take few bytes.
 
----
-
 ## 11. Portability: 32-Bit Processors
 
 The bitstream API uses `uint64_t` and `int64_t` for values and cursor
@@ -475,8 +453,6 @@ tp_bs_read_bits32(r, 5, &sym);   // no uint64_t involved
 This is the recommended path for trie symbol reads on 32-bit embedded
 targets.
 
----
-
 ## 12. Relationship to TriePack
 
 The bitstream library is the foundation of the entire TriePack stack.
@@ -497,8 +473,6 @@ tp_bs_write_bits(w, float_bits, 32)       → IEEE 754 float
 The trie itself is a flat sequence of these packed fields.  The decoder
 reads them back one at a time, using the same widths, to navigate the
 trie and extract values.
-
----
 
 ## See Also
 

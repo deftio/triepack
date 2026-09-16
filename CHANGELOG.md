@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-09-16
+
+### Fixed
+- **The release could never publish.** `check_versions.sh` refused whenever a
+  tag for the declared version existed — but `publish.yml` is *triggered* by
+  that tag, so it always did. v1.3.0 was tagged and every publishing job was
+  skipped. The check now takes `--tagged` for the case where the tag is
+  expected, confirming it points at the commit being built instead of
+  demanding it be absent, and still refusing if a registry already has the
+  version.
+- The GitHub release check reported "gh unavailable, skipped" on runners,
+  because `gh` needs a token. The workflow now passes one.
+
+### Added
+- **PyPI publishing** from `pypi.yml`, by OIDC trusted publishing. PyPI matches
+  its trusted publisher on the workflow filename, as npm does, so the two
+  registries need separate entry points. The gate they both have to pass —
+  version consistency plus the whole cross-language matrix — moved into
+  `_release-tests.yml` and is called by both, so it stays defined once and
+  neither registry can be published to on a red build.
+- `check_versions.sh` now holds PyPI to the same rule as npm rather than just
+  reporting it, including yanked releases, which still occupy a version.
+- npm and PyPI version badges in the README, linking to each package.
+- Badge colours chosen against WCAG AA rather than by eye. Shields' named
+  colours are light, and the coverage badge was white text on `brightgreen` at
+  2.12:1 — well under the 4.5:1 AA needs for normal text. The four coverage
+  steps keep their meaning at 5.1:1 to 6.5:1, and the licence badge moves from
+  4.38:1 to 6.91:1.
+- Branch protection on `main`: force pushes and deletion blocked, and the
+  sixteen checks that run on every pull request required before merging. The
+  release-only checks are deliberately not required, since they never run on a
+  pull request and would block every merge.
+
 ## [1.3.0] - 2026-09-16
 
 ### Added

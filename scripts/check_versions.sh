@@ -13,9 +13,16 @@
 # already published. Registries do not let a version be replaced, so releasing
 # one that is already out there is not recoverable.
 #
-#   ./scripts/check_versions.sh            # report and verdict
+#   ./scripts/check_versions.sh            # before tagging: the tag must be free
+#   ./scripts/check_versions.sh --tagged   # from the tag: it must exist, at HEAD
 #   ./scripts/check_versions.sh --quiet    # verdict only
 #   ./scripts/check_versions.sh --offline  # skip the network, check tags only
+#
+# The tag is the one thing whose expected state flips. Before a release it
+# must not exist; a workflow triggered by that tag runs with it necessarily
+# present, and should instead confirm it points at the commit being built.
+# Registries are checked the same way either way: the version must not be
+# published yet.
 #
 # Exit status: 0 if the declared version is clear to release, 1 if not,
 #              2 on usage error.
@@ -34,10 +41,12 @@ fi
 
 QUIET=0
 OFFLINE=0
+TAGGED=0
 for arg in "$@"; do
     case "$arg" in
         --quiet)   QUIET=1 ;;
         --offline) OFFLINE=1 ;;
+        --tagged)  TAGGED=1 ;;
         -h|--help)
             sed -n '3,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0
@@ -79,7 +88,18 @@ git fetch --tags --quiet origin 2>/dev/null || true
 LATEST_TAG=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -1)
 LATEST_TAG=${LATEST_TAG:-none}
 
-if git rev-parse "v${DECLARED}" >/dev/null 2>&1; then
+if [[ ${TAGGED} -eq 1 ]]; then
+    # Running from the tag: it has to exist, and has to be this commit.
+    if ! git rev-parse "v${DECLARED}" >/dev/null 2>&1; then
+        report "git tag" "v${LATEST_TAG}" "v${DECLARED} does not exist" "${RED}"
+        note_problem
+    elif [[ "$(git rev-parse "v${DECLARED}^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+        report "git tag" "v${LATEST_TAG}" "v${DECLARED} is not this commit" "${RED}"
+        note_problem
+    else
+        report "git tag" "v${LATEST_TAG}" "v${DECLARED} is HEAD" "${GREEN}"
+    fi
+elif git rev-parse "v${DECLARED}" >/dev/null 2>&1; then
     report "git tag" "v${LATEST_TAG}" "v${DECLARED} already exists" "${RED}"
     note_problem
 elif [[ "${LATEST_TAG}" != "none" ]] && ! newer_than "${DECLARED}" "${LATEST_TAG}"; then
@@ -129,13 +149,32 @@ else
     fi
 
     # ----------------------------------------------------------------------
-    # Registries not published to yet. Informational: if a name gets claimed
-    # elsewhere, this is where it shows up.
+    # PyPI — published by pypi.yml, so held to the same rule as npm
     # ----------------------------------------------------------------------
-    PYPI=$(curl -fsS "https://pypi.org/pypi/triepack/json" 2>/dev/null \
-           | python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])" 2>/dev/null || echo "")
-    report "PyPI triepack" "${PYPI:-none}" "$([[ -z "${PYPI}" ]] && echo 'not published' || echo 'published')" "${YELLOW}"
+    PYPI_JSON=$(curl -fsS "https://pypi.org/pypi/triepack/json" 2>/dev/null || echo "")
+    if [[ -z "${PYPI_JSON}" ]]; then
+        report "PyPI triepack" "none" "unpublished" "${GREEN}"
+    else
+        PYPI_LATEST=$(echo "${PYPI_JSON}" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])" 2>/dev/null || echo "")
+        # A version is "on PyPI" if it appears in releases, even yanked.
+        if echo "${PYPI_JSON}" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+sys.exit(0 if '${DECLARED}' in d.get('releases', {}) else 1)
+" 2>/dev/null; then
+            report "PyPI triepack" "${PYPI_LATEST:-?}" "${DECLARED} already published" "${RED}"
+            note_problem
+        elif [[ -n "${PYPI_LATEST}" ]] && ! newer_than "${DECLARED}" "${PYPI_LATEST}"; then
+            report "PyPI triepack" "${PYPI_LATEST}" "not newer than ${PYPI_LATEST}" "${RED}"
+            note_problem
+        else
+            report "PyPI triepack" "${PYPI_LATEST:-none}" "free" "${GREEN}"
+        fi
+    fi
 
+    # crates.io is not published to yet. Informational: if the name gets
+    # claimed elsewhere, this is where it shows up.
     CRATE=$(curl -fsS -H "User-Agent: triepack-release-check" \
             "https://crates.io/api/v1/crates/triepack" 2>/dev/null \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['crate']['max_version'])" 2>/dev/null || echo "")

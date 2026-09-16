@@ -9,7 +9,7 @@ import triepack
 
 
 def test_version():
-    assert triepack.__version__ == "1.3.0"
+    assert triepack.__version__ == "1.3.1"
 
 
 def test_empty_object():
