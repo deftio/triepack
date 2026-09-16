@@ -72,10 +72,13 @@ jobs:
         run: |
           COV_PCT=$(lcov --summary build-cov/lcov.info 2>&1 | grep 'lines' | sed 's/.*: \([0-9.]*\)%.*/\1/')
           COV_INT=${COV_PCT%.*}
-          if [ "$COV_INT" -ge 90 ]; then COLOR="brightgreen"
-          elif [ "$COV_INT" -ge 75 ]; then COLOR="green"
-          elif [ "$COV_INT" -ge 60 ]; then COLOR="yellow"
-          else COLOR="red"; fi
+          # Shields' named colours are light: white text on brightgreen is
+          # 2.12:1, well under the 4.5:1 WCAG AA needs. These are the same
+          # four steps, dark enough to read.
+          if [ "$COV_INT" -ge 90 ]; then COLOR="1F7A1F"
+          elif [ "$COV_INT" -ge 75 ]; then COLOR="2E7D32"
+          elif [ "$COV_INT" -ge 60 ]; then COLOR="8A6100"
+          else COLOR="B3261E"; fi
           printf '{"schemaVersion":1,"label":"C coverage","message":"%s%%","color":"%s"}\n' "$COV_PCT" "$COLOR" > docs/coverage-badge.json
 
       - name: Generate releases page from CHANGELOG

@@ -1,8 +1,10 @@
 # triepack v1.3.1
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/triepack?logo=npm&logoColor=white&label=npm&color=A1231F)](https://www.npmjs.com/package/triepack)
+[![PyPI](https://img.shields.io/pypi/v/triepack?logo=pypi&logoColor=white&label=PyPI&color=2B5B84)](https://pypi.org/project/triepack/)
 [![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)
-[![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-blue.svg)](LICENSE.txt)
+[![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-0A5C9E)](LICENSE.txt)
 
 A compressed trie-based dictionary format for fast, compact key-value storage.
 

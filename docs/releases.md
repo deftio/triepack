@@ -37,6 +37,12 @@ the full history lives in
   neither registry can be published to on a red build.
 - `check_versions.sh` now holds PyPI to the same rule as npm rather than just
   reporting it, including yanked releases, which still occupy a version.
+- npm and PyPI version badges in the README, linking to each package.
+- Badge colours chosen against WCAG AA rather than by eye. Shields' named
+  colours are light, and the coverage badge was white text on `brightgreen` at
+  2.12:1 — well under the 4.5:1 AA needs for normal text. The four coverage
+  steps keep their meaning at 5.1:1 to 6.5:1, and the licence badge moves from
+  4.38:1 to 6.91:1.
 - Branch protection on `main`: force pushes and deletion blocked, and the
   sixteen checks that run on every pull request required before merging. The
   release-only checks are deliberately not required, since they never run on a
