@@ -1,4 +1,4 @@
-# triepack v1.2.0
+# triepack v1.3.0
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)

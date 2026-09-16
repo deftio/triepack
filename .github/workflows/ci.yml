@@ -81,6 +81,13 @@ jobs:
       - name: Changelog
         run: ./scripts/sync_changelog.sh --check
 
+      # What is already published, next to what this tree declares. A pull
+      # request is not a release, so a clash is reported rather than fatal —
+      # the release itself refuses.
+      - name: Published versions
+        continue-on-error: true
+        run: ./scripts/check_versions.sh
+
   conformance-fixtures:
     name: Conformance corpus is in sync
     runs-on: ubuntu-latest

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-16
+
+### Added
+- **`scripts/check_versions.sh`** — reconciles the declared version against
+  everything already published: git tags, GitHub releases, npm, and the
+  registries not published to yet. `sync_version.sh` only checks that the
+  repository agrees with itself, which cannot see a version published by hand,
+  a tag that was never pushed, or a release cut from a different tree. 1.2.0
+  reached npm while the latest tag and GitHub release were still v1.1.0, and
+  nothing in the tooling noticed. The release gate and `publish.yml` now refuse
+  a version that is not strictly newer than everything published; CI reports
+  the same picture on every pull request without failing on it.
+
+### Changed
+- `scripts/make-release.sh` takes `--merge squash|merge|rebase`. Squash suits a
+  release PR that is only a version bump, and flattens a branch carrying real
+  work; squashing more than three commits now warns and asks first.
+
+### Note
+- npm `triepack@1.2.0` was published by hand from a tree that predates the
+  `version()` API, so it is the one artefact that does not match the 1.2.0
+  source. 1.3.0 is the first version published through CI.
+
 ## [1.2.0] - 2026-09-16
 
 ### Fixed
