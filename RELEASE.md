@@ -63,7 +63,7 @@ It prompts before each irreversible step. `--yes` skips the prompts and
 
 ## What the tag triggers
 
-Pushing `vX.Y.Z` runs `.github/workflows/release.yml`:
+Pushing `vX.Y.Z` runs `.github/workflows/publish.yml`:
 
 1. **version** — the tag must equal `triepack-version.txt`, and
    `sync_version.sh --check` must pass.
@@ -89,27 +89,48 @@ TypeScript users get types from the main package.
 
 ### Trusted publishing (OIDC)
 
-The workflow already requests `id-token: write` and publishes with
-`--provenance`, which is everything needed on the CI side. To switch off
-tokens entirely:
+Publishing authenticates by OIDC against the trusted publisher configured on
+npmjs.com. There is no `NPM_TOKEN`: a failed OIDC exchange should fail the
+release loudly rather than fall back to a long-lived token.
 
-1. On npmjs.com, open the `triepack` package → Settings → Trusted publisher.
-2. Add GitHub Actions with repository `deftio/triepack` and workflow
-   `release.yml`.
-3. Delete the `NPM_TOKEN` repository secret.
+The npm-side configuration has to match this repository exactly, and every
+field is case-sensitive:
 
-Until a trusted publisher is configured, the job authenticates with the
-`NPM_TOKEN` secret (an npm automation token). Both paths use the same step;
-`NODE_AUTH_TOKEN` is simply ignored once OIDC is in place.
+| npm field | Value |
+|---|---|
+| Repository owner | `deftio` |
+| Repository | `triepack` |
+| Workflow filename | `publish.yml` |
+| Environment | *(leave empty — the job sets none)* |
+
+The workflow filename is the usual thing to get wrong. It must be the file
+name including the extension, not the workflow's `name:`. That is why the file
+is `publish.yml` even though it also runs the test matrix and cuts the GitHub
+Release.
+
+npm requires Node 22.14+ and npm 11.5.1+ for trusted publishing; the job pins
+Node 24 and upgrades npm before publishing. Provenance is attached
+automatically when publishing this way, so `--provenance` is not passed.
 
 ### First publish
 
-The name is unregistered, so the first publish also claims it. Check the
-tarball first:
+`triepack` has never been published, so the first release also claims the
+name. With a trusted publisher configured, tagging is all it takes — CI
+publishes after the matrix is green.
+
+npm's documentation does not say whether a trusted publisher can be configured
+for a package that does not exist yet. If the first CI publish is rejected for
+that reason, claim the name once by hand and let CI take over from the next
+release:
 
 ```bash
-cd bindings/javascript && npm pack --dry-run
+cd bindings/javascript
+npm pack --dry-run     # confirm the contents first
+npm publish            # requires npm login
 ```
+
+Either way, check what is in the tarball before the first publish: a version
+on npm cannot be replaced.
 
 ## PyPI
 
@@ -124,7 +145,7 @@ twine check dist/*
 ```
 
 No publish workflow is wired up yet. Adding one means a job alongside `npm` in
-`release.yml` with `id-token: write`, using PyPI's trusted publishing.
+`publish.yml` with `id-token: write`, using PyPI's trusted publishing.
 
 ## Checklist
 

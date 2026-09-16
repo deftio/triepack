@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently skipping. See `RELEASE.md`.
 - **npm publishing.** The `triepack` package is built from
   `bindings/javascript`, ships bundled TypeScript declarations
-  (`src/index.d.ts`), and publishes from `release.yml` only after the whole
+  (`src/index.d.ts`), and publishes from `publish.yml` only after the whole
   cross-language test matrix passes. The job requests `id-token: write` and
   publishes with `--provenance`, so switching to OIDC trusted publishing is a
   registry-side setting; it is idempotent if the version already exists.

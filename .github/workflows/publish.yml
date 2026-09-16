@@ -1,4 +1,4 @@
-name: Tagged Release
+name: Release & Publish
 
 on:
   push:
@@ -165,21 +165,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Required for npm trusted publishing (OIDC) and for provenance.
+      # Required for npm trusted publishing (OIDC).
       id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
+      # Trusted publishing needs Node 22.14+ and npm 11.5.1+.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
-      # Trusted publishing needs npm 11.5.1 or newer; the bundled npm is older.
-      - name: Update npm
-        run: npm install -g npm@latest
+      - name: Confirm the toolchain is new enough for trusted publishing
+        run: |
+          node --version
+          npm --version
+          npm install -g npm@latest
+          npm --version
 
       - name: Confirm the package version matches the tag
         working-directory: bindings/javascript
@@ -206,12 +211,12 @@ jobs:
         working-directory: bindings/javascript
         run: npm publish --dry-run
 
-      # Prefers OIDC trusted publishing: once the package is configured with a
-      # trusted publisher on npmjs.com, NPM_TOKEN is not needed and can be
-      # deleted. Until then the token is the fallback.
+      # Authenticates by OIDC against the trusted publisher configured on
+      # npmjs.com, which must name this workflow file exactly (publish.yml).
+      # No NPM_TOKEN: if the OIDC exchange fails we want a loud failure, not a
+      # silent fall back to a long-lived token. Provenance is attached
+      # automatically when publishing this way.
       - name: Publish
         if: steps.published.outputs.skip == 'false'
         working-directory: bindings/javascript
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish

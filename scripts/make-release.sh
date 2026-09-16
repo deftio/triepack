@@ -395,7 +395,7 @@ run_git git tag -a "${TAG}" -m "triepack ${TAG}"
 run_git git push origin "${TAG}"
 
 echo -e "\n${GREEN}${BOLD}Released ${TAG}.${NC}"
-echo "  The tag triggers .github/workflows/release.yml, which re-runs the"
+echo "  The tag triggers .github/workflows/publish.yml, which re-runs the"
 echo "  full test matrix and only then creates the GitHub Release and"
 echo "  publishes to npm."
 echo ""
