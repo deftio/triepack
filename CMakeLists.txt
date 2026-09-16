@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(triepack VERSION 1.1.0 LANGUAGES C CXX)
+
+# Single source of truth for the release version. Every package manifest,
+# the docs site and the CLI derive from this file; scripts/sync_version.sh
+# propagates it and --check fails if anything has drifted.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/triepack-version.txt" TRIEPACK_VERSION)
+string(STRIP "${TRIEPACK_VERSION}" TRIEPACK_VERSION)
+
+project(triepack VERSION ${TRIEPACK_VERSION} LANGUAGES C CXX)
 
 # ── Options ──────────────────────────────────────────────────────────────
 option(BUILD_TESTS    "Build test suite"           ON)
