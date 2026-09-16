@@ -81,7 +81,16 @@ pub fn decode(buffer: &[u8]) -> Result<HashMap<String, Value>, TriePackError> {
 
     reader.seek(data_start);
     let bps = reader.read_bits(4)? as usize;
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    if !(1..=8).contains(&bps) {
+        return Err(TriePackError::Alphabet(bps));
+    }
     let symbol_count = reader.read_bits(8)? as usize;
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    if symbol_count < NUM_CONTROL_CODES || symbol_count > (1usize << bps) {
+        return Err(TriePackError::Alphabet(symbol_count));
+    }
 
     // Read control codes
     let mut ctrl_codes = [0u32; NUM_CONTROL_CODES];
@@ -104,6 +113,9 @@ pub fn decode(buffer: &[u8]) -> Result<HashMap<String, Value>, TriePackError> {
 
     let trie_start = data_start + trie_data_offset as usize;
     let value_start = data_start + value_store_offset as usize;
+    // The trie occupies [trie_start, value_start); the value store (when
+    // present), the byte padding and the CRC follow it.
+    let trie_end = value_start;
 
     // DFS iteration to collect all keys
     let mut result: HashMap<String, Value> = HashMap::new();
@@ -117,6 +129,7 @@ pub fn decode(buffer: &[u8]) -> Result<HashMap<String, Value>, TriePackError> {
         &reverse_map,
         &mut key_stack,
         &mut result,
+        trie_end,
     )?;
 
     // Decode values
@@ -134,6 +147,12 @@ pub fn decode(buffer: &[u8]) -> Result<HashMap<String, Value>, TriePackError> {
 }
 
 /// DFS walk through the trie collecting keys.
+///
+/// Every subtree knows where it ends: a child with a SKIP ends at
+/// `child_start + skip_dist`, the last child ends where its parent does, and
+/// the root ends at the start of the value store. `end` is the only authority
+/// on whether more symbols belong to this subtree -- the bits that happen to
+/// follow are not, because past the last terminal they are padding and CRC.
 fn dfs_walk(
     r: &mut BitReader,
     bps: usize,
@@ -141,9 +160,10 @@ fn dfs_walk(
     reverse_map: &[u8; 256],
     key_stack: &mut Vec<u8>,
     result: &mut HashMap<String, Value>,
+    end: usize,
 ) -> Result<(), TriePackError> {
     loop {
-        if r.remaining() < bps {
+        if r.position() >= end {
             return Ok(());
         }
         let sym = r.read_bits(bps)? as u32;
@@ -154,15 +174,7 @@ fn dfs_walk(
                 .map_err(|_| TriePackError::InvalidUtf8)?;
             result.insert(key_str, Value::Null);
 
-            // Check if a BRANCH follows (terminal with children)
-            if r.remaining() >= bps {
-                let next_sym = r.peek_bits(bps)? as u32;
-                if next_sym == ctrl_codes[CTRL_BRANCH] {
-                    r.read_bits(bps)?; // consume BRANCH
-                    let child_count = read_var_uint(r)? as usize;
-                    walk_branch(r, bps, ctrl_codes, reverse_map, key_stack, result, child_count)?;
-                }
-            }
+            walk_branch_if_present(r, bps, ctrl_codes, reverse_map, key_stack, result, end)?;
             return Ok(());
         }
 
@@ -173,21 +185,13 @@ fn dfs_walk(
                 .map_err(|_| TriePackError::InvalidUtf8)?;
             result.insert(key_str, Value::Null); // placeholder, replaced during value decode
 
-            // Check if a BRANCH follows
-            if r.remaining() >= bps {
-                let next_sym = r.peek_bits(bps)? as u32;
-                if next_sym == ctrl_codes[CTRL_BRANCH] {
-                    r.read_bits(bps)?; // consume BRANCH
-                    let child_count = read_var_uint(r)? as usize;
-                    walk_branch(r, bps, ctrl_codes, reverse_map, key_stack, result, child_count)?;
-                }
-            }
+            walk_branch_if_present(r, bps, ctrl_codes, reverse_map, key_stack, result, end)?;
             return Ok(());
         }
 
         if sym == ctrl_codes[CTRL_BRANCH] {
             let child_count = read_var_uint(r)? as usize;
-            walk_branch(r, bps, ctrl_codes, reverse_map, key_stack, result, child_count)?;
+            walk_branch(r, bps, ctrl_codes, reverse_map, key_stack, result, child_count, end)?;
             return Ok(());
         }
 
@@ -201,7 +205,33 @@ fn dfs_walk(
     }
 }
 
+/// A terminal is followed by a BRANCH exactly when the subtree has not reached
+/// its end -- keys that share this terminal as a prefix.
+#[allow(clippy::too_many_arguments)]
+fn walk_branch_if_present(
+    r: &mut BitReader,
+    bps: usize,
+    ctrl_codes: &[u32; NUM_CONTROL_CODES],
+    reverse_map: &[u8; 256],
+    key_stack: &mut Vec<u8>,
+    result: &mut HashMap<String, Value>,
+    end: usize,
+) -> Result<(), TriePackError> {
+    if r.position() >= end {
+        return Ok(());
+    }
+    let sym = r.read_bits(bps)? as u32;
+    if sym != ctrl_codes[CTRL_BRANCH] {
+        return Err(TriePackError::InvalidParam(
+            "Malformed trie: expected BRANCH after terminal",
+        ));
+    }
+    let child_count = read_var_uint(r)? as usize;
+    walk_branch(r, bps, ctrl_codes, reverse_map, key_stack, result, child_count, end)
+}
+
 /// Walk through a branch node's children.
+#[allow(clippy::too_many_arguments)]
 fn walk_branch(
     r: &mut BitReader,
     bps: usize,
@@ -210,6 +240,7 @@ fn walk_branch(
     key_stack: &mut Vec<u8>,
     result: &mut HashMap<String, Value>,
     child_count: usize,
+    end: usize,
 ) -> Result<(), TriePackError> {
     let saved_key_len = key_stack.len();
 
@@ -224,7 +255,12 @@ fn walk_branch(
 
         let child_start_pos = r.position();
         key_stack.truncate(saved_key_len);
-        dfs_walk(r, bps, ctrl_codes, reverse_map, key_stack, result)?;
+        let child_end = if has_skip {
+            child_start_pos + skip_dist as usize
+        } else {
+            end
+        };
+        dfs_walk(r, bps, ctrl_codes, reverse_map, key_stack, result, child_end)?;
 
         if has_skip {
             r.seek(child_start_pos + skip_dist as usize);

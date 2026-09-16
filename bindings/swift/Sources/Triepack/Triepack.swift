@@ -22,10 +22,52 @@ public enum TriepackError: Error, Equatable {
     case overflow
     case eof
     case invalidData(String)
+    /// Keys use more distinct byte values than the format can address.
+    /// The payload is the alphabet size that was rejected.
+    case alphabetTooLarge(Int)
 }
 
 /// Native Swift implementation of the Triepack .trp binary format.
+/// Metadata about a triepack build. Every implementation reports the same
+/// fields, so a polyglot system can ask each one what it is.
+public struct VersionInfo: Equatable {
+    public let name: String
+    public let implementation: String
+    public let version: String
+    public let versionMajor: Int
+    public let versionMinor: Int
+    public let versionPatch: Int
+    public let formatVersionMajor: Int
+    public let formatVersionMinor: Int
+    public let maxAlphabetSize: Int
+}
+
 public struct Triepack {
+    /// Library version, kept in step with triepack-version.txt by
+    /// scripts/sync_version.sh.
+    public static let version = "1.2.0"
+
+    /// Version of the on-disk .trp format this implementation writes.
+    /// Distinct from the library version: it changes only when the bytes
+    /// change.
+    public static let formatVersionMajor = 1
+    public static let formatVersionMinor = 0
+
+    /// Return metadata about this build.
+    public static func versionInfo() -> VersionInfo {
+        let parts = version.split(separator: ".").map { Int($0) ?? 0 }
+        return VersionInfo(
+            name: "triepack",
+            implementation: "swift",
+            version: version,
+            versionMajor: parts.count > 0 ? parts[0] : 0,
+            versionMinor: parts.count > 1 ? parts[1] : 0,
+            versionPatch: parts.count > 2 ? parts[2] : 0,
+            formatVersionMajor: formatVersionMajor,
+            formatVersionMinor: formatVersionMinor,
+            maxAlphabetSize: triepackMaxAlphabetSize)
+    }
+
     /// Encode a dictionary into the .trp binary format.
     ///
     /// - Parameter data: The dictionary to encode.

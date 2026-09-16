@@ -319,13 +319,18 @@ void test_iterator_lifecycle(void)
     TEST_ASSERT_EQUAL(TP_OK, tp_dict_iterate(dict, &it));
     TEST_ASSERT_NOT_NULL(it);
 
-    /* Current implementation returns EOF immediately */
     const char *key;
     size_t key_len;
     tp_value val;
+    TEST_ASSERT_EQUAL(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_size_t(4, key_len);
+    TEST_ASSERT_EQUAL_MEMORY("test", key, 4);
+    TEST_ASSERT_EQUAL(TP_NULL, val.type);
     TEST_ASSERT_EQUAL(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
 
     TEST_ASSERT_EQUAL(TP_OK, tp_iter_reset(it));
+    TEST_ASSERT_EQUAL(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_MEMORY("test", key, 4);
     TEST_ASSERT_EQUAL(TP_OK, tp_iter_destroy(&it));
     TEST_ASSERT_NULL(it);
 
@@ -516,11 +521,32 @@ void test_find_prefix_basic(void)
     TEST_ASSERT_EQUAL(TP_OK, tp_dict_find_prefix(dict, "app", &it));
     TEST_ASSERT_NOT_NULL(it);
 
-    /* Current implementation returns EOF immediately (stub) */
+    /* Only the two keys under "app", in order, with their values. */
     const char *key;
     size_t key_len;
     tp_value val;
+    TEST_ASSERT_EQUAL(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_size_t(5, key_len);
+    TEST_ASSERT_EQUAL_MEMORY("apple", key, 5);
+    TEST_ASSERT_EQUAL_INT64(1, val.data.int_val);
+    TEST_ASSERT_EQUAL(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_size_t(11, key_len);
+    TEST_ASSERT_EQUAL_MEMORY("application", key, 11);
+    TEST_ASSERT_EQUAL_INT64(2, val.data.int_val);
     TEST_ASSERT_EQUAL(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
+    tp_iter_destroy(&it);
+
+    /* A prefix nothing matches yields an iterator that is immediately done. */
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_find_prefix(dict, "zzz", &it));
+    TEST_ASSERT_EQUAL(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
+    tp_iter_destroy(&it);
+
+    /* An empty prefix walks the whole dictionary. */
+    TEST_ASSERT_EQUAL(TP_OK, tp_dict_find_prefix(dict, "", &it));
+    int seen = 0;
+    while (tp_iter_next(it, &key, &key_len, &val) == TP_OK)
+        seen++;
+    TEST_ASSERT_EQUAL_INT(3, seen);
 
     tp_iter_destroy(&it);
     tp_dict_close(&dict);
@@ -548,11 +574,11 @@ void test_find_fuzzy_basic(void)
     tp_dict *dict = NULL;
     tp_dict_open(&dict, buf, len);
 
+    /* Bounded edit-distance search is not implemented; it says so rather
+       than returning every key. */
     tp_iterator *it = NULL;
-    TEST_ASSERT_EQUAL(TP_OK, tp_dict_find_fuzzy(dict, "helo", 2, &it));
-    TEST_ASSERT_NOT_NULL(it);
-
-    tp_iter_destroy(&it);
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_dict_find_fuzzy(dict, "helo", 2, &it));
+    TEST_ASSERT_NULL(it);
     tp_dict_close(&dict);
     tp_encoder_destroy(&enc);
     free(buf);
@@ -884,9 +910,13 @@ void test_iter_next_returns_eof(void)
     const char *key;
     size_t key_len;
     tp_value val;
-    /* First call returns EOF (stub implementation) */
+    /* The single key, then EOF — and EOF again once the done flag is set. */
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_size_t(1, key_len);
+    TEST_ASSERT_EQUAL_MEMORY("a", key, 1);
+    TEST_ASSERT_EQUAL(TP_INT, val.type);
+    TEST_ASSERT_EQUAL_INT64(1, val.data.int_val);
     TEST_ASSERT_EQUAL_INT(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
-    /* Second call also returns EOF (done flag set) */
     TEST_ASSERT_EQUAL_INT(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
 
     tp_iter_destroy(&it);
@@ -915,10 +945,14 @@ void test_iter_reset_and_next(void)
     const char *key;
     size_t key_len;
     tp_value val;
-    tp_iter_next(it, &key, &key_len, &val);
-    /* Reset and try again */
-    tp_iter_reset(it);
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_iter_next(it, &key, &key_len, &val));
     TEST_ASSERT_EQUAL_INT(TP_ERR_EOF, tp_iter_next(it, &key, &key_len, &val));
+    /* Reset replays the dictionary from the start. */
+    tp_iter_reset(it);
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_iter_next(it, &key, &key_len, &val));
+    TEST_ASSERT_EQUAL_MEMORY("a", key, 1);
+    TEST_ASSERT_EQUAL(TP_INT, val.type);
+    TEST_ASSERT_EQUAL_INT64(1, val.data.int_val);
 
     tp_iter_destroy(&it);
     tp_dict_close(&dict);

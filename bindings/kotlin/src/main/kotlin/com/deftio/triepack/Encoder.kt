@@ -26,6 +26,14 @@ internal const val CTRL_BRANCH = 5
 internal const val NUM_CONTROL_CODES = 6
 
 /**
+ * Largest number of distinct byte values the keys may use.
+ *
+ * `symbol_count` is an 8-bit header field holding the alphabet plus the
+ * control codes, so the alphabet cannot exceed `255 - 6`.
+ */
+const val MAX_ALPHABET_SIZE: Int = 255 - NUM_CONTROL_CODES // 249
+
+/**
  * Internal context passed through trie encoding.
  */
 private class EncodeContext(
@@ -67,6 +75,13 @@ fun encode(data: Map<String, TpValue?>): ByteArray {
 
     val alphabetSize = used.count { it }
     val totalSymbols = alphabetSize + NUM_CONTROL_CODES
+    // The trie config packs symbol_count into 8 header bits, so the alphabet
+    // plus the 6 control codes must fit in 255. Encoding a wider alphabet used
+    // to produce a buffer with a valid CRC that decoded to nothing.
+    require(totalSymbols <= 255) {
+        "Keys use too many distinct byte values ($alphabetSize); " +
+            "the format allows at most $MAX_ALPHABET_SIZE"
+    }
     var bps = 1
     while ((1 shl bps) < totalSymbols) {
         bps++

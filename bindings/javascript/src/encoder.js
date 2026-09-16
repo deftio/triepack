@@ -25,6 +25,10 @@ const CTRL_SKIP = 2;
 const CTRL_BRANCH = 5;
 const NUM_CONTROL_CODES = 6;
 
+// Largest number of distinct byte values the keys may use: symbol_count is
+// an 8-bit header field holding the alphabet plus the control codes.
+const MAX_ALPHABET_SIZE = 255 - NUM_CONTROL_CODES; // 249
+
 function encode(data) {
     if (data === null || data === undefined || typeof data !== 'object') {
         throw new TypeError('encode expects a plain object');
@@ -76,6 +80,15 @@ function encode(data) {
     }
 
     const totalSymbols = alphabetSize + NUM_CONTROL_CODES;
+    // The trie config packs symbol_count into 8 header bits, so the alphabet
+    // plus the 6 control codes must fit in 255. Encoding a wider alphabet
+    // used to produce a buffer with a valid CRC that decoded to nothing.
+    if (totalSymbols > 255) {
+        throw new RangeError(
+            'Keys use too many distinct byte values (' + alphabetSize +
+            '); the format allows at most ' + MAX_ALPHABET_SIZE
+        );
+    }
     let bps = 1;
     while ((1 << bps) < totalSymbols) bps++;
 
@@ -401,4 +414,4 @@ function trieWrite(ctx, w, start, end, prefixLen, valueIdx) {
     }
 }
 
-module.exports = { encode };
+module.exports = { encode, MAX_ALPHABET_SIZE };

@@ -21,7 +21,7 @@ class TriePackTest {
 
     @Test
     fun testVersion() {
-        assertEquals("0.1.0", VERSION)
+        assertEquals(declaredVersion(), VERSION)
     }
 
     @Test
@@ -358,5 +358,95 @@ class TriePackTest {
         val buf = encode(data)
         val result = decode(buf)
         assertEquals(data, result)
+    }
+
+    // Regression: issue #1 -- walk must stop at the end of the trie.
+    //
+    // The walker used to guess whether a BRANCH followed a terminal by peeking
+    // at the next bits. Past the last terminal those bits are the byte padding
+    // and the CRC, which for some key sets look exactly like a BRANCH code,
+    // sending the walker off the end of the buffer. The trie end comes from
+    // the header, so the walker must stop there.
+    //
+    // Each of these key sets produced a trailing BRANCH-looking code before
+    // the fix.
+    private val trailingBranchKeySets = listOf(
+        listOf("eddb", "h"),
+        listOf("aad", "ebg", "ec", "ehhbf", "h", "hebad"),
+        listOf("aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"),
+        listOf("a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg")
+    )
+
+    @Test
+    fun testWalkStopsAtTrieEndKeysOnly() {
+        for (keys in trailingBranchKeySets) {
+            val data: Map<String, TpValue?> = keys.associateWith { null }
+            assertEquals(data, decode(encode(data)), "key set $keys")
+        }
+    }
+
+    @Test
+    fun testWalkStopsAtTrieEndWithValues() {
+        for (keys in trailingBranchKeySets) {
+            val data = keys.withIndex()
+                .associate { (i, k) -> k to (TpValue.UInt(i.toLong()) as TpValue?) }
+            assertEquals(data, decode(encode(data)), "key set $keys")
+        }
+    }
+
+    @Test
+    fun testHeaderDeclaresExactlyTheBitsWritten() {
+        val data = mapOf<String, TpValue?>("eddb" to null, "h" to null)
+        val buf = encode(data)
+        fun u32(off: Int): Int =
+            ((buf[off].toInt() and 0xFF) shl 24) or
+                ((buf[off + 1].toInt() and 0xFF) shl 16) or
+                ((buf[off + 2].toInt() and 0xFF) shl 8) or
+                (buf[off + 3].toInt() and 0xFF)
+        val valueStoreOffset = u32(16)
+        val totalDataBits = u32(24)
+        // No values, so the trie is the whole data section, and the data
+        // section plus its byte padding and the 4-byte CRC is the buffer.
+        assertEquals(valueStoreOffset, totalDataBits)
+        assertEquals(32 + (totalDataBits + 7) / 8 + 4, buf.size)
+    }
+
+
+    // ── Version metadata ──────────────────────────────────────────────
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private fun declaredVersion(): String {
+        var dir: java.io.File? = java.io.File("").absoluteFile
+        while (dir != null) {
+            val candidate = java.io.File(dir, "triepack-version.txt")
+            if (candidate.isFile) return candidate.readText().trim()
+            dir = dir.parentFile
+        }
+        error("cannot locate triepack-version.txt")
+    }
+
+    @Test
+    fun testVersionMatchesSourceOfTruth() {
+        val want = declaredVersion()
+        assertEquals(want, VERSION)
+        assertEquals(want, version().version)
+    }
+
+    @Test
+    fun testVersionMetadataShape() {
+        val want = declaredVersion()
+        val parts = want.split(".").map { it.toInt() }
+        val got = version()
+        assertEquals("triepack", got.name)
+        assertEquals("kotlin", got.implementation)
+        assertEquals(parts[0], got.versionMajor)
+        assertEquals(parts[1], got.versionMinor)
+        assertEquals(parts[2], got.versionPatch)
+        assertEquals(1, got.formatVersionMajor)
+        assertEquals(0, got.formatVersionMinor)
+        assertEquals(249, got.maxAlphabetSize)
     }
 }

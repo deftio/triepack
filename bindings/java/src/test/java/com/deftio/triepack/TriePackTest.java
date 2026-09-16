@@ -379,4 +379,114 @@ class TriePackTest {
         buf[crcDataLen + 3] = (byte) (newCrc & 0xFF);
         assertThrows(IllegalArgumentException.class, () -> TriePack.decode(buf));
     }
+
+    // ── Regression: issue #1 -- walk must stop at the end of the trie ──
+    //
+    // The walker used to guess whether a BRANCH followed a terminal by peeking
+    // at the next bits. Past the last terminal those bits are the byte padding
+    // and the CRC, which for some key sets look exactly like a BRANCH code,
+    // sending the walker off the end of the buffer. The trie end comes from
+    // the header, so the walker must stop there.
+    //
+    // Each of these key sets produced a trailing BRANCH-looking code before
+    // the fix.
+
+    private static final String[][] TRAILING_BRANCH_KEY_SETS = {
+        { "eddb", "h" },
+        { "aad", "ebg", "ec", "ehhbf", "h", "hebad" },
+        { "aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb" },
+        { "a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg" },
+    };
+
+    @Test
+    void testWalkStopsAtTrieEndKeysOnly() {
+        for (String[] keys : TRAILING_BRANCH_KEY_SETS) {
+            Map<String, TpValue> data = new LinkedHashMap<>();
+            for (String k : keys) {
+                data.put(k, TpValue.ofNull());
+            }
+            Map<String, TpValue> result = TriePack.decode(TriePack.encode(data));
+            assertEquals(keys.length, result.size());
+            for (String k : keys) {
+                assertNotNull(result.get(k), k);
+                assertEquals(TpValue.Type.NULL, result.get(k).getType(), k);
+            }
+        }
+    }
+
+    @Test
+    void testWalkStopsAtTrieEndWithValues() {
+        for (String[] keys : TRAILING_BRANCH_KEY_SETS) {
+            Map<String, TpValue> data = new LinkedHashMap<>();
+            for (int i = 0; i < keys.length; i++) {
+                data.put(keys[i], TpValue.ofUInt(i));
+            }
+            Map<String, TpValue> result = TriePack.decode(TriePack.encode(data));
+            assertEquals(keys.length, result.size());
+            for (int i = 0; i < keys.length; i++) {
+                assertNotNull(result.get(keys[i]), keys[i]);
+                assertEquals(i, result.get(keys[i]).uintValue(), keys[i]);
+            }
+        }
+    }
+
+    @Test
+    void testHeaderDeclaresExactlyTheBitsWritten() {
+        Map<String, TpValue> data = new LinkedHashMap<>();
+        data.put("eddb", TpValue.ofNull());
+        data.put("h", TpValue.ofNull());
+        byte[] buf = TriePack.encode(data);
+        int valueStoreOffset = u32(buf, 16);
+        int totalDataBits = u32(buf, 24);
+        // No values, so the trie is the whole data section, and the data
+        // section plus its byte padding and the 4-byte CRC is the buffer.
+        assertEquals(valueStoreOffset, totalDataBits);
+        assertEquals(32 + (totalDataBits + 7) / 8 + 4, buf.length);
+    }
+
+    private static int u32(byte[] buf, int off) {
+        return ((buf[off] & 0xFF) << 24) | ((buf[off + 1] & 0xFF) << 16)
+             | ((buf[off + 2] & 0xFF) << 8) | (buf[off + 3] & 0xFF);
+    }
+
+
+    // ── Version metadata ──────────────────────────────────────────────
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private static String declaredVersion() throws java.io.IOException {
+        java.nio.file.Path here = java.nio.file.Paths.get("").toAbsolutePath();
+        for (java.nio.file.Path p = here; p != null; p = p.getParent()) {
+            java.nio.file.Path candidate = p.resolve("triepack-version.txt");
+            if (java.nio.file.Files.isRegularFile(candidate)) {
+                return new String(java.nio.file.Files.readAllBytes(candidate),
+                                  java.nio.charset.StandardCharsets.UTF_8).trim();
+            }
+        }
+        throw new IllegalStateException("cannot locate triepack-version.txt from " + here);
+    }
+
+    @Test
+    void testVersionMatchesSourceOfTruth() throws java.io.IOException {
+        String want = declaredVersion();
+        assertEquals(want, TriePack.VERSION);
+        assertEquals(want, TriePack.version().version);
+    }
+
+    @Test
+    void testVersionMetadataShape() throws java.io.IOException {
+        String want = declaredVersion();
+        String[] parts = want.split("\\.");
+        TriePack.VersionInfo got = TriePack.version();
+        assertEquals("triepack", got.name);
+        assertEquals("java", got.implementation);
+        assertEquals(Integer.parseInt(parts[0]), got.versionMajor);
+        assertEquals(Integer.parseInt(parts[1]), got.versionMinor);
+        assertEquals(Integer.parseInt(parts[2]), got.versionPatch);
+        assertEquals(1, got.formatVersionMajor);
+        assertEquals(0, got.formatVersionMinor);
+        assertEquals(249, got.maxAlphabetSize);
+    }
 }

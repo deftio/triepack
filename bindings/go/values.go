@@ -39,26 +39,26 @@ func encodeValue(w *BitWriter, val interface{}) error {
 	case int:
 		if v < 0 {
 			w.WriteBits(tpInt, 4)
-			writeVarInt(w, v)
+			writeVarInt(w, int64(v))
 		} else {
 			w.WriteBits(tpUint, 4)
-			writeVarUint(w, v)
+			writeVarUint(w, uint64(v))
 		}
 		return nil
 
 	case int64:
 		if v < 0 {
 			w.WriteBits(tpInt, 4)
-			writeVarInt(w, int(v))
+			writeVarInt(w, v)
 		} else {
 			w.WriteBits(tpUint, 4)
-			writeVarUint(w, int(v))
+			writeVarUint(w, uint64(v))
 		}
 		return nil
 
 	case uint64:
 		w.WriteBits(tpUint, 4)
-		writeVarUint(w, int(v))
+		writeVarUint(w, v)
 		return nil
 
 	case float32:
@@ -78,14 +78,14 @@ func encodeValue(w *BitWriter, val interface{}) error {
 	case string:
 		encoded := []byte(v)
 		w.WriteBits(tpString, 4)
-		writeVarUint(w, len(encoded))
+		writeVarUint(w, uint64(len(encoded)))
 		w.AlignToByte()
 		w.WriteBytes(encoded)
 		return nil
 
 	case []byte:
 		w.WriteBits(tpBlob, 4)
-		writeVarUint(w, len(v))
+		writeVarUint(w, uint64(len(v)))
 		w.AlignToByte()
 		w.WriteBytes(v)
 		return nil
@@ -148,24 +148,24 @@ func decodeValue(r *BitReader) (interface{}, error) {
 		return math.Float64frombits(bits), nil
 
 	case tpString:
-		slen, err := readVarUint(r)
+		slenRaw, err := readVarUint(r)
 		if err != nil {
 			return nil, err
 		}
 		r.AlignToByte()
-		raw, err := r.ReadBytes(slen)
+		raw, err := r.ReadBytes(int(slenRaw))
 		if err != nil {
 			return nil, err
 		}
 		return string(raw), nil
 
 	case tpBlob:
-		blen, err := readVarUint(r)
+		blenRaw, err := readVarUint(r)
 		if err != nil {
 			return nil, err
 		}
 		r.AlignToByte()
-		data, err := r.ReadBytes(blen)
+		data, err := r.ReadBytes(int(blenRaw))
 		if err != nil {
 			return nil, err
 		}

@@ -1,14 +1,59 @@
 # Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
 
 [build-system]
-requires = ["setuptools>=45"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "triepack"
-version = "0.1.0"
-description = "Native Python implementation of the Triepack .trp binary format"
+version = "1.2.0"
+description = "Compressed trie dictionary format (.trp) — compact binary key-value storage with fast lookups and prefix search. Pure Python, no dependencies."
+readme = "README.md"
 requires-python = ">=3.8"
+license = "BSD-2-Clause"
+license-files = ["LICENSE.txt"]
+authors = [{ name = "M. A. Chatterjee", email = "deftio@deftio.com" }]
+keywords = [
+    "trie",
+    "prefix-tree",
+    "dictionary",
+    "binary-format",
+    "serialization",
+    "compression",
+    "key-value",
+    "prefix-search",
+    "trp",
+    "triepack",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Archiving :: Compression",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://deftio.github.io/triepack/"
+Documentation = "https://deftio.github.io/triepack/guide/api-reference/"
+Repository = "https://github.com/deftio/triepack"
+Issues = "https://github.com/deftio/triepack/issues"
+Changelog = "https://github.com/deftio/triepack/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = ["pytest"]
+
+[tool.setuptools]
+# Ship the package only. The test suite reads fixtures from tests/conformance/
+# in the repository, which is not part of a release.
+packages = ["triepack"]

@@ -1,0 +1,82 @@
+name: Bug report
+description: Something behaves differently from what the format or docs say
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For anything security-related please use
+        [SECURITY.md](https://github.com/deftio/triepack/blob/main/SECURITY.md)
+        instead of a public issue.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Where does it happen? Pick every one you have confirmed.
+      multiple: true
+      options:
+        - C library
+        - C++ wrapper
+        - trp CLI
+        - JavaScript
+        - TypeScript
+        - Python
+        - Go
+        - Rust
+        - Swift
+        - Java
+        - Kotlin
+        - Documentation
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `triepack-version.txt`, `trp version`, or the package version.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: |
+        The smallest input that shows the problem. A key set, a code snippet,
+        or a `.trp` buffer as hex or base64 — whichever is smaller. If it only
+        happens for some key sets, say which ones you have tried.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        OS and version, plus the toolchain. For the C library that means the
+        compiler and its version; for a binding, the language runtime version.
+      placeholder: |
+        macOS 15.2 (arm64)
+        clang 16.0.0 / node 20.11 / CPython 3.12.1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: cross-language
+    attributes:
+      label: Cross-language
+      options:
+        - label: I checked whether another implementation does the same thing
+          required: false

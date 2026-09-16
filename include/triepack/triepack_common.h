@@ -51,11 +51,14 @@ typedef enum {
     TP_ERR_INVALID_UTF8 = -7,     /**< Malformed UTF-8 */
 
     /* Dictionary errors */
-    TP_ERR_BAD_MAGIC = -10, /**< Not a .trp file */
-    TP_ERR_VERSION = -11,   /**< Unsupported format version */
-    TP_ERR_CORRUPT = -12,   /**< Integrity check failed */
-    TP_ERR_NOT_FOUND = -13, /**< Key not in dictionary */
-    TP_ERR_TRUNCATED = -14, /**< Data shorter than header claims */
+    TP_ERR_BAD_MAGIC = -10,   /**< Not a .trp file */
+    TP_ERR_VERSION = -11,     /**< Unsupported format version */
+    TP_ERR_CORRUPT = -12,     /**< Integrity check failed */
+    TP_ERR_NOT_FOUND = -13,   /**< Key not in dictionary */
+    TP_ERR_TRUNCATED = -14,   /**< Data shorter than header claims */
+    TP_ERR_ALPHABET = -15,    /**< Keys use more distinct bytes than the format
+                                   can address (see TP_MAX_ALPHABET_SIZE) */
+    TP_ERR_UNSUPPORTED = -16, /**< Operation is declared but not implemented */
 
     /* JSON errors */
     TP_ERR_JSON_SYNTAX = -20, /**< Malformed JSON */
@@ -127,9 +130,59 @@ typedef enum { TP_CHECKSUM_CRC32 = 0, TP_CHECKSUM_SHA256, TP_CHECKSUM_XXHASH64 }
 
 /* ── Format constants ────────────────────────────────────────────────── */
 
-#define TP_HEADER_SIZE       32 /**< Fixed header size in bytes */
+#define TP_HEADER_SIZE 32 /**< Fixed header size in bytes */
+
+/**
+ * @brief Largest number of distinct byte values the keys may use.
+ *
+ * The trie config packs symbol_count into 8 header bits, and symbol_count is
+ * the alphabet size plus the 6 control codes, so the alphabet cannot exceed
+ * 255 - 6 = 249 distinct byte values. Encoding keys that use more returns
+ * TP_ERR_ALPHABET rather than producing a dictionary that cannot be read.
+ *
+ * ASCII and most single-language UTF-8 text stay far below this; reaching it
+ * takes keys drawn from raw bytes or from many scripts at once.
+ */
+#define TP_MAX_ALPHABET_SIZE 249
 #define TP_MAX_NESTING_DEPTH 32 /**< Maximum nesting depth for JSON */
 #define TP_VARINT_MAX_GROUPS 10 /**< Maximum VarInt continuation groups */
+
+/**
+ * @brief Version of the on-disk .trp format this library writes.
+ *
+ * Distinct from the library version: it changes only when the bytes change,
+ * and a reader accepts any minor version of the same major.
+ */
+#define TP_FORMAT_VERSION_MAJOR 1
+#define TP_FORMAT_VERSION_MINOR 0
+
+/* ── Version metadata ────────────────────────────────────────────────── */
+
+/**
+ * @brief What this build of triepack is.
+ *
+ * Every implementation exposes the same fields, so a polyglot system can ask
+ * each one what it is and compare answers. See tp_version().
+ */
+typedef struct tp_version_info {
+    const char *name;           /**< Always "triepack" */
+    const char *implementation; /**< Which implementation answered: "c" */
+    const char *version;        /**< Library version, e.g. "1.2.0" */
+    uint8_t version_major;
+    uint8_t version_minor;
+    uint8_t version_patch;
+    uint8_t format_version_major; /**< .trp format written */
+    uint8_t format_version_minor;
+    uint16_t max_alphabet_size; /**< Distinct key bytes the format can address */
+} tp_version_info;
+
+/**
+ * @brief Return metadata about this build.
+ *
+ * The version derives from triepack-version.txt at build time, so it cannot
+ * drift from the release.
+ */
+tp_version_info tp_version(void);
 
 /* ── Value construction helpers ───────────────────────────────────────── */
 

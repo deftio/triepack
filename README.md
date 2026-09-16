@@ -1,4 +1,4 @@
-# triepack v1.1.0
+# triepack v1.2.0
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)
@@ -12,8 +12,7 @@ TriePack encodes dictionaries into a compact binary format (`.trp`) optimized fo
 
 - **Compact binary format** — compressed tries with prefix sharing and bit-level packing
 - **Fast lookups** — O(key-length) point queries via skip pointers
-- **Prefix search** — iterate all keys matching a prefix
-- **Fuzzy search** — find keys within edit distance d<=2
+- **Prefix search** — iterate all keys matching a prefix, by descending the trie
 - **ROM-safe** — readers work directly on `const` buffers with zero allocation
 - **Typed values** — null, bool, int, uint, float, double, string, blob, array, nested dict
 - **JSON support** — encode/decode JSON documents to/from `.trp` format
@@ -73,9 +72,7 @@ free(buf);
 ### Python
 
 ```bash
-# Install (from source, PyPI package coming soon)
-cd bindings/python
-pip install -e .
+pip install triepack
 ```
 
 ```python
@@ -89,13 +86,11 @@ print(result)  # {'hello': 42, 'world': 'foo'}
 ### JavaScript
 
 ```bash
-# Install (from source, npm package coming soon)
-cd bindings/javascript
-npm install
+npm install triepack
 ```
 
 ```js
-const { encode, decode } = require('./src/index');
+const { encode, decode } = require('triepack');
 
 const buf = encode({ hello: 42, world: 'foo' });
 const result = decode(buf);
@@ -240,7 +235,7 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.1.0 released.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. 27 C/C++ test programs, 97 Python tests, 99 JavaScript tests, 75 Rust tests, 27 Swift tests, plus Go, Kotlin, and Java test suites.
+**v1.2.0.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. All nine implementations run a [shared conformance suite](tests/conformance/README.md) that checks they decode the same fixtures to the same values and re-encode them byte for byte — about 1,500 tests across 56 files.
 
 ## Roadmap
 
@@ -248,11 +243,12 @@ See `docs/internals/` for format details.
 - [x] TypeScript binding (wraps JS implementation)
 - [x] Go binding
 - [x] Swift binding (with SPM package)
-- [x] Rust binding (with crate on crates.io)
+- [x] Rust binding
 - [x] Kotlin binding
 - [x] Java binding
-- [ ] npm package for JavaScript/TypeScript
-- [ ] PyPI package for Python
+- [x] npm package for JavaScript/TypeScript (ships bundled type declarations)
+- [ ] PyPI package for Python (metadata ready; publish workflow not wired up)
+- [ ] crates.io package for Rust
 
 ### v1.2 — Format Enhancements
 - [ ] Suffix table (shared ending compression)
@@ -261,9 +257,23 @@ See `docs/internals/` for format details.
 
 ### v1.3 — Tooling & Ecosystem
 - [x] `trp` CLI: encode/decode/validate/inspect
+- [x] Language binding conformance test suite
 - [ ] Fuzzy search (edit distance d<=2)
 - [ ] Performance benchmarks across languages
-- [ ] Language binding conformance test suite
+
+## Contributing
+
+Bug reports and pull requests are welcome. See
+[CONTRIBUTING.md](.github/CONTRIBUTING.md) for how to build and test each
+target, and for what a change to the binary format has to satisfy — every
+implementation has to agree byte for byte, which the
+[conformance suite](tests/conformance/README.md) checks.
+
+Participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Security issues go through [SECURITY.md](SECURITY.md) rather than the public
+tracker.
+
+Releases are cut with `./scripts/make-release.sh`; see [RELEASE.md](RELEASE.md).
 
 ## License
 

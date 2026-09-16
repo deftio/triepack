@@ -22,6 +22,10 @@ CTRL_SKIP = 2
 CTRL_BRANCH = 5
 NUM_CONTROL_CODES = 6
 
+# Largest number of distinct byte values the keys may use: symbol_count is an
+# 8-bit header field holding the alphabet plus the control codes.
+MAX_ALPHABET_SIZE = 255 - NUM_CONTROL_CODES  # 249
+
 
 def encode(data):
     """Encode a dict into the .trp binary format. Returns bytes."""
@@ -50,6 +54,14 @@ def encode(data):
 
     alphabet_size = sum(used)
     total_symbols = alphabet_size + NUM_CONTROL_CODES
+    # The trie config packs symbol_count into 8 header bits, so the alphabet
+    # plus the 6 control codes must fit in 255. Encoding a wider alphabet used
+    # to produce a buffer with a valid CRC that decoded to nothing.
+    if total_symbols > 255:
+        raise ValueError(
+            f"Keys use too many distinct byte values ({alphabet_size}); "
+            f"the format allows at most {MAX_ALPHABET_SIZE}"
+        )
     bps = 1
     while (1 << bps) < total_symbols:
         bps += 1

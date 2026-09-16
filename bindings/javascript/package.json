@@ -1,13 +1,48 @@
 {
   "name": "triepack",
-  "version": "0.1.0",
-  "description": "Native JavaScript implementation of the Triepack .trp binary format",
+  "version": "1.2.0",
+  "description": "Compressed trie dictionary format (.trp) — compact binary key-value storage with fast lookups and prefix search. Native JavaScript implementation, no dependencies.",
+  "keywords": [
+    "trie",
+    "prefix-tree",
+    "dictionary",
+    "binary-format",
+    "serialization",
+    "compression",
+    "key-value",
+    "prefix-search",
+    "trp",
+    "triepack"
+  ],
+  "homepage": "https://deftio.github.io/triepack/",
+  "bugs": {
+    "url": "https://github.com/deftio/triepack/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deftio/triepack.git",
+    "directory": "bindings/javascript"
+  },
+  "license": "BSD-2-Clause",
+  "author": "M. A. Chatterjee <deftio@deftio.com> (https://deftio.com)",
   "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE.txt"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
   "scripts": {
     "test": "jest"
   },
   "devDependencies": {
     "jest": "^29.0.0"
-  },
-  "license": "BSD-2-Clause"
+  }
 }

@@ -24,12 +24,16 @@ static tp_result value_deep_copy(tp_value *v)
         memcpy(copy, v->data.string_val.str, len);
         copy[len] = '\0';
         v->data.string_val.str = copy;
-    } else if (v->type == TP_BLOB && v->data.blob_val.data && v->data.blob_val.len > 0) {
+    } else if (v->type == TP_BLOB && v->data.blob_val.data) {
+        /* Copy zero-length blobs too: value_free_copy() frees any non-NULL
+           blob pointer, so leaving the caller's pointer in place would make
+           the encoder free memory it does not own. */
         size_t len = v->data.blob_val.len;
-        uint8_t *copy = malloc(len);
+        uint8_t *copy = malloc(len > 0 ? len : 1);
         if (!copy)
             return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
-        memcpy(copy, v->data.blob_val.data, len);
+        if (len > 0)
+            memcpy(copy, v->data.blob_val.data, len);
         v->data.blob_val.data = copy;
     }
     return TP_OK;
@@ -563,6 +567,13 @@ tp_result tp_encoder_build(tp_encoder *enc, uint8_t **buf, size_t *len)
 
     /* Analyze symbols and build maps */
     analyze_symbols(enc);
+
+    /* The trie config packs symbol_count into 8 header bits. An alphabet
+       wider than TP_MAX_ALPHABET_SIZE overflows that field, which used to
+       produce a buffer with a valid CRC whose every lookup silently failed.
+       Refuse to build it instead. */
+    if (enc->sym.symbol_count > 255)
+        return TP_ERR_ALPHABET;
 
     /* Create writer */
     tp_bitstream_writer *w = NULL;

@@ -10,7 +10,6 @@ jobs:
   python:
     name: Python Bindings
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -29,7 +28,6 @@ jobs:
   typescript:
     name: TypeScript Bindings
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -43,13 +41,13 @@ jobs:
       - name: Install and test
         run: |
           cd bindings/typescript
-          npm install
+          npm ci
+          npx tsc --noEmit
           npm test
 
   javascript:
     name: JavaScript Bindings
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -69,7 +67,6 @@ jobs:
   go:
     name: Go Bindings
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -88,7 +85,6 @@ jobs:
   swift:
     name: Swift Bindings
     runs-on: macos-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -102,7 +98,6 @@ jobs:
   rust:
     name: Rust Bindings
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -115,3 +110,55 @@ jobs:
         run: |
           cd bindings/rust
           cargo test
+
+  java:
+    name: Java Bindings
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
+
+      - name: Test
+        run: |
+          cd bindings/java
+          gradle --no-daemon --console=plain test
+
+  kotlin:
+    name: Kotlin Bindings
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
+
+      - name: Test
+        run: |
+          cd bindings/kotlin
+          gradle --no-daemon --console=plain test

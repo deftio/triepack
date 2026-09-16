@@ -6,6 +6,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 // Forward declarations of C handles
 struct tp_encoder;
@@ -15,115 +17,263 @@ struct tp_iterator;
 namespace triepack
 {
 
-/// RAII wrapper around tp_encoder.
-/// Builds a compressed trie dictionary from key-value pairs.
+/// Result of an operation. Values match the C API's tp_result.
+enum class Status : int {
+    Ok = 0,
+    Eof = -1,
+    Alloc = -2,
+    InvalidParam = -3,
+    InvalidPosition = -4,
+    NotAligned = -5,
+    Overflow = -6,
+    InvalidUtf8 = -7,
+    BadMagic = -10,
+    Version = -11,
+    Corrupt = -12,
+    NotFound = -13,
+    Truncated = -14,
+    Alphabet = -15,
+    Unsupported = -16
+};
+
+/// Human-readable description of a status.
+const char *message(Status status);
+
+/// Largest number of distinct byte values the keys may use.
+extern const size_t kMaxAlphabetSize;
+
+/**
+ * Metadata about a triepack build. Every implementation reports the same
+ * fields, so a polyglot system can ask each one what it is.
+ */
+struct VersionInfo {
+    const char *name;           ///< Always "triepack"
+    const char *implementation; ///< "c++"
+    const char *version;        ///< Library version, e.g. "1.2.0"
+    unsigned version_major;
+    unsigned version_minor;
+    unsigned version_patch;
+    unsigned format_version_major; ///< .trp format written
+    unsigned format_version_minor;
+    size_t max_alphabet_size;
+};
+
+/// Return metadata about this build. The version derives from
+/// triepack-version.txt at build time, so it cannot drift from the release.
+VersionInfo version();
+
+/// The eight value types the format carries.
+enum class Type { Null, Bool, Int, UInt, Float32, Float64, String, Blob };
+
+/**
+ * A typed value, owning its string or blob payload.
+ *
+ * Int and UInt are distinct on the wire, so the choice of factory decides how
+ * a number is stored; other implementations pick UInt for anything
+ * non-negative, and matching that keeps encodings byte-identical.
+ */
+class Value
+{
+  public:
+    /// A null value.
+    Value();
+
+    static Value null();
+    static Value boolean(bool v);
+    static Value integer(int64_t v);
+    static Value unsigned_integer(uint64_t v);
+    static Value float32(float v);
+    static Value float64(double v);
+    static Value string(const std::string &v);
+    static Value blob(const std::vector<uint8_t> &v);
+    static Value blob(const uint8_t *data, size_t size);
+
+    Type type() const
+    {
+        return type_;
+    }
+    bool is_null() const
+    {
+        return type_ == Type::Null;
+    }
+
+    /// Accessors. Reading the wrong one returns a zero-like default rather
+    /// than reinterpreting the stored value.
+    bool as_bool() const;
+    int64_t as_int() const;
+    uint64_t as_uint() const;
+    float as_float32() const;
+    double as_float64() const;
+    const std::string &as_string() const;
+    const std::vector<uint8_t> &as_blob() const;
+
+    /// Same type and same payload. Doubles compare by bit pattern, so -0.0
+    /// differs from 0.0 and two NaNs of the same pattern are equal.
+    bool operator==(const Value &other) const;
+    bool operator!=(const Value &other) const
+    {
+        return !(*this == other);
+    }
+
+  private:
+    Type type_;
+    bool bool_;
+    int64_t int_;
+    uint64_t uint_;
+    float f32_;
+    double f64_;
+    std::string str_;
+    std::vector<uint8_t> blob_;
+};
+
+/// Builds a .trp dictionary from key/value pairs.
 class Encoder
 {
   public:
-    /// Construct an encoder with default options.
     Encoder();
-
-    /// Destructor. Releases the underlying C handle.
     ~Encoder();
 
-    // Non-copyable
     Encoder(const Encoder &) = delete;
     Encoder &operator=(const Encoder &) = delete;
-
-    // Movable
     Encoder(Encoder &&other) noexcept;
     Encoder &operator=(Encoder &&other) noexcept;
 
-    /// Insert a key-value pair into the encoder.
-    /// @param key    Null-terminated key string.
-    /// @param value  Integer value to associate with the key.
-    void insert(const char *key, int32_t value);
+    /// Add a key/value pair. Later adds of the same key replace earlier ones.
+    Status add(const std::string &key, const Value &value);
 
-    /// Encode the trie and return a serialized blob.
-    /// @param out_data  Receives a pointer to the encoded data.
-    /// @param out_size  Receives the size of the encoded data in bytes.
-    /// @return 0 on success, non-zero on error.
-    int encode(const uint8_t **out_data, size_t *out_size);
+    /// Add a key that may contain any byte, including NUL.
+    Status add(const char *key, size_t key_len, const Value &value);
 
-    /// Return the underlying C handle (nullable).
-    tp_encoder *handle() const;
+    /// Number of pairs added so far.
+    size_t count() const;
+
+    /// Serialize into `out`, replacing its contents.
+    Status build(std::vector<uint8_t> &out);
+
+    /// Drop every pair, keeping the encoder usable.
+    Status reset();
+
+    /// Underlying C handle (nullable).
+    tp_encoder *handle() const
+    {
+        return handle_;
+    }
 
   private:
     tp_encoder *handle_;
 };
 
-/// RAII wrapper around tp_dict.
-/// Provides read-only access to a compressed trie dictionary.
+/// Read-only view of a .trp buffer.
 class Dict
 {
   public:
-    /// Construct a dict from a serialized blob.
-    /// @param data  Pointer to the encoded data (not owned).
-    /// @param size  Size of the encoded data in bytes.
+    Dict();
+
+    /// Open `data` immediately; check status() for the outcome. The buffer is
+    /// borrowed, not copied, and must outlive the Dict.
     Dict(const uint8_t *data, size_t size);
 
-    /// Destructor. Releases the underlying C handle.
     ~Dict();
 
-    // Non-copyable
     Dict(const Dict &) = delete;
     Dict &operator=(const Dict &) = delete;
-
-    // Movable
     Dict(Dict &&other) noexcept;
     Dict &operator=(Dict &&other) noexcept;
 
-    /// Look up a key and return its value.
-    /// @param key        Null-terminated key string.
-    /// @param out_value  Receives the value if found.
-    /// @return true if the key was found, false otherwise.
-    bool lookup(const char *key, int32_t *out_value) const;
+    /// Open a buffer, replacing any dictionary already held.
+    Status open(const uint8_t *data, size_t size);
 
-    /// Return the number of entries in the dictionary.
+    /// Status of the last open().
+    Status status() const
+    {
+        return status_;
+    }
+    bool is_open() const
+    {
+        return handle_ != nullptr;
+    }
+
+    /// Look up a key. Returns Status::NotFound if it is absent.
+    Status lookup(const std::string &key, Value &out) const;
+    Status lookup(const char *key, size_t key_len, Value &out) const;
+
+    bool contains(const std::string &key) const;
+
+    /// Number of keys.
     size_t size() const;
 
-    /// Return the underlying C handle (nullable).
-    tp_dict *handle() const;
+    /// Underlying C handle (nullable).
+    tp_dict *handle() const
+    {
+        return handle_;
+    }
 
   private:
     tp_dict *handle_;
+    Status status_;
 };
 
-/// RAII wrapper around tp_iterator.
-/// Iterates over all entries in a Dict.
+/**
+ * Walks a dictionary's keys in lexicographic byte order.
+ *
+ * ```
+ * triepack::Iterator it(dict);
+ * while (it.next())
+ *     use(it.key(), it.value());
+ * ```
+ */
 class Iterator
 {
   public:
-    /// Construct an iterator for the given dictionary.
-    /// @param dict  The dictionary to iterate (must outlive the iterator).
+    /// Iterate every key. The dictionary must outlive the iterator.
     explicit Iterator(const Dict &dict);
 
-    /// Destructor. Releases the underlying C handle.
+    /// Iterate only the keys starting with `prefix`.
+    Iterator(const Dict &dict, const std::string &prefix);
+
     ~Iterator();
 
-    // Non-copyable
     Iterator(const Iterator &) = delete;
     Iterator &operator=(const Iterator &) = delete;
-
-    // Movable
     Iterator(Iterator &&other) noexcept;
     Iterator &operator=(Iterator &&other) noexcept;
 
-    /// Advance to the next entry.
-    /// @return true if there is a valid entry, false if iteration is complete.
+    /// Advance. Returns false at the end, or on error — check status().
     bool next();
 
-    /// Get the current key. Valid only after a successful next() call.
-    const char *key() const;
+    /// The current key. Valid after next() returned true.
+    const std::string &key() const
+    {
+        return key_;
+    }
 
-    /// Get the current value. Valid only after a successful next() call.
-    int32_t value() const;
+    /// The current value. Valid after next() returned true.
+    const Value &value() const
+    {
+        return value_;
+    }
 
-    /// Return the underlying C handle (nullable).
-    tp_iterator *handle() const;
+    /// Status of construction or of the last next(): Ok while entries remain,
+    /// Eof once exhausted, or the error that stopped it.
+    Status status() const
+    {
+        return status_;
+    }
+
+    /// Restart from the beginning.
+    Status reset();
+
+    /// Underlying C handle (nullable).
+    tp_iterator *handle() const
+    {
+        return handle_;
+    }
 
   private:
     tp_iterator *handle_;
+    Status status_;
+    std::string key_;
+    Value value_;
 };
 
 } // namespace triepack

@@ -28,6 +28,7 @@
 
 #include "triepack/triepack.h"
 #include "triepack/triepack_json.h"
+#include "triepack/triepack_version.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -691,7 +692,9 @@ static void print_usage(void)
 
 static void print_version(void)
 {
-    printf("trp 1.1.0 (TriePack CLI inspector)\n");
+    /* TP_VERSION_STRING comes from triepack-version.txt via CMake, so the CLI
+       cannot drift from the release version. */
+    printf("trp %s (TriePack CLI inspector)\n", TP_VERSION_STRING);
 }
 
 /* ── Main ────────────────────────────────────────────────────────────── */

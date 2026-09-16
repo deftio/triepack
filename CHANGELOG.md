@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-16
+
+### Fixed
+- **Decode could throw EOF for some key sets** (#1) -- the trie walk in the
+  native bindings decided whether a BRANCH followed a terminal by peeking at
+  the next `bits_per_symbol` bits. Past the trie's last terminal those bits
+  are the byte padding and the CRC, which for some key sets happen to equal
+  the BRANCH code; the walker then followed a branch that isn't there and ran
+  off the end of the buffer. The walk is now bounded by the trie extent the
+  header already declares (`value_store_offset`, and each child's SKIP
+  distance), so a terminal is followed by a BRANCH exactly when the subtree
+  has not reached its end. Affected the JavaScript, Python, Go, Rust, Swift,
+  Java and Kotlin bindings; the C core walks by key count and was unaffected.
+  Header fields were correct throughout -- the 2-bit "slack" in the report is
+  the data section's byte-alignment padding.
+- **Alphabets of 250+ distinct bytes produced unreadable dictionaries** --
+  `symbol_count` is an 8-bit header field holding the alphabet plus the six
+  control codes, so an alphabet past 249 overflowed it. The encoder reported
+  success, the CRC validated, and every lookup then failed silently. All
+  implementations now refuse to build such a dictionary (`TP_ERR_ALPHABET`,
+  `TP_MAX_ALPHABET_SIZE`), and readers reject a trie config whose
+  `bits_per_symbol` or `symbol_count` is out of range. Reachable from C and Go,
+  whose keys are arbitrary bytes; UTF-8-only bindings cap out around 243.
+- **Zero-length blob values freed the caller's memory** (C) -- `value_deep_copy`
+  skipped blobs of length 0 while `value_free_copy` still freed the pointer, so
+  `tp_encoder_add` with `tp_value_blob(ptr, 0)` left the encoder owning memory
+  it never copied.
+- **The full 64-bit integer range did not survive a round trip** in four
+  bindings: Go held varints in `int` (`uint64` values above `MaxInt64` went
+  negative), Swift trapped negating `Int64.min` for the zigzag, and Java and
+  Kotlin both overflowed the same negation and rejected `uint64` values above
+  `Long.MAX_VALUE`. All four now zigzag on the bit pattern and treat the
+  unsigned range as unsigned. JavaScript, which holds integers in a double,
+  now raises a `RangeError` instead of writing bytes that decode to a
+  different number.
+- **`tp_iter_next` was a stub that always returned EOF**, so iteration and
+  prefix search returned nothing in C and, through it, in the C++ wrapper.
+  Both are now implemented: a resumable bounded trie walk yielding keys in
+  lexicographic order, and a prefix search that descends to the subtree
+  instead of scanning.
+- **Kotlin did not compile** with kotlinc 1.9.24: inside `TpValue`, the bare
+  `Int` in `Blob.hashCode()` resolved to the nested `TpValue.Int`.
+
+### Changed
+- **Binding CI can now fail.** Every job in `bindings.yml` carried
+  `continue-on-error: true`, so a broken binding never turned the build red;
+  Java and Kotlin had no jobs at all. Both are fixed, which is what makes
+  "publish only on green CI" mean anything.
+- Every binding README said "Not yet implemented". Rewritten with real
+  install and usage instructions — the JavaScript and Python ones are the npm
+  and PyPI landing pages.
+- **The C++ wrapper is a complete API rather than an int32-only stub.** New
+  `triepack::Value` (an owning tagged value for all eight format types),
+  `Status` mirroring `tp_result`, `Encoder::add`/`build` (which writes into a
+  caller-owned `std::vector` instead of handing back memory to `free`), and a
+  working `Iterator` with prefix support. The old `Encoder::insert` and
+  `Encoder::encode` are gone; `insert` always used the signed tag, so its
+  output differed from every other implementation for non-negative values.
+- `tp_dict_find_fuzzy` returns `TP_ERR_UNSUPPORTED` instead of an iterator
+  over every key. It was never implemented; now that iteration works, the old
+  behaviour would have looked like a successful fuzzy match for anything.
+
+### Added
+- **`triepack-version.txt`, one source of truth for the release version.**
+  CMake reads it directly and the CLI prints the header CMake generates from
+  it; `scripts/sync_version.sh` propagates it to every package manifest, every
+  binding's `VERSION` constant, the docs site header and the README, with
+  `--check` failing on drift. CI runs `--check` on every push, and each
+  binding's tests read the file and assert that what they report matches, so a
+  stale constant fails in that language rather than shipping. All bindings move
+  from 0.1.0 to match the C library. The on-disk *format* version is
+  deliberately not synced.
+- **`version()` in every implementation** — C (`tp_version`), C++, JavaScript,
+  Python, Go, Rust, Swift, Java and Kotlin all report the same metadata: name,
+  which implementation answered, the library version and its parts, the `.trp`
+  format version they write, and the alphabet ceiling. A polyglot system can
+  ask each one what it is and compare.
+- **`scripts/sync_changelog.sh`** — `docs/releases.md` was a hand-written
+  second copy of the changelog, saying the same things in different words.
+  It is now generated from `CHANGELOG.md`, with `--check` in CI.
+- **`scripts/test-jvm.sh`** — builds and tests the Java and Kotlin bindings
+  with `javac`/`kotlinc` and the JUnit console launcher, fetching a JDK, JUnit
+  and the Kotlin compiler into a gitignored cache rather than installing
+  anything. The local release gate now covers all nine targets on a machine
+  with no JVM toolchain.
+- **`scripts/make-release.sh`** — builds and tests every target, and only if
+  all of it is green drives the release: PR if the version bump has not landed
+  yet, wait for CI, squash-merge, tag. It *reads* the version and never sets
+  it; passing `--version` is an error that says so. A version bump is an
+  ordinary reviewed change, which keeps the shipped version the one that was
+  reviewed and makes the script safe to run as a check. `--check` runs the gate
+  alone; `--dry-run` prints the git and gh commands. See `RELEASE.md`.
+- **npm publishing.** The `triepack` package is built from
+  `bindings/javascript`, ships bundled TypeScript declarations
+  (`src/index.d.ts`), and publishes from `publish.yml` only after the whole
+  cross-language test matrix passes. The job requests `id-token: write` and
+  publishes with `--provenance`, so switching to OIDC trusted publishing is a
+  registry-side setting; it is idempotent if the version already exists.
+- Complete package metadata for npm and PyPI: repository, homepage, author,
+  keywords, classifiers, project URLs, bundled licences, and an `files` /
+  `MANIFEST.in` pair so neither package ships tests or fixtures that cannot
+  run outside a checkout.
+- GoatCounter analytics on the documentation site.
+- Project boilerplate: `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `SECURITY.md` with a disclosure process and a scope aimed at the decoder,
+  issue and pull-request templates, and an `.editorconfig` matching
+  `.clang-format`. `CONTRIBUTING.md` was boilerplate from another project --
+  it welcomed you to "TXZ" and told you to clone `txz` -- and has been
+  rewritten around this repository's actual build, test and conformance
+  workflow.
+- **A cross-language conformance corpus** (`tests/conformance/`): one case
+  list that the C library and all eight bindings run, checking that each
+  decodes the C-generated fixtures to the same values and re-encodes them byte
+  for byte. 50 cases covering trie shapes, `bits_per_symbol` boundaries,
+  Unicode keys, the full numeric range, blobs and scale, plus 11 malformed
+  buffers every reader must reject. See `tests/conformance/README.md`.
+- `TP_ERR_ALPHABET`, `TP_ERR_UNSUPPORTED` and `TP_MAX_ALPHABET_SIZE` in the
+  public C API; `MAX_ALPHABET_SIZE` exported by each binding
+- `try_encode` in the Rust binding, for callers who would rather handle the
+  alphabet limit than have `encode` panic
+- Regression tests for issue #1 in all seven native bindings, plus a
+  deterministic sweep over 2,000 generated key sets in JavaScript and Python
+- `tests/test_core_limits.c` and `tests/test_conformance.c`
+- docs/triepack-technical-doc.md section 5.4 "Subtree Extent", describing how
+  a reader determines where a subtree ends
+
 ## [1.1.0] - 2026-03-04
 
 ### Added

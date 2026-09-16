@@ -448,3 +448,103 @@ fn test_roundtrip_negative_ints() {
     assert_eq!(result.get("neg1"), Some(&Value::Int(-1)));
     assert_eq!(result.get("neg100"), Some(&Value::Int(-100)));
 }
+
+// ---------------------------------------------------------------------------
+// Regression: issue #1 -- walk must stop at the end of the trie
+//
+// The walker used to guess whether a BRANCH followed a terminal by peeking at
+// the next bits. Past the last terminal those bits are the byte padding and
+// the CRC, which for some key sets look exactly like a BRANCH code, sending
+// the walker off the end of the buffer. The trie end comes from the header,
+// so the walker must stop there.
+//
+// Each of these key sets produced a trailing BRANCH-looking code and failed
+// with Eof before the fix.
+// ---------------------------------------------------------------------------
+
+const TRAILING_BRANCH_KEY_SETS: &[&[&str]] = &[
+    &["eddb", "h"],
+    &["aad", "ebg", "ec", "ehhbf", "h", "hebad"],
+    &["aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"],
+    &["a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"],
+];
+
+#[test]
+fn test_walk_stops_at_trie_end_keys_only() {
+    for keys in TRAILING_BRANCH_KEY_SETS {
+        let mut data = HashMap::new();
+        for k in *keys {
+            data.insert(k.to_string(), Value::Null);
+        }
+        let result = decode(&encode(&data)).unwrap();
+        assert_eq!(result, data, "key set {:?}", keys);
+    }
+}
+
+#[test]
+fn test_walk_stops_at_trie_end_with_values() {
+    for keys in TRAILING_BRANCH_KEY_SETS {
+        let mut data = HashMap::new();
+        for (i, k) in keys.iter().enumerate() {
+            data.insert(k.to_string(), Value::UInt(i as u64));
+        }
+        let result = decode(&encode(&data)).unwrap();
+        assert_eq!(result, data, "key set {:?}", keys);
+    }
+}
+
+#[test]
+fn test_header_declares_exactly_the_bits_written() {
+    let mut data = HashMap::new();
+    data.insert("eddb".to_string(), Value::Null);
+    data.insert("h".to_string(), Value::Null);
+    let buf = encode(&data);
+    let value_store_offset = u32::from_be_bytes([buf[16], buf[17], buf[18], buf[19]]) as usize;
+    let total_data_bits = u32::from_be_bytes([buf[24], buf[25], buf[26], buf[27]]) as usize;
+    // No values, so the trie is the whole data section, and the data section
+    // plus its byte padding and the 4-byte CRC is the buffer.
+    assert_eq!(value_store_offset, total_data_bits);
+    assert_eq!(buf.len(), 32 + total_data_bits.div_ceil(8) + 4);
+}
+
+// ---------------------------------------------------------------------------
+// Version metadata
+//
+// The version a build reports has to equal triepack-version.txt, the single
+// source of truth. Reading the file rather than a copy of the string is the
+// point: a stale constant fails.
+// ---------------------------------------------------------------------------
+
+fn declared_version() -> String {
+    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.push("..");
+    p.push("..");
+    p.push("triepack-version.txt");
+    std::fs::read_to_string(&p)
+        .unwrap_or_else(|e| panic!("{}: {}", p.display(), e))
+        .trim()
+        .to_string()
+}
+
+#[test]
+fn version_matches_source_of_truth() {
+    let want = declared_version();
+    assert_eq!(triepack::VERSION, want);
+    assert_eq!(triepack::version().version, want);
+    assert_eq!(env!("CARGO_PKG_VERSION"), want, "Cargo.toml disagrees");
+}
+
+#[test]
+fn version_metadata_shape() {
+    let want = declared_version();
+    let parts: Vec<u8> = want.split('.').map(|p| p.parse().unwrap()).collect();
+    let got = triepack::version();
+    assert_eq!(got.name, "triepack");
+    assert_eq!(got.implementation, "rust");
+    assert_eq!(got.version_major, parts[0]);
+    assert_eq!(got.version_minor, parts[1]);
+    assert_eq!(got.version_patch, parts[2]);
+    assert_eq!(got.format_version_major, 1);
+    assert_eq!(got.format_version_minor, 0);
+    assert_eq!(got.max_alphabet_size, 249);
+}

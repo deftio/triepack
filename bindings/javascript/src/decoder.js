@@ -76,7 +76,16 @@ function decode(buffer) {
 
     // bits_per_symbol (4 bits) + symbol_count (8 bits)
     const bps = reader.readBits(4);
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    if (bps < 1 || bps > 8) {
+        throw new Error('Invalid trie config: bits_per_symbol must be 1..8, got ' + bps);
+    }
     const symbolCount = reader.readBits(8);
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    if (symbolCount < NUM_CONTROL_CODES || symbolCount > (1 << bps)) {
+        throw new Error('Invalid trie config: symbol_count out of range: ' + symbolCount);
+    }
 
     // Read control codes
     const ctrlCodes = new Uint32Array(NUM_CONTROL_CODES);
@@ -99,30 +108,29 @@ function decode(buffer) {
 
     const trieStart = dataStart + trieDataOffset;
     const valueStart = dataStart + valueStoreOffset;
+    // The trie occupies [trieStart, valueStart); the value store (when
+    // present), the byte padding and the CRC follow it.
+    const trieEnd = valueStart;
 
     // DFS iteration to collect all key-value pairs
     const result = {};
     const keyStack = []; // accumulated key bytes
 
-    function dfsWalk(r) {
+    // Every subtree knows where it ends: a child with a SKIP ends at
+    // childStart + skipDist, the last child ends where its parent does,
+    // and the root ends at trieEnd. `end` is the only authority on whether
+    // more symbols belong to this subtree — the bits that happen to follow
+    // are not, because past the last terminal they are padding and CRC.
+    function dfsWalk(r, end) {
         while (true) {
-            if (r.position >= r._bitLen) return;
+            if (r.position >= end) return;
             const sym = r.readBits(bps);
 
             if (sym === ctrlCodes[CTRL_END]) {
                 // Terminal with no value (null)
                 const keyStr = Buffer.from(keyStack).toString('utf8');
                 result[keyStr] = null;
-
-                // Check if BRANCH follows
-                if (r.position + bps <= r._bitLen) {
-                    const nextSym = r.peekBits(bps);
-                    if (nextSym === ctrlCodes[CTRL_BRANCH]) {
-                        r.readBits(bps); // consume BRANCH
-                        const childCount = readVarUint(r);
-                        walkBranch(r, childCount);
-                    }
-                }
+                walkBranchIfPresent(r, end);
                 return;
             }
 
@@ -130,22 +138,13 @@ function decode(buffer) {
                 readVarUint(r); // value index (consumed but we decode values in order)
                 const keyStr = Buffer.from(keyStack).toString('utf8');
                 result[keyStr] = null; // placeholder, replaced later if hasValues
-
-                // Check if BRANCH follows
-                if (r.position + bps <= r._bitLen) {
-                    const nextSym = r.peekBits(bps);
-                    if (nextSym === ctrlCodes[CTRL_BRANCH]) {
-                        r.readBits(bps); // consume BRANCH
-                        const childCount = readVarUint(r);
-                        walkBranch(r, childCount);
-                    }
-                }
+                walkBranchIfPresent(r, end);
                 return;
             }
 
             if (sym === ctrlCodes[CTRL_BRANCH]) {
                 const childCount = readVarUint(r);
-                walkBranch(r, childCount);
+                walkBranch(r, childCount, end);
                 return;
             }
 
@@ -158,7 +157,19 @@ function decode(buffer) {
         }
     }
 
-    function walkBranch(r, childCount) {
+    // A terminal is followed by a BRANCH exactly when the subtree has not
+    // reached its end — keys that share this terminal as a prefix.
+    function walkBranchIfPresent(r, end) {
+        if (r.position >= end) return;
+        const sym = r.readBits(bps);
+        if (sym !== ctrlCodes[CTRL_BRANCH]) {
+            throw new Error('Malformed trie: expected BRANCH after terminal');
+        }
+        const childCount = readVarUint(r);
+        walkBranch(r, childCount, end);
+    }
+
+    function walkBranch(r, childCount, end) {
         const savedKeyLen = keyStack.length;
         for (let ci = 0; ci < childCount; ci++) {
             const hasSkip = ci < childCount - 1;
@@ -171,7 +182,7 @@ function decode(buffer) {
 
             const childStartPos = r.position;
             keyStack.length = savedKeyLen;
-            dfsWalk(r);
+            dfsWalk(r, hasSkip ? childStartPos + skipDist : end);
 
             // If this wasn't the last child, verify position matches skip
             if (hasSkip) {
@@ -186,7 +197,7 @@ function decode(buffer) {
     if (numKeys > 0) {
         // The trie root may start with a single child (no explicit BRANCH)
         // so we just start dfsWalk from the root
-        dfsWalk(reader);
+        dfsWalk(reader, trieEnd);
     }
 
     // Now decode values if present

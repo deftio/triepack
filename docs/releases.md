@@ -3,171 +3,267 @@ layout: default
 title: Releases
 ---
 
+<!-- GENERATED from CHANGELOG.md by scripts/sync_changelog.sh.
+     Do not edit: edit CHANGELOG.md and rerun the script. -->
+
 # Releases
 
-<!-- Copyright (c) 2026 M. A. Chatterjee -->
-
-Download releases from the [GitHub Releases page](https://github.com/deftio/triepack/releases).
-
----
-
-## v1.1.0 -- 2026-03-04
-
-Five new native language bindings with full cross-language binary compatibility.
-
-### Added
-- **Go binding** -- pure-Go `.trp` encoder/decoder (~38 tests, no external dependencies)
-- **Rust binding** -- pure-Rust `.trp` encoder/decoder (75 tests, no external dependencies)
-- **Swift binding** -- pure-Swift `.trp` encoder/decoder via SPM (27 tests)
-- **Kotlin binding** -- pure-Kotlin/JVM `.trp` encoder/decoder (~41 tests, Gradle/JUnit 5)
-- **Java binding** -- pure-Java `.trp` encoder/decoder (~42 tests, Gradle/JUnit 5)
-- All bindings produce **byte-identical** `.trp` output and validate against the 7
-  C-generated fixture files
-- Usage examples and test documentation for all five new languages
-
-### Changed
-- README and docs updated with new binding status, test counts, and examples
-- v1.1 roadmap items (Go, Rust, Swift, Kotlin, Java) marked complete
-
-### Test Totals
-- C/C++: 27 test programs, ~330 tests, 100% line coverage
-- Python: 97 tests, 100% line coverage
-- JavaScript: 99 tests, 100% line coverage
-- Rust: 75 tests
-- Swift: 27 tests
-- Go: ~38 tests
-- Kotlin: ~41 tests
-- Java: ~42 tests
-- **Grand total: ~749 tests across 8 languages**
+What changed in each version. Downloads are on the
+[GitHub Releases page](https://github.com/deftio/triepack/releases);
+the full history lives in
+[CHANGELOG.md](https://github.com/deftio/triepack/blob/main/CHANGELOG.md).
 
 ---
 
-## v1.0.7 -- 2026-03-04
-
-100% line coverage achieved across all three languages.
-
-### Added
-- **100% line coverage** in C/C++ (2,395 lines, 27 test programs), Python (590 statements,
-  97 tests), and JavaScript (99 tests, 6 suites)
-- New C test for keys-only dictionary lookup returning null value
-- New JavaScript tests: values encode/decode, bitstream edge cases, crafted trie error paths
-- New Python tests: encoder edge cases, decoder error paths, bitstream bounds checking
+## v1.2.0 — 2026-09-16
 
 ### Fixed
-- **Dead code removed** from C, Python, and JavaScript encoders: unreachable start>=end guards,
-  single-child branches (proven impossible by common-prefix loop invariant), and dedup loops
-  (dict keys are unique)
+- **Decode could throw EOF for some key sets** (#1) -- the trie walk in the
+  native bindings decided whether a BRANCH followed a terminal by peeking at
+  the next `bits_per_symbol` bits. Past the trie's last terminal those bits
+  are the byte padding and the CRC, which for some key sets happen to equal
+  the BRANCH code; the walker then followed a branch that isn't there and ran
+  off the end of the buffer. The walk is now bounded by the trie extent the
+  header already declares (`value_store_offset`, and each child's SKIP
+  distance), so a terminal is followed by a BRANCH exactly when the subtree
+  has not reached its end. Affected the JavaScript, Python, Go, Rust, Swift,
+  Java and Kotlin bindings; the C core walks by key count and was unaffected.
+  Header fields were correct throughout -- the 2-bit "slack" in the report is
+  the data section's byte-alignment padding.
+- **Alphabets of 250+ distinct bytes produced unreadable dictionaries** --
+  `symbol_count` is an 8-bit header field holding the alphabet plus the six
+  control codes, so an alphabet past 249 overflowed it. The encoder reported
+  success, the CRC validated, and every lookup then failed silently. All
+  implementations now refuse to build such a dictionary (`TP_ERR_ALPHABET`,
+  `TP_MAX_ALPHABET_SIZE`), and readers reject a trie config whose
+  `bits_per_symbol` or `symbol_count` is out of range. Reachable from C and Go,
+  whose keys are arbitrary bytes; UTF-8-only bindings cap out around 243.
+- **Zero-length blob values freed the caller's memory** (C) -- `value_deep_copy`
+  skipped blobs of length 0 while `value_free_copy` still freed the pointer, so
+  `tp_encoder_add` with `tp_value_blob(ptr, 0)` left the encoder owning memory
+  it never copied.
+- **The full 64-bit integer range did not survive a round trip** in four
+  bindings: Go held varints in `int` (`uint64` values above `MaxInt64` went
+  negative), Swift trapped negating `Int64.min` for the zigzag, and Java and
+  Kotlin both overflowed the same negation and rejected `uint64` values above
+  `Long.MAX_VALUE`. All four now zigzag on the bit pattern and treat the
+  unsigned range as unsigned. JavaScript, which holds integers in a double,
+  now raises a `RangeError` instead of writing bytes that decode to a
+  different number.
+- **`tp_iter_next` was a stub that always returned EOF**, so iteration and
+  prefix search returned nothing in C and, through it, in the C++ wrapper.
+  Both are now implemented: a resumable bounded trie walk yielding keys in
+  lexicographic order, and a prefix search that descends to the subtree
+  instead of scanning.
+- **Kotlin did not compile** with kotlinc 1.9.24: inside `TpValue`, the bare
+  `Int` in `Blob.hashCode()` resolved to the nested `TpValue.Int`.
 
 ### Changed
-- LCOV_EXCL markers added to allocation failure paths in 14 C source files
-- Updated testing docs, README project status, and test counts
+- **Binding CI can now fail.** Every job in `bindings.yml` carried
+  `continue-on-error: true`, so a broken binding never turned the build red;
+  Java and Kotlin had no jobs at all. Both are fixed, which is what makes
+  "publish only on green CI" mean anything.
+- Every binding README said "Not yet implemented". Rewritten with real
+  install and usage instructions — the JavaScript and Python ones are the npm
+  and PyPI landing pages.
+- **The C++ wrapper is a complete API rather than an int32-only stub.** New
+  `triepack::Value` (an owning tagged value for all eight format types),
+  `Status` mirroring `tp_result`, `Encoder::add`/`build` (which writes into a
+  caller-owned `std::vector` instead of handing back memory to `free`), and a
+  working `Iterator` with prefix support. The old `Encoder::insert` and
+  `Encoder::encode` are gone; `insert` always used the signed tag, so its
+  output differed from every other implementation for non-negative values.
+- `tp_dict_find_fuzzy` returns `TP_ERR_UNSUPPORTED` instead of an iterator
+  over every key. It was never implemented; now that iteration works, the old
+  behaviour would have looked like a successful fuzzy match for anything.
 
-### Test Totals
-- C/C++: 27 test programs, 2,395 source lines at 100% coverage
-- Python: 5 test files, 97 tests, 590 statements at 100% coverage
-- JavaScript: 6 test suites, 99 tests, all files at 100% coverage
+### Added
+- **`triepack-version.txt`, one source of truth for the release version.**
+  CMake reads it directly and the CLI prints the header CMake generates from
+  it; `scripts/sync_version.sh` propagates it to every package manifest, every
+  binding's `VERSION` constant, the docs site header and the README, with
+  `--check` failing on drift. CI runs `--check` on every push, and each
+  binding's tests read the file and assert that what they report matches, so a
+  stale constant fails in that language rather than shipping. All bindings move
+  from 0.1.0 to match the C library. The on-disk *format* version is
+  deliberately not synced.
+- **`version()` in every implementation** — C (`tp_version`), C++, JavaScript,
+  Python, Go, Rust, Swift, Java and Kotlin all report the same metadata: name,
+  which implementation answered, the library version and its parts, the `.trp`
+  format version they write, and the alphabet ceiling. A polyglot system can
+  ask each one what it is and compare.
+- **`scripts/sync_changelog.sh`** — `docs/releases.md` was a hand-written
+  second copy of the changelog, saying the same things in different words.
+  It is now generated from `CHANGELOG.md`, with `--check` in CI.
+- **`scripts/test-jvm.sh`** — builds and tests the Java and Kotlin bindings
+  with `javac`/`kotlinc` and the JUnit console launcher, fetching a JDK, JUnit
+  and the Kotlin compiler into a gitignored cache rather than installing
+  anything. The local release gate now covers all nine targets on a machine
+  with no JVM toolchain.
+- **`scripts/make-release.sh`** — builds and tests every target, and only if
+  all of it is green drives the release: PR if the version bump has not landed
+  yet, wait for CI, squash-merge, tag. It *reads* the version and never sets
+  it; passing `--version` is an error that says so. A version bump is an
+  ordinary reviewed change, which keeps the shipped version the one that was
+  reviewed and makes the script safe to run as a check. `--check` runs the gate
+  alone; `--dry-run` prints the git and gh commands. See `RELEASE.md`.
+- **npm publishing.** The `triepack` package is built from
+  `bindings/javascript`, ships bundled TypeScript declarations
+  (`src/index.d.ts`), and publishes from `publish.yml` only after the whole
+  cross-language test matrix passes. The job requests `id-token: write` and
+  publishes with `--provenance`, so switching to OIDC trusted publishing is a
+  registry-side setting; it is idempotent if the version already exists.
+- Complete package metadata for npm and PyPI: repository, homepage, author,
+  keywords, classifiers, project URLs, bundled licences, and an `files` /
+  `MANIFEST.in` pair so neither package ships tests or fixtures that cannot
+  run outside a checkout.
+- GoatCounter analytics on the documentation site.
+- Project boilerplate: `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `SECURITY.md` with a disclosure process and a scope aimed at the decoder,
+  issue and pull-request templates, and an `.editorconfig` matching
+  `.clang-format`. `CONTRIBUTING.md` was boilerplate from another project --
+  it welcomed you to "TXZ" and told you to clone `txz` -- and has been
+  rewritten around this repository's actual build, test and conformance
+  workflow.
+- **A cross-language conformance corpus** (`tests/conformance/`): one case
+  list that the C library and all eight bindings run, checking that each
+  decodes the C-generated fixtures to the same values and re-encodes them byte
+  for byte. 50 cases covering trie shapes, `bits_per_symbol` boundaries,
+  Unicode keys, the full numeric range, blobs and scale, plus 11 malformed
+  buffers every reader must reject. See `tests/conformance/README.md`.
+- `TP_ERR_ALPHABET`, `TP_ERR_UNSUPPORTED` and `TP_MAX_ALPHABET_SIZE` in the
+  public C API; `MAX_ALPHABET_SIZE` exported by each binding
+- `try_encode` in the Rust binding, for callers who would rather handle the
+  alphabet limit than have `encode` panic
+- Regression tests for issue #1 in all seven native bindings, plus a
+  deterministic sweep over 2,000 generated key sets in JavaScript and Python
+- `tests/test_core_limits.c` and `tests/test_conformance.c`
+- docs/triepack-technical-doc.md section 5.4 "Subtree Extent", describing how
+  a reader determines where a subtree ends
 
----
+## v1.1.0 — 2026-03-04
 
-## v1.0.6 -- 2026-03-02
+### Added
+- **Go binding** -- native Go implementation with ~38 tests (roundtrip + fixture)
+- **Rust binding** -- native Rust implementation with 75 tests (44 unit + 31 integration)
+- **Swift binding** -- native Swift implementation with 27 tests via SPM
+- **Kotlin binding** -- native Kotlin/JVM implementation with ~41 tests via Gradle
+- **Java binding** -- native Java implementation with ~42 tests via Gradle
+- All five bindings validate against 7 C-generated fixture files for byte-level
+  binary compatibility (both decode and byte-identical encode)
+- Usage examples for all five new languages in docs/guide/examples.md
 
-Bug fixes for CI stability, CLI conversion commands, and README improvements.
+### Changed
+- README: all 8 bindings marked "Implemented", project status updated, v1.1
+  roadmap items checked off
+- bindings/README.md: updated status and test counts for all bindings
+- docs/guide/testing.md: added Go, Rust, Swift, Kotlin, Java test organization
+  sections; grand total now ~749 tests across 51 test files
+- docs/guide/examples.md: added contents table entries and usage examples for
+  all five new languages
+
+## v1.0.7 — 2026-03-04
+
+### Added
+- 100% line coverage across all three languages (C/C++, Python, JavaScript)
+- C/C++: 2,395 lines covered across 16 source files, 27 test programs
+- Python: 590 statements covered, 97 tests across 5 test files
+- JavaScript: 99 tests across 6 test suites, all files at 100%
+- New C test: keys-only dictionary lookup returns null value
+- New JS tests: values encode/decode, bitstream edge cases, crafted trie
+  error paths, trie prefix/branch coverage
+- New Python tests: encoder edge cases, decoder error paths, bitstream
+  bounds checking, varint overflow
 
 ### Fixed
-- **Encoder string value corruption** -- `tp_encoder_add_n()` now deep-copies string
-  and blob data so the encoder owns it, preventing use-after-return from stack buffers
-- **JSON decoder heap overflow** -- segment dedup was using entry index as byte offset
-  into key strings, causing out-of-bounds reads
-- **Bitstream zigzag UB** -- left-shift of negative `int64_t` replaced with unsigned cast
-
-### Added
-- **CLI conversion commands** -- `trp encode` (JSON to `.trp`), `trp decode` (`.trp` to
-  JSON with `--pretty`), `trp validate` (integrity check); all accept `-` for stdin
-- README badges (CI build, coverage, BSD-2-Clause license)
-- README roadmap section with language binding and format enhancement milestones
+- Encoder: removed 4 unreachable code paths (start>=end guards and
+  single-child branches proven impossible by common-prefix loop invariant)
+- Python encoder: removed unreachable dedup loop (dict keys are unique)
+  and single-child branch (same invariant as C)
+- JavaScript encoder: removed unreachable dedup loop and single-child branch
 
 ### Changed
-- CLI: removed `trp json` (replaced by `trp decode`)
-- README: language bindings table updated (Python, JavaScript = implemented)
+- Added LCOV_EXCL markers to allocation failure paths across 14 C source
+  files (malloc/realloc NULL returns require custom allocator injection to
+  test, excluded from coverage measurement)
+- Updated testing documentation with JavaScript test inventory
+- Updated README project status and test counts
 
----
+## v1.0.6 — 2026-03-02
 
-## v1.0.5 -- 2026-03-02
-
-Python binding, expanded test coverage, complex JSON example, and test data files.
+### Fixed
+- Encoder: deep-copy string/blob value data to prevent use-after-return when
+  JSON encoder passes stack-allocated buffers (root cause of CI flaky test)
+- JSON decoder: fix heap-buffer-overflow in segment dedup that used entry index
+  as byte offset into key string
+- Bitstream: fix undefined behavior in zigzag encode (left-shift of negative
+  value); cast to uint64_t before shifting
 
 ### Added
-- **Native Python binding** -- pure-Python `.trp` encoder/decoder with byte-for-byte
-  cross-language compatibility (70 tests, 5 test files)
-- **Complex JSON example** (`json_complex.c`) -- nested objects, arrays, DOM lookups, pretty-print
-- **Test data files** -- `common_words_10k.txt` (10K English words), `benchmark_100k.json` (202 KB synthetic catalog)
-- **Benchmark generator** -- `tools/generate_benchmark_json.py`
-- **3 new C test files** -- `test_json_decode.c` (27 tests), `test_core_internal.c` (21 tests), `test_bitstream_errors.c` (46 tests)
-- Expanded 6 existing C test files with error-path and edge-case coverage
-- Updated testing documentation with full test inventory
+- README: CI build, coverage, and BSD-2-Clause license badges
+- README: roadmap section with planned milestones for language bindings,
+  format enhancements, and tooling
+- CLI tool: `trp encode`, `trp decode`, `trp validate` commands with stdin
+  support and `-o`/`--pretty` flags
 
-### Test Totals
-- C/C++: 27 test programs, ~330 individual tests
-- Python: 5 test files, 70 individual tests
-- Grand total: ~400 tests across C, C++, and Python
+### Changed
+- README: updated language bindings table (Python, JavaScript now implemented)
+- README: updated project status to v1.0.5 test counts
+- CLI tool: removed `trp json` command (replaced by `trp decode`)
 
----
+## v1.0.5 — 2026-03-02
 
-## v1.0.4 -- 2026-03-02
+### Added
+- Native Python binding: pure-Python `.trp` encoder/decoder with byte-for-byte compatibility
+- Python test suite: 70 tests across 5 files (crc32, bitstream, varint, roundtrip, fixtures)
+- Complex JSON example (`json_complex.c`): nested objects, arrays, DOM lookups, pretty-print
+- Test data files: `common_words_10k.txt` (10K words) and `benchmark_100k.json` (202 KB)
+- Generator script: `tools/generate_benchmark_json.py`
+- 3 new C test files: `test_json_decode.c`, `test_core_internal.c`, `test_bitstream_errors.c`
+- Expanded existing test files with error-path and edge-case coverage
 
-Documentation improvement.
+### Changed
+- C test suite: 16 test programs -> 20 test programs, ~330 individual tests
+- Total tests across all languages: ~400 (C/C++ + Python)
+- Updated testing documentation (`docs/guide/testing.md`)
+- Updated bindings README: Python and JavaScript marked as implemented
+
+## v1.0.4 — 2026-03-02
 
 ### Fixed
 - Bitstream guide: clarify signed bit-field extraction with worked example
 
----
-
-## v1.0.3 -- 2026-03-02
-
-Site styling fixes.
+## v1.0.3 — 2026-03-02
 
 ### Fixed
-- Move stylesheet to `assets/main.scss` so minima theme loads correctly
-- Remove hardcoded top bar above navigation
-- Add whitespace around section dividers
+- CSS: move stylesheet to `assets/main.scss` so minima theme loads correctly
+- Remove hardcoded top bar above nav, add whitespace around section dividers
 - Adjust version label size and color for readability
 
----
-
-## v1.0.2 -- 2026-03-01
-
-JavaScript binding, cross-language fixtures, CI and site fixes.
+## v1.0.2 — 2026-03-01
 
 ### Added
-- **Native JavaScript binding** -- pure-JS `.trp` encoder/decoder
-- **Cross-language fixture files** -- 7 `.trp` files for interop testing
-  (`empty`, `single_null`, `single_int`, `multi_mixed`, `shared_prefix`, `large`, `keys_only`)
-- **Cross-language test** (`test_cross_language.c`) validating fixture files from C, JavaScript, and Python
+- Native JavaScript `.trp` implementation: pure-JS encoder/decoder
+- Cross-language fixture files (7 `.trp` files) for interop testing
+- Cross-language test (`test_cross_language.c`) validating fixture files
 
 ### Fixed
-- 32-bit CI: enable Unity 64-bit type support, switch Pages to workflow-based build
+- 32-bit CI: enable Unity 64-bit type support, switch Pages to workflow build
 - Site margins: use 75% viewport width, fix `!important` overrides
 - clang-tidy: suppress `misc-no-recursion` false positive, fix dead store bug
-- GitHub Pages: fix lcov coverage report overwriting the docs site, fix broken navigation links
+- GitHub Pages: fix lcov report overwriting docs site, fix broken links
 
----
-
-## v1.0.1 -- 2026-03-01
-
-GitHub Pages deployment fix.
+## v1.0.1 — 2026-03-01
 
 ### Fixed
-- Docs site was showing lcov coverage report instead of the Jekyll documentation site
-- Broken navigation links on the docs site
+- GitHub Pages deployment: docs site was showing lcov coverage report instead of Jekyll site
+- Fix broken navigation links on docs site
 
----
+## v1.0.0 — 2026-02-28
 
-## v1.0.0 -- 2026-02-28
+### Added
 
-First stable release. All core libraries are implemented and tested.
-
-### Bitstream Library (`triepack_bitstream`)
-
+**Bitstream Library (`triepack_bitstream`)**
 - Arbitrary-width bit field read/write (1-64 bits per field)
 - MSB-first and LSB-first bit ordering
 - Fixed-width byte reads: u8, u16, u32, u64 (big-endian)
@@ -181,8 +277,7 @@ First stable release. All core libraries are implemented and tested.
 - Bulk copy (reader-to-writer)
 - 64-bit cursor addressing
 
-### Core Trie Codec (`triepack_core`)
-
+**Core Trie Codec (`triepack_core`)**
 - Encoder: batch insert key-value pairs, build compressed trie
 - Automatic symbol analysis (optimal bits-per-symbol selection)
 - Two-pass trie encoding with skip pointers for O(key-length) lookups
@@ -194,8 +289,7 @@ First stable release. All core libraries are implemented and tested.
 - 32-byte binary header with magic bytes (`TRP\0`), version, flags, offsets
 - CRC-32 footer (reflected polynomial, matches zlib)
 
-### JSON Library (`triepack_json`)
-
+**JSON Library (`triepack_json`)**
 - One-shot JSON encode: parse JSON string, produce `.trp` blob
 - One-shot JSON decode: reconstruct JSON from `.trp` blob
 - Pretty-printed decode with configurable indentation
@@ -204,72 +298,50 @@ First stable release. All core libraries are implemented and tested.
 - Supports objects, arrays, strings, numbers, booleans, null
 - Unicode escape handling (`\uXXXX`) with surrogate pair support
 
-### C++ Wrappers (`triepack_wrapper`)
-
+**C++ Wrappers (`triepack_wrapper`)**
 - `triepack::Encoder` -- RAII encoder with move semantics
 - `triepack::Dict` -- RAII dictionary reader with move semantics
 - `triepack::Iterator` -- RAII iterator with move semantics
 - `triepack::BitstreamReader` / `BitstreamWriter` -- RAII bitstream wrappers
 - `triepack::Json` -- RAII JSON DOM wrapper
 
-### Build & CI
-
-- CMake 3.16+ build system (C99 + C++11, no extensions)
-- Strict warnings: `-Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow`
+**Build System**
+- CMake 3.16+ build system
+- C99 (no extensions) + C++11 (no extensions) enforced
+- Strict compiler warnings: -Wall -Wextra -Wpedantic -Werror
 - Unity test framework (v2.6.0) via FetchContent
+- Code coverage support (gcov/lcov)
+- Doxygen documentation generation
+
+**CI/CD**
 - GitHub Actions: Ubuntu GCC, Ubuntu Clang, macOS Clang, 32-bit
-- clang-tidy linting, clang-format checking
-- Code coverage (gcov/lcov), Doxygen docs, GitHub Pages
+- clang-tidy linting and clang-format style checking
+- Coverage report generation and GitHub Pages deploy
 
-### Tests & Examples
+**Tests**
+- 16 test suites covering bitstream, core, JSON, and C++ wrappers
+- 6 example programs registered as integration tests
 
-- 16 test suites with full coverage of bitstream, core, JSON, and C++ wrappers
-- 6 example programs registered as integration tests:
-  `basic_encode_decode`, `compaction_benchmark`, `rom_lookup`,
-  `prefix_search`, `json_roundtrip`, `cpp_usage`
+**Examples**
+- `basic_encode_decode` -- encode/decode with multiple value types
+- `compaction_benchmark` -- 10k-word compression ratio measurement
+- `rom_lookup` -- ROM-style zero-allocation dictionary access
+- `prefix_search` -- membership checking with shared-prefix keys
+- `json_roundtrip` -- JSON encode/decode/DOM round-trip
+- `cpp_usage` -- C++ RAII wrapper demonstration
 
-### Documentation
-
-- Getting started guide, build instructions, comprehensive API reference
+**Documentation**
+- Getting started guide, build instructions, API reference
 - Binary format specification with worked examples
 - Bitstream specification with cross-byte field diagrams
 - Technical deep dive document
-- Jekyll-based GitHub Pages site with Doxygen API docs
+- Jekyll-based GitHub Pages site
 
----
+## v0.1.0 — 2026-02-27
 
-## v0.1.0 -- 2026-02-27
-
-Initial project scaffolding.
-
+### Added
+- Initial project scaffolding
 - Directory structure, CMake build system, public API headers
 - Stub implementations for all libraries
-- CI/CD pipeline configuration (GitHub Actions)
+- CI/CD pipeline configuration
 - Language binding scaffolding (Python, TypeScript, JavaScript, Go, Swift, Rust)
-
----
-
-## Installing a Release
-
-### From Source
-
-```bash
-git clone https://github.com/deftio/triepack.git
-cd triepack
-git checkout v1.1.0
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-sudo cmake --install build
-```
-
-### Verifying
-
-```bash
-cmake -B build -DBUILD_TESTS=ON -DBUILD_JSON=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-## Creating a Release
-
-See the [Release Process](guide/release-process.md) guide.

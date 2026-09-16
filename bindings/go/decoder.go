@@ -61,12 +61,21 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 		return nil, err
 	}
 	bps := int(bpsBits)
+	// Symbol codes index 256-entry maps, so a symbol may not be wider than a
+	// byte; 0 would make the trie unreadable.
+	if bps < 1 || bps > 8 {
+		return nil, fmt.Errorf("invalid trie config: bits_per_symbol must be 1..8, got %d", bps)
+	}
 
 	symCountBits, err := reader.ReadBits(8)
 	if err != nil {
 		return nil, err
 	}
 	symbolCount := int(symCountBits)
+	// Must leave room for the control codes and fit in bits_per_symbol.
+	if symbolCount < numControlCodes || symbolCount > (1<<uint(bps)) {
+		return nil, fmt.Errorf("invalid trie config: symbol_count out of range: %d", symbolCount)
+	}
 
 	// Read control codes
 	var ctrlCodes [numControlCodes]int
@@ -86,50 +95,44 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 			return nil, err
 		}
 		if cd < 256 && cp < 256 {
-			reverseMap[cd] = cp
+			reverseMap[cd] = int(cp)
 		}
 	}
 
 	trieStart := dataStart + trieDataOffset
 	valueStart := dataStart + valueStoreOffset
+	// The trie occupies [trieStart, valueStart); the value store (when
+	// present), the byte padding and the CRC follow it.
+	trieEnd := valueStart
 
 	// DFS iteration
 	result := make(map[string]interface{})
 	keyStack := make([]byte, 0, 64)
 
-	var dfsWalk func(r *BitReader) error
-	var walkBranch func(r *BitReader, childCount int) error
+	var dfsWalk func(r *BitReader, end int) error
+	var walkBranchIfPresent func(r *BitReader, end int) error
+	var walkBranch func(r *BitReader, childCount int, end int) error
 
-	dfsWalk = func(r *BitReader) error {
+	// Every subtree knows where it ends: a child with a SKIP ends at
+	// childStart + skipDist, the last child ends where its parent does, and
+	// the root ends at trieEnd. end is the only authority on whether more
+	// symbols belong to this subtree - the bits that happen to follow are
+	// not, because past the last terminal they are padding and CRC.
+	dfsWalk = func(r *BitReader, end int) error {
 		for {
-			if r.Position() >= r.bitLen {
+			if r.Position() >= end {
 				return nil
 			}
 			sym, err := r.ReadBits(bps)
 			if err != nil {
-				return nil
+				return err
 			}
 			s := int(sym)
 
 			if s == ctrlCodes[ctrlEnd] {
 				keyStr := string(keyStack)
 				result[keyStr] = nil
-
-				if r.Position()+bps <= r.bitLen {
-					nextSym, err := r.PeekBits(bps)
-					if err == nil && int(nextSym) == ctrlCodes[ctrlBranch] {
-						r.ReadBits(bps) //nolint: errcheck
-						cc, err := readVarUint(r)
-						if err != nil {
-							return err
-						}
-						err = walkBranch(r, cc)
-						if err != nil {
-							return err
-						}
-					}
-				}
-				return nil
+				return walkBranchIfPresent(r, end)
 			}
 
 			if s == ctrlCodes[ctrlEndVal] {
@@ -139,22 +142,7 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 				}
 				keyStr := string(keyStack)
 				result[keyStr] = nil
-
-				if r.Position()+bps <= r.bitLen {
-					nextSym, err := r.PeekBits(bps)
-					if err == nil && int(nextSym) == ctrlCodes[ctrlBranch] {
-						r.ReadBits(bps) //nolint: errcheck
-						cc, err := readVarUint(r)
-						if err != nil {
-							return err
-						}
-						err = walkBranch(r, cc)
-						if err != nil {
-							return err
-						}
-					}
-				}
-				return nil
+				return walkBranchIfPresent(r, end)
 			}
 
 			if s == ctrlCodes[ctrlBranch] {
@@ -162,7 +150,7 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 				if err != nil {
 					return err
 				}
-				return walkBranch(r, cc)
+				return walkBranch(r, int(cc), end)
 			}
 
 			// Regular symbol
@@ -174,7 +162,27 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 		}
 	}
 
-	walkBranch = func(r *BitReader, childCount int) error {
+	// A terminal is followed by a BRANCH exactly when the subtree has not
+	// reached its end - keys that share this terminal as a prefix.
+	walkBranchIfPresent = func(r *BitReader, end int) error {
+		if r.Position() >= end {
+			return nil
+		}
+		sym, err := r.ReadBits(bps)
+		if err != nil {
+			return err
+		}
+		if int(sym) != ctrlCodes[ctrlBranch] {
+			return fmt.Errorf("malformed trie: expected BRANCH after terminal")
+		}
+		cc, err := readVarUint(r)
+		if err != nil {
+			return err
+		}
+		return walkBranch(r, int(cc), end)
+	}
+
+	walkBranch = func(r *BitReader, childCount int, end int) error {
 		savedKeyLen := len(keyStack)
 		for ci := 0; ci < childCount; ci++ {
 			hasSkip := ci < childCount-1
@@ -185,15 +193,20 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 				if err != nil {
 					return err
 				}
-				skipDist, err = readVarUint(r)
+				sd, err := readVarUint(r)
 				if err != nil {
 					return err
 				}
+				skipDist = int(sd)
 			}
 
 			childStartPos := r.Position()
 			keyStack = keyStack[:savedKeyLen]
-			if err := dfsWalk(r); err != nil {
+			childEnd := end
+			if hasSkip {
+				childEnd = childStartPos + skipDist
+			}
+			if err := dfsWalk(r, childEnd); err != nil {
 				return err
 			}
 
@@ -208,7 +221,7 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 	// Walk the trie
 	reader.Seek(trieStart)
 	if numKeys > 0 {
-		if err := dfsWalk(reader); err != nil {
+		if err := dfsWalk(reader, trieEnd); err != nil {
 			return nil, err
 		}
 	}

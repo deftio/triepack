@@ -47,21 +47,26 @@ npm test
 
 | Suite | Test Programs / Files | Total Tests | Line Coverage |
 |-------|----------------------|-------------|---------------|
-| C Bitstream | 6 | ~100 | 100% |
-| C Core | 6 | ~80 | 100% |
-| C JSON | 4 | ~100 | 100% |
-| C Cross-Language | 1 | 14 | 100% |
-| C++ Wrappers | 3 | ~30 | 100% |
+| C Bitstream | 6 | 210 | 100% |
+| C Core | 7 | 179 | 100% |
+| C JSON | 4 | 120 | 100% |
+| C Cross-Language | 2 | 9 | 100% |
+| C++ Wrappers | 3 | 47 | 100% |
 | Examples (smoke) | 7 | 7 | — |
-| **C/C++ Total** | **27** | **~330** | **100%** |
-| Python | 5 | 97 | 100% |
-| JavaScript | 6 | 99 | 100% |
-| Go | 2 | ~38 | — |
-| Rust | 2 | 75 | — |
-| Swift | 1 | 27 | — |
-| Kotlin | 2 | ~41 | — |
-| Java | 2 | ~42 | — |
-| **Grand Total** | **51** | **~749** | — |
+| **C/C++ Total** | **29** | **572** | **100%** |
+| Python | 6 | 220 | 100% |
+| JavaScript | 7 | 226 | 100% |
+| Go | 3 | 164 | — |
+| Rust | 3 | 82 | — |
+| Swift | 2 | 34 | — |
+| Kotlin | 3 | 52 | — |
+| Java | 3 | 159 | — |
+| **Grand Total** | **56** | **1,509** | — |
+
+Counts include the cross-language conformance suite, which contributes cases
+to every row. The C "Cross-Language" figure is small because
+`test_conformance.c` runs the whole corpus inside two Unity tests rather than
+one per case.
 
 ## C/C++ Test Organization
 
@@ -103,7 +108,8 @@ test framework (v2.6.0). They are organized by component.
 
 | File | What it covers |
 |------|----------------|
-| `test_cross_language.c` | Validates C-generated `.trp` fixture files used by JavaScript and Python bindings |
+| `test_cross_language.c` | Validates the original C-generated `.trp` fixture files |
+| `test_conformance.c` | Runs the shared conformance corpus, and checks that malformed buffers are rejected |
 
 ### C++ Wrapper Tests
 
@@ -137,10 +143,11 @@ The Python binding is a pure-Python native implementation (no FFI).
 | `test_crc32.py` | 5 | CRC-32 known-answer tests including `"123456789"` -> `0xCBF43926` |
 | `test_bitstream.py` | 19 | `BitWriter`/`BitReader` bit-level and byte-level operations, edge cases |
 | `test_varint.py` | 16 | VarInt unsigned/signed round-trips, zigzag mapping, encoding sizes, overflow |
-| `test_triepack.py` | 36 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling, edge cases |
+| `test_triepack.py` | 45 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling, edge cases, issue #1 regressions |
 | `test_values.py` | 7 | Value encode/decode for all types: null, bool, int, uint, float32, float64, string, blob |
 | `test_fixtures.py` | 14 | 7 decode tests + 7 **byte-for-byte** encode match against C-generated `.trp` fixture files |
-| **Total** | **97** | |
+| `test_conformance.py` | 113 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **220** | |
 
 ## JavaScript Test Organization
 
@@ -149,13 +156,14 @@ The JavaScript binding is a pure-JS native implementation (no FFI).
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `triepack.test.js` | 30 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, crafted trie error paths |
+| `triepack.test.js` | 40 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, crafted trie error paths, issue #1 regressions |
 | `bitstream.test.js` | 21 | `BitWriter`/`BitReader` bit-level and byte-level operations, u64, growth, EOF |
-| `varint.test.js` | 9 | VarInt unsigned/signed round-trips, overflow, negative rejection |
+| `varint.test.js` | 13 | VarInt unsigned/signed round-trips, overflow, negative rejection, the exact-integer range |
 | `values.test.js` | 7 | Value encode/decode: null, undefined, bool, float32, unknown tag |
 | `crc32.test.js` | 8 | CRC-32 known-answer tests, empty input, incremental |
 | `fixtures.test.js` | 24 | 7 decode + 7 encode match + 7 cross-read + 3 error tests |
-| **Total** | **99** | |
+| `conformance.test.js` | 113 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **226** | |
 
 ## Go Test Organization
 
@@ -163,9 +171,10 @@ Go tests live in `bindings/go/` and use Go's built-in `testing` package.
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `triepack_test.go` | ~24 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling |
+| `triepack_test.go` | ~29 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, the alphabet limit |
 | `fixtures_test.go` | ~14 | Decode + byte-identical encode match against C-generated `.trp` fixture files |
-| **Total** | **~38** | |
+| `conformance_test.go` | ~121 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **164** | |
 
 ```bash
 cd bindings/go
@@ -179,8 +188,9 @@ Rust tests live in `bindings/rust/` and use Rust's built-in test framework.
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `src/*.rs` (unit) | 44 | BitWriter/BitReader, CRC-32, VarInt, Values encode/decode |
-| `tests/integration_test.rs` | 31 | Round-trips, shared prefixes, UTF-8, magic bytes, CRC corruption, fixture decode + encode match |
-| **Total** | **75** | |
+| `tests/integration_test.rs` | 34 | Round-trips, shared prefixes, UTF-8, magic bytes, CRC corruption, fixture decode + encode match, issue #1 regressions |
+| `tests/conformance_test.rs` | 4 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **82** | |
 
 ```bash
 cd bindings/rust
@@ -193,8 +203,9 @@ Swift tests live in `bindings/swift/Tests/` and use XCTest via Swift Package Man
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `TriepackTests.swift` | 27 | Round-trips for all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, fixture decode + encode match |
-| **Total** | **27** | |
+| `TriepackTests.swift` | 30 | Round-trips for all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, fixture decode + encode match, issue #1 regressions |
+| `ConformanceTests.swift` | 4 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **34** | |
 
 ```bash
 cd bindings/swift
@@ -207,9 +218,10 @@ Kotlin tests live in `bindings/kotlin/src/test/` and use JUnit 5 via Gradle.
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `TriePackTest.kt` | ~27 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check |
+| `TriePackTest.kt` | ~31 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, issue #1 regressions |
 | `FixturesTest.kt` | ~14 | Decode + byte-identical encode match against C-generated `.trp` fixture files |
-| **Total** | **~41** | |
+| `ConformanceTest.kt` | 4 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **52** | |
 
 ```bash
 cd bindings/kotlin
@@ -222,20 +234,44 @@ Java tests live in `bindings/java/src/test/` and use JUnit 5 via Gradle.
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `TriePackTest.java` | ~28 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check |
+| `TriePackTest.java` | ~34 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, issue #1 regressions |
 | `FixturesTest.java` | ~14 | Decode + byte-identical encode match against C-generated `.trp` fixture files |
-| **Total** | **~42** | |
+| `ConformanceTest.java` | 111 | The shared conformance corpus, and rejection of malformed buffers |
+| **Total** | **159** | |
 
 ```bash
 cd bindings/java
 ./gradlew test
 ```
 
-### Cross-Language Fixture Tests
+### Cross-Language Conformance Suite
 
-The `tests/fixtures/` directory contains `.trp` files generated by the C
-library. All language bindings validate against these fixtures to ensure
-binary-level compatibility across all implementations:
+`tests/conformance/` holds one case list that every implementation runs, so
+the C library and the eight bindings cannot drift apart without a test
+noticing. Each implementation has a harness that reads `cases.txt` and, for
+each of the 50 cases:
+
+- **Decode**: read `fixtures/<name>.trp` and check the values against the corpus
+- **Encode**: encode the corpus values and check the bytes against the same file
+
+Byte-for-byte encoding is the strong claim: any implementation can produce a
+`.trp` another can read, and two implementations given the same input produce
+the same file.
+
+`malformed/` holds 11 buffers with one field damaged each — bad magic, wrong
+version, broken CRC, truncation, and out-of-range trie configs. Every
+implementation asserts that all of them are rejected.
+
+The corpus and its fixtures are generated; CI fails if the checked-in files
+are not what the generators produce. See
+[`tests/conformance/README.md`](https://github.com/deftio/triepack/blob/main/tests/conformance/README.md)
+for the file format and how to add a case.
+
+### Original Fixture Set
+
+`tests/fixtures/` predates the conformance suite and covers seven of the same
+cases; the two are byte-identical where they overlap, and a test would fail if
+they stopped being so.
 
 | Fixture | Description |
 |---------|-------------|
@@ -246,10 +282,6 @@ binary-level compatibility across all implementations:
 | `shared_prefix.trp` | `{"abc": 10, "abd": 20, "xyz": 30}` |
 | `large.trp` | 100 keys: `key_0000` through `key_0099` |
 | `keys_only.trp` | `{"apple": null, "banana": null, "cherry": null}` |
-
-Each binding tests both directions:
-- **Decode**: Read the C-generated `.trp` file and verify the extracted data matches
-- **Encode**: Encode the same data and verify the output is byte-identical to the C fixture
 
 ## Test Data Files
 

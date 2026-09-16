@@ -18,9 +18,6 @@
 #define TP_MAGIC_2 0x50
 #define TP_MAGIC_3 0x00
 
-#define TP_FORMAT_VERSION_MAJOR 1
-#define TP_FORMAT_VERSION_MINOR 0
-
 /* ── Control codes ──────────────────────────────────────────────────── */
 
 #define TP_CTRL_END          0
@@ -99,10 +96,17 @@ struct tp_dict {
 
 #define TP_ITER_MAX_DEPTH 256
 
+/**
+ * One BRANCH the walk is inside.
+ *
+ * `subtree_end` is where the branch's own subtree stops; the last child
+ * inherits it, and every earlier child stops at its SKIP distance instead.
+ */
 typedef struct tp_iter_frame {
-    uint64_t bit_pos;
-    uint32_t remaining_children;
-    size_t key_prefix_len;
+    uint64_t subtree_end;    /* bit position just past this subtree */
+    uint64_t next_child_pos; /* start of the next child's preamble */
+    uint32_t remaining;      /* children not yet visited */
+    size_t key_prefix_len;   /* key length at the branch point */
 } tp_iter_frame;
 
 struct tp_iterator {
@@ -116,6 +120,19 @@ struct tp_iterator {
     tp_iter_frame stack[TP_ITER_MAX_DEPTH];
     int stack_top;
     bool started;
+
+    /* Where iteration begins, and how far it runs. find_prefix narrows these
+       to the subtree under the prefix; plain iteration uses the whole trie. */
+    uint64_t root_pos;
+    uint64_t root_end;
+    size_t root_key_len; /* prefix already in key_buf when iteration starts */
+
+    /* Value indices are assigned in the order terminals are visited, so a
+       cursor through the value store usually lands on the next one already.
+       value_index is the index the cursor sits at; a prefix iteration starts
+       partway in and pays one scan to get there. */
+    uint64_t value_pos;
+    uint64_t value_index;
 };
 
 /* ── Internal function declarations ─────────────────────────────────── */

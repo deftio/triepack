@@ -21,23 +21,25 @@ private class TrieDecoder(
     val result = LinkedHashMap<String, TpValue?>()
     private val keyStack = mutableListOf<Int>()
 
-    fun dfsWalk() {
+    /**
+     * DFS walk through the trie collecting keys.
+     *
+     * Every subtree knows where it ends: a child with a SKIP ends at
+     * `childStart + skipDist`, the last child ends where its parent does, and
+     * the root ends at the start of the value store. [end] is the only
+     * authority on whether more symbols belong to this subtree -- the bits
+     * that happen to follow are not, because past the last terminal they are
+     * padding and CRC.
+     */
+    fun dfsWalk(end: Int) {
         while (true) {
-            if (reader.position >= reader.totalBitLength) return
+            if (reader.position >= end) return
             val sym = reader.readBits(bps).toInt()
 
             if (sym == ctrlCodes[CTRL_END]) {
                 val keyStr = String(ByteArray(keyStack.size) { keyStack[it].toByte() }, Charsets.UTF_8)
                 result[keyStr] = null
-
-                if (reader.position + bps <= reader.totalBitLength) {
-                    val nextSym = reader.peekBits(bps).toInt()
-                    if (nextSym == ctrlCodes[CTRL_BRANCH]) {
-                        reader.readBits(bps)
-                        val childCount = readVarUint(reader).toInt()
-                        walkBranch(childCount)
-                    }
-                }
+                walkBranchIfPresent(end)
                 return
             }
 
@@ -45,21 +47,13 @@ private class TrieDecoder(
                 readVarUint(reader) // value index
                 val keyStr = String(ByteArray(keyStack.size) { keyStack[it].toByte() }, Charsets.UTF_8)
                 result[keyStr] = null
-
-                if (reader.position + bps <= reader.totalBitLength) {
-                    val nextSym = reader.peekBits(bps).toInt()
-                    if (nextSym == ctrlCodes[CTRL_BRANCH]) {
-                        reader.readBits(bps)
-                        val childCount = readVarUint(reader).toInt()
-                        walkBranch(childCount)
-                    }
-                }
+                walkBranchIfPresent(end)
                 return
             }
 
             if (sym == ctrlCodes[CTRL_BRANCH]) {
                 val childCount = readVarUint(reader).toInt()
-                walkBranch(childCount)
+                walkBranch(childCount, end)
                 return
             }
 
@@ -69,7 +63,21 @@ private class TrieDecoder(
         }
     }
 
-    private fun walkBranch(childCount: Int) {
+    /**
+     * A terminal is followed by a BRANCH exactly when the subtree has not
+     * reached its end -- keys that share this terminal as a prefix.
+     */
+    private fun walkBranchIfPresent(end: Int) {
+        if (reader.position >= end) return
+        val sym = reader.readBits(bps).toInt()
+        if (sym != ctrlCodes[CTRL_BRANCH]) {
+            throw IllegalArgumentException("Malformed trie: expected BRANCH after terminal")
+        }
+        val childCount = readVarUint(reader).toInt()
+        walkBranch(childCount, end)
+    }
+
+    private fun walkBranch(childCount: Int, end: Int) {
         val savedKeyLen = keyStack.size
         for (ci in 0 until childCount) {
             val hasSkip = ci < childCount - 1
@@ -84,7 +92,7 @@ private class TrieDecoder(
             while (keyStack.size > savedKeyLen) {
                 keyStack.removeAt(keyStack.size - 1)
             }
-            dfsWalk()
+            dfsWalk(if (hasSkip) childStartPos + skipDist else end)
 
             if (hasSkip) {
                 reader.seek(childStartPos + skipDist)
@@ -157,7 +165,14 @@ fun decode(buffer: ByteArray): Map<String, TpValue?> {
 
     reader.seek(dataStart)
     val bps = reader.readBits(4).toInt()
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    require(bps in 1..8) { "Invalid trie config: bits_per_symbol must be 1..8, got $bps" }
     val symbolCount = reader.readBits(8).toInt()
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    require(symbolCount >= NUM_CONTROL_CODES && symbolCount <= (1 shl bps)) {
+        "Invalid trie config: symbol_count out of range: $symbolCount"
+    }
 
     // Read control codes
     val ctrlCodes = IntArray(NUM_CONTROL_CODES)
@@ -176,12 +191,15 @@ fun decode(buffer: ByteArray): Map<String, TpValue?> {
 
     val trieStart = dataStart + trieDataOffset
     val valueStart = dataStart + valueStoreOffset
+    // The trie occupies [trieStart, valueStart); the value store (when
+    // present), the byte padding and the CRC follow it.
+    val trieEnd = valueStart
 
     // Walk the trie
     val decoder = TrieDecoder(reader, bps, ctrlCodes, reverseMap)
     reader.seek(trieStart)
     if (numKeys > 0) {
-        decoder.dfsWalk()
+        decoder.dfsWalk(trieEnd)
     }
 
     val result = decoder.result

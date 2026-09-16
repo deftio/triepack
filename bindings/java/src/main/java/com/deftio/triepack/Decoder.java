@@ -92,7 +92,18 @@ public class Decoder {
 
         reader.seek(dataStart);
         int bps = (int) reader.readBits(4);
+        // Symbol codes index 256-entry maps, so a symbol may not be wider than
+        // a byte; 0 would make the trie unreadable.
+        if (bps < 1 || bps > 8) {
+            throw new IllegalArgumentException(
+                "Invalid trie config: bits_per_symbol must be 1..8, got " + bps);
+        }
         int symbolCount = (int) reader.readBits(8);
+        // Must leave room for the control codes and fit in bits_per_symbol.
+        if (symbolCount < NUM_CONTROL_CODES || symbolCount > (1 << bps)) {
+            throw new IllegalArgumentException(
+                "Invalid trie config: symbol_count out of range: " + symbolCount);
+        }
 
         // Read control codes
         int[] ctrlCodes = new int[NUM_CONTROL_CODES];
@@ -115,6 +126,9 @@ public class Decoder {
 
         int trieStart = dataStart + trieDataOffset;
         int valueStart = dataStart + valueStoreOffset;
+        // The trie occupies [trieStart, valueStart); the value store (when
+        // present), the byte padding and the CRC follow it.
+        int trieEnd = valueStart;
 
         // DFS iteration
         Map<String, TpValue> result = new LinkedHashMap<>();
@@ -123,7 +137,7 @@ public class Decoder {
         // Walk the trie
         reader.seek(trieStart);
         if (numKeys > 0) {
-            dfsWalk(reader, bps, ctrlCodes, reverseMap, keyStack, result);
+            dfsWalk(reader, bps, ctrlCodes, reverseMap, keyStack, result, trieEnd);
         }
 
         // Decode values
@@ -143,11 +157,21 @@ public class Decoder {
         return result;
     }
 
+    /**
+     * DFS walk through the trie collecting keys.
+     *
+     * <p>Every subtree knows where it ends: a child with a SKIP ends at
+     * {@code childStart + skipDist}, the last child ends where its parent
+     * does, and the root ends at the start of the value store. {@code end} is
+     * the only authority on whether more symbols belong to this subtree -- the
+     * bits that happen to follow are not, because past the last terminal they
+     * are padding and CRC.
+     */
     private static void dfsWalk(BitReader r, int bps, int[] ctrlCodes,
                                  int[] reverseMap, List<Integer> keyStack,
-                                 Map<String, TpValue> result) {
+                                 Map<String, TpValue> result, int end) {
         while (true) {
-            if (r.getPosition() >= r.getBitLen()) {
+            if (r.getPosition() >= end) {
                 return;
             }
             int sym = (int) r.readBits(bps);
@@ -155,16 +179,7 @@ public class Decoder {
             if (sym == ctrlCodes[CTRL_END]) {
                 String keyStr = buildKeyString(keyStack);
                 result.put(keyStr, TpValue.ofNull());
-
-                if (r.getPosition() + bps <= r.getBitLen()) {
-                    int nextSym = (int) r.peekBits(bps);
-                    if (nextSym == ctrlCodes[CTRL_BRANCH]) {
-                        r.readBits(bps);
-                        int childCount = (int) VarInt.readVarUint(r);
-                        walkBranch(r, bps, ctrlCodes, reverseMap,
-                                   keyStack, result, childCount);
-                    }
-                }
+                walkBranchIfPresent(r, bps, ctrlCodes, reverseMap, keyStack, result, end);
                 return;
             }
 
@@ -172,23 +187,14 @@ public class Decoder {
                 VarInt.readVarUint(r); // value index (consumed but unused here)
                 String keyStr = buildKeyString(keyStack);
                 result.put(keyStr, TpValue.ofNull());
-
-                if (r.getPosition() + bps <= r.getBitLen()) {
-                    int nextSym = (int) r.peekBits(bps);
-                    if (nextSym == ctrlCodes[CTRL_BRANCH]) {
-                        r.readBits(bps);
-                        int childCount = (int) VarInt.readVarUint(r);
-                        walkBranch(r, bps, ctrlCodes, reverseMap,
-                                   keyStack, result, childCount);
-                    }
-                }
+                walkBranchIfPresent(r, bps, ctrlCodes, reverseMap, keyStack, result, end);
                 return;
             }
 
             if (sym == ctrlCodes[CTRL_BRANCH]) {
                 int childCount = (int) VarInt.readVarUint(r);
                 walkBranch(r, bps, ctrlCodes, reverseMap,
-                           keyStack, result, childCount);
+                           keyStack, result, childCount, end);
                 return;
             }
 
@@ -198,10 +204,28 @@ public class Decoder {
         }
     }
 
+    /**
+     * A terminal is followed by a BRANCH exactly when the subtree has not
+     * reached its end -- keys that share this terminal as a prefix.
+     */
+    private static void walkBranchIfPresent(BitReader r, int bps, int[] ctrlCodes,
+                                             int[] reverseMap, List<Integer> keyStack,
+                                             Map<String, TpValue> result, int end) {
+        if (r.getPosition() >= end) {
+            return;
+        }
+        int sym = (int) r.readBits(bps);
+        if (sym != ctrlCodes[CTRL_BRANCH]) {
+            throw new IllegalArgumentException("Malformed trie: expected BRANCH after terminal");
+        }
+        int childCount = (int) VarInt.readVarUint(r);
+        walkBranch(r, bps, ctrlCodes, reverseMap, keyStack, result, childCount, end);
+    }
+
     private static void walkBranch(BitReader r, int bps, int[] ctrlCodes,
                                     int[] reverseMap, List<Integer> keyStack,
                                     Map<String, TpValue> result,
-                                    int childCount) {
+                                    int childCount, int end) {
         int savedKeyLen = keyStack.size();
         for (int ci = 0; ci < childCount; ci++) {
             boolean hasSkip = ci < childCount - 1;
@@ -217,7 +241,8 @@ public class Decoder {
             while (keyStack.size() > savedKeyLen) {
                 keyStack.remove(keyStack.size() - 1);
             }
-            dfsWalk(r, bps, ctrlCodes, reverseMap, keyStack, result);
+            dfsWalk(r, bps, ctrlCodes, reverseMap, keyStack, result,
+                    hasSkip ? childStartPos + skipDist : end);
 
             if (hasSkip) {
                 r.seek(childStartPos + skipDist);

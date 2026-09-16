@@ -1,6 +1,7 @@
 # Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
 
 import math
+import os
 
 import pytest
 
@@ -8,7 +9,7 @@ import triepack
 
 
 def test_version():
-    assert triepack.__version__ == "0.1.0"
+    assert triepack.__version__ == "1.2.0"
 
 
 def test_empty_object():
@@ -320,3 +321,100 @@ def test_decoder_eof_during_dfs():
 
     result = triepack.decode(bytes(buf))
     assert isinstance(result, dict)
+
+
+# Regression: issue #1 -- the walker used to guess whether a BRANCH followed a
+# terminal by peeking at the next bits. Past the last terminal those bits are
+# the byte padding and the CRC, which for some key sets look exactly like a
+# BRANCH code, sending the walker off the end of the buffer (EOFError). The
+# trie end comes from the header, so the walker must stop there.
+#
+# Each of these key sets produced a trailing BRANCH-looking code and raised
+# EOFError before the fix.
+TRAILING_BRANCH_KEY_SETS = [
+    ["eddb", "h"],
+    ["aad", "ebg", "ec", "ehhbf", "h", "hebad"],
+    ["aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"],
+    ["a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"],
+]
+
+
+@pytest.mark.parametrize("keys", TRAILING_BRANCH_KEY_SETS)
+def test_walk_stops_at_trie_end_keys_only(keys):
+    data = {k: None for k in keys}
+    assert triepack.decode(triepack.encode(data)) == data
+
+
+@pytest.mark.parametrize("keys", TRAILING_BRANCH_KEY_SETS)
+def test_walk_stops_at_trie_end_with_values(keys):
+    data = {k: i for i, k in enumerate(keys)}
+    assert triepack.decode(triepack.encode(data)) == data
+
+
+def test_round_trips_generated_key_sets():
+    """The trigger is set-dependent (the trailing bits have to land on the
+    BRANCH code), so cover many small key sets deterministically."""
+    seed = 1
+
+    def rnd():
+        nonlocal seed
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        return seed / 0x7FFFFFFF
+
+    alpha = "abcdefgh"
+
+    for _ in range(2000):
+        keys = set()
+        n = 2 + int(rnd() * 12)
+        while len(keys) < n:
+            length = 1 + int(rnd() * 5)
+            keys.add("".join(alpha[int(rnd() * len(alpha))] for _ in range(length)))
+        data = {k: None for k in keys}
+        assert triepack.decode(triepack.encode(data)) == data
+
+
+def test_header_declares_exactly_the_bits_written():
+    buf = triepack.encode({"eddb": None, "h": None})
+    value_store_offset = int.from_bytes(buf[16:20], "big")
+    total_data_bits = int.from_bytes(buf[24:28], "big")
+    # No values, so the trie is the whole data section, and the data section
+    # plus its byte padding and the 4-byte CRC is the buffer.
+    assert value_store_offset == total_data_bits
+    assert len(buf) == 32 + (total_data_bits + 7) // 8 + 4
+
+
+# -- Version metadata ------------------------------------------------------
+#
+# The version a build reports has to equal triepack-version.txt, the single
+# source of truth. Reading the file rather than a copy of the string is the
+# point: a stale constant fails.
+
+VERSION_FILE = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "triepack-version.txt"
+)
+
+
+def declared_version():
+    with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
+
+def test_version_matches_the_source_of_truth():
+    assert triepack.__version__ == declared_version()
+    assert triepack.version()["version"] == declared_version()
+
+
+def test_version_metadata_shape():
+    declared = declared_version()
+    major, minor, patch = (int(p) for p in declared.split("."))
+    assert triepack.version() == {
+        "name": "triepack",
+        "implementation": "python",
+        "version": declared,
+        "version_major": major,
+        "version_minor": minor,
+        "version_patch": patch,
+        "format_version_major": 1,
+        "format_version_minor": 0,
+        "max_alphabet_size": 249,
+    }

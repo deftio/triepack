@@ -63,6 +63,50 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  version-sync:
+    name: Derived files are in sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # triepack-version.txt is the single source of truth; every package
+      # manifest, every binding's version() and the docs site derive from it.
+      - name: Versions
+        run: ./scripts/sync_version.sh --check
+
+      # CHANGELOG.md is the single source of truth for what changed in each
+      # version; docs/releases.md is generated from it.
+      - name: Changelog
+        run: ./scripts/sync_changelog.sh --check
+
+  conformance-fixtures:
+    name: Conformance corpus is in sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF
+
+      - name: Regenerate the corpus and its fixtures
+        run: |
+          python3 tools/gen_conformance_cases.py
+          cmake --build build --target fixtures
+          python3 tools/gen_malformed_fixtures.py
+
+      # The bindings check themselves against checked-in fixtures, so those
+      # files have to be what the generators produce from the current source.
+      - name: Nothing changed
+        run: |
+          if ! git diff --exit-code -- tests/conformance tests/fixtures; then
+            echo "::error::tests/conformance is stale — run the generators (see tests/conformance/README.md) and commit the result"
+            exit 1
+          fi
+
   lint:
     name: clang-tidy
     runs-on: ubuntu-latest

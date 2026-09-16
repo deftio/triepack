@@ -7,11 +7,11 @@ import "errors"
 const varintMaxGroups = 10
 
 // writeVarUint writes an unsigned LEB128 VarInt to the BitWriter.
-func writeVarUint(w *BitWriter, value int) {
-	if value < 0 {
-		panic("writeVarUint: negative value")
-	}
-	v := uint64(value)
+//
+// The value is a uint64 so the full unsigned range round-trips; an int would
+// turn anything above MaxInt64 negative on the way in.
+func writeVarUint(w *BitWriter, value uint64) {
+	v := value
 	for {
 		b := uint8(v & 0x7F)
 		v >>= 7
@@ -26,7 +26,7 @@ func writeVarUint(w *BitWriter, value int) {
 }
 
 // readVarUint reads an unsigned LEB128 VarInt from the BitReader.
-func readVarUint(r *BitReader) (int, error) {
+func readVarUint(r *BitReader) (uint64, error) {
 	val := uint64(0)
 	shift := uint(0)
 	for i := 0; i < varintMaxGroups; i++ {
@@ -36,7 +36,7 @@ func readVarUint(r *BitReader) (int, error) {
 		}
 		val |= uint64(b&0x7F) << shift
 		if (b & 0x80) == 0 {
-			return int(val), nil
+			return val, nil
 		}
 		shift += 7
 	}
@@ -44,30 +44,25 @@ func readVarUint(r *BitReader) (int, error) {
 }
 
 // writeVarInt writes a signed zigzag VarInt to the BitWriter.
-func writeVarInt(w *BitWriter, value int) {
-	var raw int
-	if value >= 0 {
-		raw = value * 2
-	} else {
-		raw = (-value)*2 - 1
-	}
+//
+// Zigzag is computed on the bit pattern rather than by negating, which would
+// overflow at MinInt64.
+func writeVarInt(w *BitWriter, value int64) {
+	raw := uint64(value<<1) ^ uint64(value>>63)
 	writeVarUint(w, raw)
 }
 
 // readVarInt reads a signed zigzag VarInt from the BitReader.
-func readVarInt(r *BitReader) (int, error) {
+func readVarInt(r *BitReader) (int64, error) {
 	raw, err := readVarUint(r)
 	if err != nil {
 		return 0, err
 	}
-	if raw&1 != 0 {
-		return -(raw >> 1) - 1, nil
-	}
-	return raw >> 1, nil
+	return int64(raw>>1) ^ -int64(raw&1), nil
 }
 
 // varUintBits returns the number of bits needed to encode val as a VarUint.
-func varUintBits(val int) int {
+func varUintBits(val uint64) int {
 	bits := 0
 	v := val
 	for {

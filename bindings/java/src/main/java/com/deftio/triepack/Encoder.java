@@ -37,6 +37,14 @@ public class Encoder {
     static final int NUM_CONTROL_CODES = 6;
 
     /**
+     * Largest number of distinct byte values the keys may use.
+     *
+     * <p>symbol_count is an 8-bit header field holding the alphabet plus the
+     * control codes, so the alphabet cannot exceed 255 - 6.
+     */
+    public static final int MAX_ALPHABET_SIZE = 255 - NUM_CONTROL_CODES; // 249
+
+    /**
      * Encode a map into the .trp binary format. Returns the encoded bytes.
      */
     public static byte[] encode(Map<String, TpValue> data) {
@@ -94,6 +102,15 @@ public class Encoder {
             if (u) alphabetSize++;
         }
         int totalSymbols = alphabetSize + NUM_CONTROL_CODES;
+        // The trie config packs symbol_count into 8 header bits, so the
+        // alphabet plus the 6 control codes must fit in 255. Encoding a wider
+        // alphabet used to produce a buffer with a valid CRC that decoded to
+        // nothing.
+        if (totalSymbols > 255) {
+            throw new IllegalArgumentException(
+                "Keys use too many distinct byte values (" + alphabetSize
+                + "); the format allows at most " + MAX_ALPHABET_SIZE);
+        }
         int bps = 1;
         while ((1 << bps) < totalSymbols) {
             bps++;

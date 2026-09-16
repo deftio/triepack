@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The roadmap in [README.md](https://github.com/deftio/triepack#roadmap)
+        lists what is already planned — worth a look first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What you are trying to do, and where the library gets in the way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you would like it to do. An API sketch helps.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Binary format change (affects every implementation)
+        - C library API
+        - One or more bindings
+        - Tooling or CLI
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Anything you tried or rejected, and why.
+    validations:
+      required: false

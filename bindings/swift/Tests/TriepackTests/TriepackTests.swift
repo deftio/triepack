@@ -267,4 +267,102 @@ final class TriepackTests: XCTestCase {
             XCTAssertEqual(decoded, val, "Signed VarInt roundtrip failed for \(val)")
         }
     }
+
+    // MARK: - Regression: issue #1 -- walk must stop at the end of the trie
+    //
+    // The walker used to guess whether a BRANCH followed a terminal by peeking
+    // at the next bits. Past the last terminal those bits are the byte padding
+    // and the CRC, which for some key sets look exactly like a BRANCH code,
+    // sending the walker off the end of the buffer. The trie end comes from
+    // the header, so the walker must stop there.
+    //
+    // Each of these key sets produced a trailing BRANCH-looking code and threw
+    // .eof before the fix.
+
+    private static let trailingBranchKeySets: [[String]] = [
+        ["eddb", "h"],
+        ["aad", "ebg", "ec", "ehhbf", "h", "hebad"],
+        ["aghed", "bae", "bfffa", "cad", "d", "ebbhb", "fa", "feb"],
+        ["a", "aad", "bg", "bgc", "egba", "gahad", "ghehg", "hbdab", "hg"],
+    ]
+
+    func testWalkStopsAtTrieEndKeysOnly() throws {
+        for keys in Self.trailingBranchKeySets {
+            var data: [String: TriepackValue] = [:]
+            for k in keys { data[k] = TriepackValue.null }
+            let result = try Triepack.decode(try Triepack.encode(data))
+            XCTAssertEqual(result.count, keys.count, "key set \(keys)")
+            for k in keys {
+                XCTAssertEqual(result[k], .null, "key \(k) in set \(keys)")
+            }
+        }
+    }
+
+    func testWalkStopsAtTrieEndWithValues() throws {
+        for keys in Self.trailingBranchKeySets {
+            var data: [String: TriepackValue] = [:]
+            for (i, k) in keys.enumerated() { data[k] = TriepackValue.uint(UInt64(i)) }
+            let result = try Triepack.decode(try Triepack.encode(data))
+            XCTAssertEqual(result.count, keys.count, "key set \(keys)")
+            for (i, k) in keys.enumerated() {
+                XCTAssertEqual(result[k], .uint(UInt64(i)), "key \(k) in set \(keys)")
+            }
+        }
+    }
+
+    func testHeaderDeclaresExactlyTheBitsWritten() throws {
+        let data: [String: TriepackValue] = ["eddb": .null, "h": .null]
+        let buf = try Triepack.encode(data)
+        func u32(_ off: Int) -> Int {
+            let b0 = Int(buf[off]) << 24
+            let b1 = Int(buf[off + 1]) << 16
+            let b2 = Int(buf[off + 2]) << 8
+            let b3 = Int(buf[off + 3])
+            return b0 | b1 | b2 | b3
+        }
+        let valueStoreOffset = u32(16)
+        let totalDataBits = u32(24)
+        // No values, so the trie is the whole data section, and the data
+        // section plus its byte padding and the 4-byte CRC is the buffer.
+        XCTAssertEqual(valueStoreOffset, totalDataBits)
+        XCTAssertEqual(buf.count, 32 + (totalDataBits + 7) / 8 + 4)
+    }
+
+    // MARK: - Version metadata
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private func declaredVersion() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // TriepackTests/
+            .deletingLastPathComponent()   // Tests/
+            .deletingLastPathComponent()   // swift/
+            .deletingLastPathComponent()   // bindings/
+            .deletingLastPathComponent()   // repository root
+            .appendingPathComponent("triepack-version.txt")
+        return try String(contentsOf: url, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func testVersionMatchesSourceOfTruth() throws {
+        let want = try declaredVersion()
+        XCTAssertEqual(Triepack.version, want)
+        XCTAssertEqual(Triepack.versionInfo().version, want)
+    }
+
+    func testVersionMetadataShape() throws {
+        let want = try declaredVersion()
+        let parts = want.split(separator: ".").map { Int($0)! }
+        let got = Triepack.versionInfo()
+        XCTAssertEqual(got.name, "triepack")
+        XCTAssertEqual(got.implementation, "swift")
+        XCTAssertEqual(got.versionMajor, parts[0])
+        XCTAssertEqual(got.versionMinor, parts[1])
+        XCTAssertEqual(got.versionPatch, parts[2])
+        XCTAssertEqual(got.formatVersionMajor, 1)
+        XCTAssertEqual(got.formatVersionMinor, 0)
+        XCTAssertEqual(got.maxAlphabetSize, 249)
+    }
 }

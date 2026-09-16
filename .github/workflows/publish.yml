@@ -1,0 +1,225 @@
+name: Release & Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. The tag has to match the single source of truth, and every version string
+  #    in the tree has to match it too.
+  # ---------------------------------------------------------------------------
+  version:
+    name: Version is consistent
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tag matches triepack-version.txt
+        id: check
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          FILE_VERSION=$(head -1 triepack-version.txt | tr -d '[:space:]')
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag ($TAG_VERSION) does not match triepack-version.txt ($FILE_VERSION)"
+            exit 1
+          fi
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Every version string is in sync
+        run: ./scripts/sync_version.sh --check
+
+      - name: The docs changelog is in sync
+        run: ./scripts/sync_changelog.sh --check
+
+  # ---------------------------------------------------------------------------
+  # 2. Re-run every target. Nothing is published unless all of this is green.
+  # ---------------------------------------------------------------------------
+  test-c:
+    name: Test / C & C++
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+      - name: Build
+        run: cmake --build build 2>&1 | tee build.log
+      - name: Verify zero warnings
+        run: |
+          if grep -iE "warning:" build.log | grep -v "In file included"; then
+            echo "::error::Build produced warnings"
+            exit 1
+          fi
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Conformance corpus is in sync
+        run: |
+          python3 tools/gen_conformance_cases.py
+          cmake --build build --target fixtures
+          python3 tools/gen_malformed_fixtures.py
+          git diff --exit-code -- tests/conformance tests/fixtures
+
+  test-bindings:
+    name: Test / ${{ matrix.name }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: JavaScript
+            dir: bindings/javascript
+          - name: TypeScript
+            dir: bindings/typescript
+          - name: Python
+            dir: bindings/python
+          - name: Go
+            dir: bindings/go
+          - name: Rust
+            dir: bindings/rust
+          - name: Swift
+            dir: bindings/swift
+          - name: Java
+            dir: bindings/java
+          - name: Kotlin
+            dir: bindings/kotlin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: matrix.name == 'JavaScript' || matrix.name == 'TypeScript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Set up Python
+        if: matrix.name == 'Python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Go
+        if: matrix.name == 'Go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - name: Set up Rust
+        if: matrix.name == 'Rust'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Swift
+        if: matrix.name == 'Swift'
+        uses: swift-actions/setup-swift@v2
+      - name: Set up JDK
+        if: matrix.name == 'Java' || matrix.name == 'Kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Gradle
+        if: matrix.name == 'Java' || matrix.name == 'Kotlin'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
+
+      - name: Test
+        working-directory: ${{ matrix.dir }}
+        run: |
+          case "${{ matrix.name }}" in
+            JavaScript) npm ci && npm test ;;
+            TypeScript) npm ci && npx tsc --noEmit && npm test ;;
+            Python)     python -m pip install --upgrade pip pytest && python -m pytest -q ;;
+            Go)         test -z "$(gofmt -l .)" && go vet ./... && go test ./... ;;
+            Rust)       cargo test ;;
+            Swift)      swift test ;;
+            Java)       gradle --no-daemon --console=plain test ;;
+            Kotlin)     gradle --no-daemon --console=plain test ;;
+          esac
+
+  # ---------------------------------------------------------------------------
+  # 3. Publish. Each of these needs the whole matrix above.
+  # ---------------------------------------------------------------------------
+  github-release:
+    name: GitHub Release
+    needs: [version, test-c, test-bindings]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+  npm:
+    name: Publish to npm
+    needs: [version, test-c, test-bindings]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm trusted publishing (OIDC).
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Trusted publishing needs Node 22.14+ and npm 11.5.1+.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Confirm the toolchain is new enough for trusted publishing
+        run: |
+          node --version
+          npm --version
+          npm install -g npm@latest
+          npm --version
+
+      - name: Confirm the package version matches the tag
+        working-directory: bindings/javascript
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ needs.version.outputs.version }}" ]; then
+            echo "::error::package.json ($PKG_VERSION) does not match the tag (${{ needs.version.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Check whether this version is already on npm
+        id: published
+        working-directory: bindings/javascript
+        run: |
+          if npm view "triepack@${{ needs.version.outputs.version }}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "triepack@${{ needs.version.outputs.version }} is already published; nothing to do."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show what would be published
+        if: steps.published.outputs.skip == 'false'
+        working-directory: bindings/javascript
+        run: npm publish --dry-run
+
+      # Authenticates by OIDC against the trusted publisher configured on
+      # npmjs.com, which must name this workflow file exactly (publish.yml).
+      # No NPM_TOKEN: if the OIDC exchange fails we want a loud failure, not a
+      # silent fall back to a long-lived token. Provenance is attached
+      # automatically when publishing this way.
+      - name: Publish
+        if: steps.published.outputs.skip == 'false'
+        working-directory: bindings/javascript
+        run: npm publish
