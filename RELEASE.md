@@ -114,9 +114,14 @@ It does, in order:
    genuinely cannot run, and the summary will say so. Java and Kotlin need
    nothing installed — see `scripts/test-jvm.sh`.
 4. **PR, if the bump has not landed yet** — pushes the current branch, opens
-   the PR, waits for CI with `gh pr checks --watch --fail-fast`, squash-merges.
-   Run from the default branch with the bump already in, it skips straight to
+   the PR, waits for CI with `gh pr checks --watch --fail-fast`, merges. Run
+   from the default branch with the bump already in, it skips straight to
    tagging.
+
+   `--merge` picks how: `squash` (the default), `merge` or `rebase`. Squash
+   suits a release PR that is only a version bump. A branch carrying real work
+   would be flattened into one commit, so the script warns and asks before
+   squashing more than three commits.
 5. **Tags** `vX.Y.Z` and pushes it, which is what publishes.
 
 It prompts before each irreversible step. `--yes` skips the prompts and

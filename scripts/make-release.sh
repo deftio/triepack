@@ -26,6 +26,11 @@
 #                     Targets: c, js, ts, python, go, rust, swift, java, kotlin
 #                     java and kotlin need no toolchain installed — see
 #                     scripts/test-jvm.sh.
+#   --merge STRATEGY  How to land the PR: squash (default), merge, or rebase.
+#                     Squash is right for a release PR that is only a version
+#                     bump. It is wrong for a branch carrying real work, which
+#                     it would flatten into one commit — the script warns
+#                     before doing that.
 #   --dry-run         Print the git/gh commands instead of running them.
 #   --yes             Do not prompt before the PR, merge and tag steps.
 #
@@ -52,6 +57,7 @@ CHECK_ONLY=0
 DRY_RUN=0
 ASSUME_YES=0
 SKIP_LIST=""
+MERGE_STRATEGY="squash"
 BUILD_DIR="${PROJECT_ROOT}/build-release"
 
 ALL_TARGETS=(c js ts python go rust swift java kotlin)
@@ -77,6 +83,22 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --skip=*)    SKIP_LIST="${1#*=}"; shift ;;
+        --merge)
+            MERGE_STRATEGY="${2:-}"
+            case "${MERGE_STRATEGY}" in
+                squash|merge|rebase) ;;
+                *) echo "--merge takes squash, merge or rebase" >&2; exit 2 ;;
+            esac
+            shift 2
+            ;;
+        --merge=*)
+            MERGE_STRATEGY="${1#*=}"
+            case "${MERGE_STRATEGY}" in
+                squash|merge|rebase) ;;
+                *) echo "--merge takes squash, merge or rebase" >&2; exit 2 ;;
+            esac
+            shift
+            ;;
         --dry-run)   DRY_RUN=1; shift ;;
         --yes|-y)    ASSUME_YES=1; shift ;;
         -h|--help)
@@ -362,8 +384,21 @@ else
 fi
 
 step "Merging"
-confirm "Squash-merge the release PR into ${DEFAULT_BRANCH}?" || die "declined"
-run_git gh pr merge --squash --delete-branch
+
+# Squashing a branch that carries real work throws away its history. A release
+# PR is usually a single version-bump commit, where squash is exactly right.
+BRANCH_COMMITS=$(git rev-list --count "origin/${DEFAULT_BRANCH}..HEAD" 2>/dev/null || echo 0)
+if [[ "${MERGE_STRATEGY}" == "squash" && "${BRANCH_COMMITS}" -gt 3 ]]; then
+    echo -e "  ${YELLOW}This branch has ${BRANCH_COMMITS} commits.${NC}"
+    echo -e "  ${YELLOW}--merge squash lands them on ${DEFAULT_BRANCH} as one commit and${NC}"
+    echo -e "  ${YELLOW}discards the rest. Use --merge merge or --merge rebase to keep them.${NC}"
+    confirm "Squash ${BRANCH_COMMITS} commits into one anyway?" \
+        || die "declined — rerun with --merge merge or --merge rebase"
+else
+    confirm "Merge the release PR into ${DEFAULT_BRANCH} (--${MERGE_STRATEGY})?" || die "declined"
+fi
+
+run_git gh pr merge "--${MERGE_STRATEGY}" --delete-branch
 
 run_git git checkout "${DEFAULT_BRANCH}"
 run_git git pull --ff-only origin "${DEFAULT_BRANCH}"
