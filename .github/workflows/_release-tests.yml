@@ -1,0 +1,161 @@
+name: Release gate
+
+# Shared by every publishing workflow. Each registry matches its trusted
+# publisher on a workflow *filename*, so npm and PyPI need separate entry
+# points (publish.yml, pypi.yml) — but the gate they both have to pass is
+# defined once, here.
+#
+# Nothing publishes unless every job below is green.
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: The version being released, from triepack-version.txt
+        value: ${{ jobs.version.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version is consistent
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # check_versions.sh --tagged confirms the tag points at this commit,
+          # which needs the tags fetched.
+          fetch-depth: 0
+
+      - name: Tag matches triepack-version.txt
+        id: check
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          FILE_VERSION=$(head -1 triepack-version.txt | tr -d '[:space:]')
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag ($TAG_VERSION) does not match triepack-version.txt ($FILE_VERSION)"
+            exit 1
+          fi
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Every version string is in sync
+        run: ./scripts/sync_version.sh --check
+
+      - name: The docs changelog is in sync
+        run: ./scripts/sync_changelog.sh --check
+
+      # --tagged: this run was triggered by the tag, so it exists by
+      # definition; what matters is that it points here and that no registry
+      # already has this version.
+      - name: Not already published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/check_versions.sh --tagged
+
+  test-c:
+    name: Test / C & C++
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+      - name: Build
+        run: cmake --build build 2>&1 | tee build.log
+      - name: Verify zero warnings
+        run: |
+          if grep -iE "warning:" build.log | grep -v "In file included"; then
+            echo "::error::Build produced warnings"
+            exit 1
+          fi
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Conformance corpus is in sync
+        run: |
+          python3 tools/gen_conformance_cases.py
+          cmake --build build --target fixtures
+          python3 tools/gen_malformed_fixtures.py
+          git diff --exit-code -- tests/conformance tests/fixtures
+
+  test-bindings:
+    name: Test / ${{ matrix.name }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: JavaScript
+            dir: bindings/javascript
+          - name: TypeScript
+            dir: bindings/typescript
+          - name: Python
+            dir: bindings/python
+          - name: Go
+            dir: bindings/go
+          - name: Rust
+            dir: bindings/rust
+          - name: Swift
+            dir: bindings/swift
+          - name: Java
+            dir: bindings/java
+          - name: Kotlin
+            dir: bindings/kotlin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: matrix.name == 'JavaScript' || matrix.name == 'TypeScript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Set up Python
+        if: matrix.name == 'Python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Go
+        if: matrix.name == 'Go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - name: Set up Rust
+        if: matrix.name == 'Rust'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Swift
+        if: matrix.name == 'Swift'
+        uses: swift-actions/setup-swift@v2
+      - name: Set up JDK
+        if: matrix.name == 'Java' || matrix.name == 'Kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Gradle
+        if: matrix.name == 'Java' || matrix.name == 'Kotlin'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # No Gradle wrapper in this repo, so the action has to
+          # install Gradle itself to put `gradle` on PATH.
+          gradle-version: "8.10"
+
+      - name: Test
+        working-directory: ${{ matrix.dir }}
+        run: |
+          case "${{ matrix.name }}" in
+            JavaScript) npm ci && npm test ;;
+            TypeScript) npm ci && npx tsc --noEmit && npm test ;;
+            Python)     python -m pip install --upgrade pip pytest && python -m pytest -q ;;
+            Go)         test -z "$(gofmt -l .)" && go vet ./... && go test ./... ;;
+            Rust)       cargo test ;;
+            Swift)      swift test ;;
+            Java)       gradle --no-daemon --console=plain test ;;
+            Kotlin)     gradle --no-daemon --console=plain test ;;
+          esac

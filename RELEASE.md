@@ -129,17 +129,25 @@ It prompts before each irreversible step. `--yes` skips the prompts and
 
 ## What the tag triggers
 
-Pushing `vX.Y.Z` runs `.github/workflows/publish.yml`:
+Pushing `vX.Y.Z` runs two workflows, `publish.yml` and `pypi.yml`. Both start
+by calling `_release-tests.yml`:
 
-1. **version** — the tag must equal `triepack-version.txt`, and
-   `sync_version.sh --check` must pass.
+1. **version** — the tag must equal `triepack-version.txt`, both sync scripts
+   must be clean, and `check_versions.sh --tagged` must confirm the tag is
+   this commit and that no registry already has the version.
 2. **test-c** and **test-bindings** — the whole matrix again, on clean
    runners.
-3. **github-release** and **npm** — both `needs:` every job above, so nothing
-   is published unless all of it is green.
 
-The npm job is idempotent: if that version is already on the registry it logs
-and exits rather than failing the run.
+Then each workflow publishes what it owns: `publish.yml` cuts the GitHub
+Release and pushes to npm, `pypi.yml` pushes to PyPI. Every publishing job
+`needs:` the gate, so nothing ships from a red build.
+
+Both are idempotent: a version already on a registry is logged and skipped
+rather than failing the run, so a re-run is safe.
+
+`--tagged` matters here. Before a release the tag must *not* exist; a workflow
+triggered by that tag runs with it necessarily present. Getting that backwards
+is what stopped v1.3.0 from publishing at all.
 
 ## npm publishing
 
@@ -198,11 +206,26 @@ npm publish            # requires npm login
 Either way, check what is in the tarball before the first publish: a version
 on npm cannot be replaced.
 
-## PyPI
+## PyPI publishing
 
-`bindings/python` carries complete PyPI metadata — SPDX licence expression,
-classifiers, project URLs, README — and builds a clean wheel and sdist that
-pass `twine check`:
+The published package is `triepack`, built from `bindings/python`: a wheel and
+an sdist, both without the test suite, since it reads fixtures from
+`tests/conformance/` and cannot run from an unpacked tarball.
+
+Publishing happens in `pypi.yml` by OIDC, the same way npm does. The npm-side
+configuration lives on npmjs.com and the PyPI one on pypi.org, and both match
+on the workflow filename — which is why there are two entry points rather than
+one:
+
+| PyPI field | Value |
+|---|---|
+| PyPI project name | `triepack` |
+| Owner | `deftio` |
+| Repository | `triepack` |
+| Workflow name | `pypi.yml` |
+| Environment | *(leave empty — the job sets none)* |
+
+Check the artifacts before a first publish:
 
 ```bash
 cd bindings/python
@@ -210,8 +233,17 @@ python -m build
 twine check dist/*
 ```
 
-No publish workflow is wired up yet. Adding one means a job alongside `npm` in
-`publish.yml` with `id-token: write`, using PyPI's trusted publishing.
+## Why the gate is its own workflow
+
+Each registry matches its trusted publisher on a workflow filename, so npm
+needs `publish.yml` and PyPI needs `pypi.yml`. If each carried its own copy of
+the tests they would drift, and if either skipped them it could publish from a
+red build.
+
+`_release-tests.yml` holds the gate — version consistency plus the whole
+cross-language matrix — and both workflows call it. The publishing step itself
+stays in the calling workflow, because that is the filename the registry
+checks.
 
 ## Changelog
 

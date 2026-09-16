@@ -1,0 +1,66 @@
+name: Publish to PyPI
+
+# PyPI matches its trusted publisher on this filename, so it must stay
+# pypi.yml — separate from publish.yml, which npm matches on. Both call the
+# same gate, so a release still has to pass everything before either registry
+# sees it.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: ./.github/workflows/_release-tests.yml
+
+  pypi:
+    name: Publish to PyPI
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for PyPI trusted publishing (OIDC).
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Confirm the package version matches the tag
+        working-directory: bindings/python
+        run: |
+          PKG_VERSION=$(grep -m1 '^version = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$PKG_VERSION" != "${{ needs.gate.outputs.version }}" ]; then
+            echo "::error::pyproject.toml ($PKG_VERSION) does not match the tag (${{ needs.gate.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Build the wheel and sdist
+        working-directory: bindings/python
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check dist/*
+          ls -l dist/
+
+      # Authenticates by OIDC against the trusted publisher configured on
+      # pypi.org, which must name this workflow file exactly (pypi.yml). No
+      # API token: a failed OIDC exchange should fail the release loudly
+      # rather than fall back to a long-lived credential.
+      #
+      # skip-existing keeps a re-run from failing when the version is already
+      # there, matching how the npm job behaves.
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: bindings/python/dist
+          skip-existing: true
+          print-hash: true
