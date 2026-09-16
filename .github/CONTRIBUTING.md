@@ -124,6 +124,11 @@ separate and changes only when the bytes change.
 5. Respond to review with new commits rather than force-pushes, so the
    discussion stays readable. The maintainer squash-merges.
 
+Commits that land on `main` carry the maintainer's sign-off and no one else's.
+When triepack breaks, that is who gets called, and the history should say so.
+Do not add `Co-Authored-By:` trailers for tools or assistants; the release
+script strips them from the squash message if any slip through.
+
 ## What gets accepted
 
 - Bug fixes with a regression test

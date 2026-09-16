@@ -1,6 +1,7 @@
 # triepack v1.3.1
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/deftio/triepack?sort=semver&logo=github&logoColor=white&label=GitHub&color=24292F)](https://github.com/deftio/triepack/releases)
 [![npm](https://img.shields.io/npm/v/triepack?logo=npm&logoColor=white&label=npm&color=A1231F)](https://www.npmjs.com/package/triepack)
 [![PyPI](https://img.shields.io/pypi/v/triepack?logo=pypi&logoColor=white&label=PyPI&color=2B5B84)](https://pypi.org/project/triepack/)
 [![C Coverage](https://img.shields.io/endpoint?url=https://deftio.github.io/triepack/coverage-badge.json)](https://deftio.github.io/triepack/coverage/)
@@ -16,10 +17,11 @@ TriePack encodes dictionaries into a compact binary format (`.trp`) optimized fo
 - **Fast lookups** — O(key-length) point queries via skip pointers
 - **Prefix search** — iterate all keys matching a prefix, by descending the trie
 - **ROM-safe** — readers work directly on `const` buffers with zero allocation
-- **Typed values** — null, bool, int, uint, float, double, string, blob, array, nested dict
+- **Typed values** — null, bool, int, uint, float32, float64, string, blob
+- **Same bytes everywhere** — every implementation encodes identically, checked by a [conformance suite](tests/conformance/README.md) all ten run
 - **JSON support** — encode/decode JSON documents to/from `.trp` format
 - **10 languages** — C core with native implementations across 9 additional languages
-- **Small footprint** — C static library under 235 KB; bindings are 874-1,672 source lines each
+- **Small footprint** — trie codec and bitstream are 49 KB of static library (Release, 64-bit); bindings are 934-1,796 source lines each
 
 ### Supported Languages
 
@@ -27,16 +29,19 @@ All bindings are native implementations that read/write the `.trp` binary format
 
 | Language | Type | Source Lines | Binary/Library Size | Notes |
 |----------|------|-------------|---------------------|-------|
-| C | Core library | 4,169 | ~235 KB (static, 64-bit) | C99, 32-bit and 64-bit, ROM-safe |
-| C++ | Wrapper | 369 | ~51 KB (static) | C++11 RAII wrappers over C core |
-| Python | Binding | 874 | pure source | No dependencies |
-| JavaScript | Binding | 1,052 | pure source | Node.js and browser |
-| TypeScript | Binding | 49 | pure source | Type-safe wrapper over JS |
-| Go | Binding | 1,239 | pure source | No dependencies |
-| Rust | Binding | 1,672 | pure source | No dependencies, no `unsafe` |
-| Swift | Binding | 1,092 | pure source | SPM package |
-| Kotlin | Binding | 1,079 | pure source | Kotlin/JVM, Gradle |
-| Java | Binding | 1,485 | pure source | Java 11+, Gradle |
+| C | Core library | 5,387 | 49 KB (codec + bitstream), 72 KB with JSON | C99, 32-bit and 64-bit, ROM-safe |
+| C++ | Wrapper | 1,113 | 37 KB (static) | C++11 RAII, owning `Value`, iteration and prefix search |
+| Python | Binding | 934 | pure source | No dependencies |
+| JavaScript | Binding | 1,134 | pure source | Node.js and browser, ships type declarations |
+| TypeScript | Binding | 49 | pure source | In-repo wrapper; published types come with the npm package |
+| Go | Binding | 1,307 | pure source | No dependencies |
+| Rust | Binding | 1,796 | pure source | No dependencies, no `unsafe` |
+| Swift | Binding | 1,156 | pure source | SPM package |
+| Kotlin | Binding | 1,150 | pure source | Kotlin/JVM, Gradle |
+| Java | Binding | 1,585 | pure source | Java 11+, Gradle |
+
+Static library sizes are a Release build; the archives above are the trie
+codec plus bitstream, and the figure with JSON adds `triepack_json`.
 
 ## Quick Start
 
@@ -101,27 +106,30 @@ console.log(result);  // { hello: 42, world: 'foo' }
 
 ### TypeScript
 
+The npm package ships its own type declarations, so there is nothing extra to
+install:
+
 ```bash
-cd bindings/typescript
-npm install
+npm install triepack
 ```
 
 ```ts
-import { encode, decode } from './src/index';
+import { encode, decode, TriePackData } from 'triepack';
 
-const buf = encode({ hello: 42, world: 'foo' });
-const result = decode(buf);
+const data: TriePackData = { hello: 42, world: 'foo' };
+const buf: Uint8Array = encode(data);
+const result: TriePackData = decode(buf);
 ```
 
 ### Go
 
 ```bash
-# Copy bindings/go/ into your project
-cp -r bindings/go/triepack your_project/
+# The module lives in bindings/go; vendor it or add a replace directive:
+# replace github.com/deftio/triepack => ./path/to/triepack/bindings/go
 ```
 
 ```go
-data := map[string]interface{}{"hello": 42, "world": "foo"}
+data := map[string]interface{}{"hello": uint64(42), "world": "foo"}
 buf, _ := triepack.Encode(data)
 result, _ := triepack.Decode(buf)
 ```
@@ -129,7 +137,7 @@ result, _ := triepack.Decode(buf)
 ### Rust
 
 ```bash
-# Add to Cargo.toml (from source, crates.io coming soon)
+# Not on crates.io yet; add from source:
 # [dependencies]
 # triepack = { path = "bindings/rust" }
 ```
@@ -140,8 +148,8 @@ use std::collections::HashMap;
 
 let mut data = HashMap::new();
 data.insert("hello".into(), Value::UInt(42));
-let buf = encode(&data).unwrap();
-let result = decode(&buf).unwrap();
+let buf = encode(&data);          // infallible for String keys
+let result = decode(&buf)?;
 ```
 
 ### Swift
@@ -164,7 +172,7 @@ let result = try Triepack.decode(buf)
 ```bash
 # Add bindings/kotlin/ to your Gradle project
 cd bindings/kotlin
-./gradlew test
+gradle test
 ```
 
 ```kotlin
@@ -180,7 +188,7 @@ val result = decode(buf)
 ```bash
 # Add bindings/java/ to your Gradle project
 cd bindings/java
-./gradlew test
+gradle test
 ```
 
 ```java
@@ -191,6 +199,39 @@ data.put("hello", TpValue.ofUInt(42));
 byte[] buf = TriePack.encode(data);
 Map<String, TpValue> result = TriePack.decode(buf);
 ```
+
+### Asking a build what it is
+
+Every implementation reports the same metadata, so a polyglot system can ask
+each one and compare:
+
+```js
+require('triepack').version()
+// { name: 'triepack', implementation: 'javascript', version: '1.3.1',
+//   versionMajor: 1, versionMinor: 3, versionPatch: 1,
+//   formatVersionMajor: 1, formatVersionMinor: 0, maxAlphabetSize: 249 }
+```
+
+The same call is `tp_version()` in C, `triepack::version()` in C++,
+`version()` in Python, Rust and Kotlin, `VersionMetadata()` in Go,
+`Triepack.versionInfo()` in Swift and `TriePack.version()` in Java. The
+library version comes from `triepack-version.txt` at build time; the *format*
+version is separate and moves only when the bytes change.
+
+### Iterating and prefix search (C and C++)
+
+```c
+tp_iterator *it = NULL;
+tp_dict_find_prefix(dict, "app", &it);      /* descends, does not scan */
+
+const char *key; size_t key_len; tp_value val;
+while (tp_iter_next(it, &key, &key_len, &val) == TP_OK)
+    printf("%.*s\n", (int)key_len, key);
+tp_iter_destroy(&it);
+```
+
+Keys come out in lexicographic byte order. The bindings decode to a native
+map instead, so they iterate with whatever their language already provides.
 
 See [Examples](docs/guide/examples.md) for more detailed usage including JSON round-trips, file I/O, and cross-language interop.
 
@@ -221,8 +262,11 @@ Each layer can be used independently. `triepack_wrapper` provides C++11 RAII wra
 - Magic bytes: `TRP\0` (`0x54 0x52 0x50 0x00`)
 - File extension: `.trp`
 - 32-byte fixed header
-- Two-trie architecture with configurable addressing modes
-- CRC32/SHA256/xxHash64 integrity checking
+- Bit-packed prefix trie, with the value store following it
+- CRC-32 integrity check over the whole buffer
+
+A valid checksum means the buffer is intact, not that it is trustworthy —
+anyone who can supply a buffer can supply a matching CRC.
 
 See `docs/internals/` for format details.
 
@@ -237,7 +281,18 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.2.0.** Core C library (bitstream, trie codec, JSON), C++ wrappers, and 8 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, Java) are implemented. C/C++, Python, and JavaScript maintain **100% line coverage**. All nine implementations run a [shared conformance suite](tests/conformance/README.md) that checks they decode the same fixtures to the same values and re-encode them byte for byte — about 1,500 tests across 56 files.
+**v1.3.1.** Core C library (bitstream, trie codec, JSON), C++ wrapper, and 8
+language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin,
+Java) are implemented. C/C++, Python and JavaScript maintain **100% line
+coverage**.
+
+All ten implementations run a [shared conformance
+suite](tests/conformance/README.md): for each of 50 cases every one must
+decode the same C-generated fixture to the same values *and* re-encode it byte
+for byte, and reject the same 11 malformed buffers. About 1,550 tests in total.
+
+`scripts/make-release.sh --check` builds and tests all ten targets locally;
+`scripts/test-ci-linux.sh` runs the ubuntu-only jobs in a container.
 
 ## Roadmap
 
@@ -249,7 +304,7 @@ See `docs/internals/` for format details.
 - [x] Kotlin binding
 - [x] Java binding
 - [x] npm package for JavaScript/TypeScript (ships bundled type declarations)
-- [ ] PyPI package for Python (metadata ready; publish workflow not wired up)
+- [x] PyPI package for Python
 - [ ] crates.io package for Rust
 
 ### v1.2 — Format Enhancements
@@ -260,7 +315,8 @@ See `docs/internals/` for format details.
 ### v1.3 — Tooling & Ecosystem
 - [x] `trp` CLI: encode/decode/validate/inspect
 - [x] Language binding conformance test suite
-- [ ] Fuzzy search (edit distance d<=2)
+- [x] Trie iteration and prefix search
+- [ ] Fuzzy search (edit distance d<=2) — declared, returns `TP_ERR_UNSUPPORTED`
 - [ ] Performance benchmarks across languages
 
 ## Contributing

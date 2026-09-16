@@ -10,8 +10,6 @@ title: Binary Format Specification
 This document defines the binary format of `.trp` files produced by the
 TriePack encoder and consumed by the TriePack decoder.
 
----
-
 ## 1. Overview
 
 A `.trp` file stores a string-keyed dictionary using a compressed prefix
@@ -33,8 +31,6 @@ end-4     4 B        CRC-32 footer
 ```
 
 All multi-byte integers in the header are **big-endian** (MSB first).
-
----
 
 ## 2. Header (32 Bytes)
 
@@ -85,8 +81,6 @@ absolute_bit_pos = 256 + offset_value
 ```
 
 (256 = 32 header bytes × 8 bits)
-
----
 
 ## 3. Trie Configuration
 
@@ -147,8 +141,6 @@ code 7  → VarInt → byte value (e.g., 'b' = 98)
 ```
 
 The decoder builds a reverse map (byte value → code) for lookup.
-
----
 
 ## 4. Prefix Trie
 
@@ -217,8 +209,6 @@ Root: no common prefix ('a' vs 'x')
 
 Stream: `BRANCH 2 SKIP <n> 'a' 'b' BRANCH 2 SKIP <m> 'c' END_VAL 0 'd' END_VAL 1 'x' 'y' 'z' END_VAL 2`
 
----
-
 ## 5. Value Store
 
 When the `has_values` flag is set, the value store follows the prefix
@@ -259,8 +249,6 @@ decode a value:
 String and blob values support **zero-copy** when the stream is
 byte-aligned: the decoded value points directly into the source buffer.
 
----
-
 ## 6. CRC-32 Footer
 
 The last 4 bytes of a `.trp` file contain a CRC-32 checksum in
@@ -289,8 +277,6 @@ header. After the data stream is complete:
 5. Recompute CRC-32 over patched data
 6. Update the last 4 bytes with the corrected CRC
 
----
-
 ## 7. VarInt Encoding
 
 See the [Bitstream Specification](bitstream-spec.md) for full details on
@@ -298,8 +284,6 @@ VarInt encoding (Sections 5 and 6). Summary:
 
 - **Unsigned**: LEB128 -- 7 data bits + 1 continuation bit per byte
 - **Signed**: Zigzag transform then LEB128
-
----
 
 ## 8. Encoding Pipeline
 
@@ -322,8 +306,6 @@ The full encoding pipeline in `tp_encoder_build()`:
 14. Recompute CRC-32 over patched data
 15. Return buffer to caller
 ```
-
----
 
 ## 9. Lookup Algorithm
 
@@ -352,8 +334,6 @@ To look up a key in a compiled dictionary:
         Match → advance key_idx, continue
         Mismatch → NOT_FOUND
 ```
-
----
 
 ## 10. ROM Deployment
 

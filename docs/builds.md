@@ -12,8 +12,6 @@ Library sizes, source metrics, and CI configuration for TriePack v{{ site.versio
 All sizes are from a Release build (`-O2`, no debug info) on macOS arm64.
 Sizes will vary slightly by platform and compiler.
 
----
-
 ## Static Library Sizes
 
 | Library                | Size   | Description                                |
@@ -25,8 +23,6 @@ Sizes will vary slightly by platform and compiler.
 | **Total (all 4)**          | **86 KB** | Complete library stack                  |
 
 The `trp` CLI tool (statically linked) is **59 KB**.
-
----
 
 ## Source Code
 
@@ -42,8 +38,6 @@ The `trp` CLI tool (statically linked) is **59 KB**.
 | Python binding     | Python   | 890    | 7     |
 | **Grand total**    |          | **7,591** |    |
 
----
-
 ## Example Program Sizes
 
 All examples link statically against the TriePack libraries.
@@ -57,8 +51,6 @@ All examples link statically against the TriePack libraries.
 | `cpp_usage`            | 40 KB  | wrapper, core, bitstream        |
 | `json_roundtrip`       | 51 KB  | json, core, bitstream           |
 | `json_complex`         | 51 KB  | json, core, bitstream           |
-
----
 
 ## Cross-Language Fixture Files
 
@@ -75,8 +67,6 @@ by the JavaScript, TypeScript, and Python bindings.
 | `multi_mixed.trp`| 102 B   | 5 keys, mixed types (bool, int, float, string) |
 | `large.trp`      | 628 B   | 100 sequential keys with integer values |
 
----
-
 ## Test Suite
 
 | Category          | Test Programs | Individual Tests |
@@ -88,8 +78,6 @@ by the JavaScript, TypeScript, and Python bindings.
 | **Total**         | **28**        | **688**          |
 
 Code coverage: **93.7%** line coverage (remaining lines are `malloc` failure paths).
-
----
 
 ## CI Matrix
 
@@ -108,20 +96,22 @@ All CI runs on GitHub Actions.
 
 Compiler flags: `-Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow`
 
----
-
 ## Language Binding Status
 
-| Language   | Status                 | Package         | Tests |
-|------------|------------------------|-----------------|-------|
-| Python     | Implemented            | `pip install` (planned) | 70  |
-| JavaScript | Implemented            | `npm install` (planned) | 70  |
-| TypeScript | Implemented (wraps JS) | (same as JS)    | 38    |
-| Go         | Not yet implemented    | --              | --    |
-| Swift      | Not yet implemented    | --              | --    |
-| Rust       | Not yet implemented    | --              | --    |
+| Language   | Status                 | Package                     | Tests |
+|------------|------------------------|-----------------------------|-------|
+| Python     | Implemented            | `pip install triepack`      | 220   |
+| JavaScript | Implemented            | `npm install triepack`      | 226   |
+| TypeScript | Implemented (wraps JS) | types ship with the npm package | 38 |
+| Go         | Implemented            | module in `bindings/go`     | 164   |
+| Swift      | Implemented            | SPM package                 | 36    |
+| Rust       | Implemented            | crate in `bindings/rust`    | 82    |
+| Kotlin     | Implemented            | Gradle project              | 54    |
+| Java       | Implemented            | Gradle project              | 161   |
 
----
+Every one of them also runs the shared
+[conformance suite](https://github.com/deftio/triepack/blob/main/tests/conformance/README.md),
+which is included in the counts above.
 
 ## Binary Format Summary
 

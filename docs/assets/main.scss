@@ -156,3 +156,33 @@ body:not(.tp-js-enabled) .tp-tab-panel {
 body:not(.tp-js-enabled) .tp-tab-bar {
   display: none;
 }
+
+/* Pin the GitHub link to the far right of the nav bar, and show the mark
+   rather than the word once there is room for it. */
+.site-nav .trigger {
+  .page-link-github {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+}
+
+@media screen and (min-width: 600px) {
+  .site-nav .trigger {
+    display: flex;
+    align-items: center;
+  }
+  .site-nav .page-link-github {
+    margin-left: auto;          /* far right */
+    padding-left: 1rem;
+  }
+  .site-nav .page-link-github-text {
+    /* The mark alone is enough once it sits on its own at the edge. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

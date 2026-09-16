@@ -13,8 +13,6 @@ It is designed for situations where you need a read-mostly dictionary that
 is small, fast to query, and can live in ROM or flash memory with zero
 load-time setup.
 
----
-
 ## The Problem
 
 You have a dictionary -- string keys mapped to typed values -- and you need
@@ -36,8 +34,6 @@ TriePack's prefix trie shares common prefixes across keys and packs symbols
 at the bit level, producing encoded output that is typically **2-4x smaller**
 than the raw key data alone. Lookups walk the trie in O(key-length) time
 using skip pointers -- no hashing, no binary search, no full decompression.
-
----
 
 ## How It Works
 
@@ -117,8 +113,6 @@ Small integers (common in practice) take as little as 1-2 bytes. Strings
 and blobs support **zero-copy** reads -- the decoded value points directly
 into the source buffer, with no allocation.
 
----
-
 ## The Binary Format
 
 A `.trp` file has three regions:
@@ -153,8 +147,6 @@ directly in ROM or flash memory.
 For the full byte-level specification, see the
 [Binary Format Specification](internals/format-spec.md).
 
----
-
 ## Compression Results
 
 The `compaction_benchmark` example encodes ~10,000 generated English-like
@@ -172,8 +164,6 @@ Lookup verified:   10000/10000 OK
 Compression ratio depends on how much prefix sharing exists in the keys.
 Word lists, URL paths, file paths, and dotted identifiers compress well.
 Random binary keys compress poorly (but still benefit from bit packing).
-
----
 
 ## Design Goals
 
@@ -203,8 +193,6 @@ TriePack was designed with these priorities:
 6. **Portability** -- Pure C99, no extensions, no platform-specific code.
    Builds and passes all tests on 32-bit and 64-bit architectures. The
    same encoded file works on any platform.
-
----
 
 ## Library Architecture
 
@@ -244,8 +232,6 @@ hood.
 C++ RAII wrappers (`triepack_wrapper`) wrap all three layers with
 `Encoder`, `Dict`, `Iterator`, and `BitstreamReader`/`Writer` classes
 that handle lifetime management automatically.
-
----
 
 ## Quick Start
 
@@ -314,18 +300,22 @@ int main(void) {
 ```cpp
 #include <triepack/triepack.hpp>
 
-triepack::Encoder enc;
-enc.insert("apple", 42);
-enc.insert("banana", 17);
+using triepack::Dict;
+using triepack::Encoder;
+using triepack::Status;
+using triepack::Value;
 
-const uint8_t *data;
-size_t size;
-enc.encode(&data, &size);
+Encoder enc;
+enc.add("apple", Value::unsigned_integer(42));
+enc.add("banana", Value::unsigned_integer(17));
 
-triepack::Dict dict(data, size);
-int32_t val;
-if (dict.lookup("apple", &val))
-    printf("apple => %d\n", val);  // 42
+std::vector<uint8_t> data;          // the vector owns the bytes
+if (enc.build(data) != Status::Ok) { /* handle */ }
+
+Dict dict(data.data(), data.size());
+Value v;
+if (dict.lookup("apple", v) == Status::Ok)
+    printf("apple => %llu\n", (unsigned long long)v.as_uint());  // 42
 ```
 
 ### JSON Round-Trip
@@ -346,8 +336,6 @@ printf("%.*s\n", (int)decoded_len, decoded);
 free(decoded);
 free(buf);
 ```
-
----
 
 ## Use Cases
 
@@ -374,8 +362,6 @@ that benefit from compact encoding and fast point queries.
 compact storage. The JSON library flattens objects into dot-path keys
 and reconstructs them on decode.
 
----
-
 ## Documentation
 
 ### Guides
@@ -399,8 +385,6 @@ and reconstructs them on decode.
 - [Releases](releases.md) -- release history and downloads
 - [Release Process](guide/release-process.md) -- versioning policy and release checklist
 - [Code Coverage](coverage/) -- line and branch coverage report
-
----
 
 ## License
 

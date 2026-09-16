@@ -85,8 +85,6 @@ with open(target, "w", encoding="utf-8") as f:
         "the full history lives in\n"
         "[CHANGELOG.md](https://github.com/deftio/triepack/blob/main/CHANGELOG.md).\n"
         "\n"
-        "---\n"
-        "\n"
     )
     f.write(entries.rstrip() + "\n")
 PY

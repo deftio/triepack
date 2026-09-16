@@ -27,8 +27,6 @@ body:not(.tp-js-enabled) .tp-tab-panel { display: block; }
 body:not(.tp-js-enabled) .tp-tab-bar { display: none; }
 </style>
 
----
-
 ## What We Will Build
 
 We will take this JSON:
@@ -47,8 +45,6 @@ and:
 2. **Decode** it back to JSON
 3. **Look up** individual keys
 4. **Verify** the round-trip is lossless
-
----
 
 ## Step-by-Step
 
@@ -318,8 +314,6 @@ console.log("Round-trip OK");
 </div>
 </div>
 
----
-
 ## What Happened Under the Hood
 
 1. **Parse** -- the JSON string is parsed into key-value pairs
@@ -332,8 +326,6 @@ console.log("Round-trip OK");
 The resulting `.trp` blob is typically **40--60% smaller** than the
 original JSON for structured data with shared key prefixes.
 
----
-
 ## Key Differences from JSON
 
 | Feature            | JSON                   | TriePack (.trp)             |
@@ -345,8 +337,6 @@ original JSON for structured data with shared key prefixes.
 | Compression        | None                   | Shared-prefix trie          |
 | Integrity          | None                   | CRC-32 checksum             |
 | Human-readable     | Yes                    | No (use `trp decode`)       |
-
----
 
 ## Next Steps
 

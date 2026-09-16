@@ -9,8 +9,6 @@ This document describes the internal workings of the TriePack library:
 how keys and values are encoded, how the binary format is structured,
 and how lookup, encoding, and decoding algorithms operate.
 
----
-
 ## 1. Introduction
 
 TriePack is a compact binary format for storing string-keyed dictionaries
@@ -34,8 +32,6 @@ The library is organized as a stack:
   triepack_json        -- JSON overlay (separate library)
 ```
 
----
-
 ## 2. File Format Overview
 
 A `.trp` file has three regions:
@@ -49,8 +45,6 @@ A `.trp` file has three regions:
 ```
 
 All multi-byte integers are big-endian (MSB first).
-
----
 
 ## 3. Header Format
 
@@ -79,8 +73,6 @@ The 32-byte header is:
 | 1   | has_suffix_table     | Suffix table is present (future) |
 | 2   | has_nested_dicts     | Nested dict values (future)      |
 | 3   | compact_mode         | Compact encoding variant         |
-
----
 
 ## 4. Data Stream
 
@@ -119,8 +111,6 @@ Six control codes are used in the trie stream:
 | 3    | SUFFIX   | Jump to suffix table (reserved, not implemented) |
 | 4    | ESCAPE   | Literal next symbol (reserved)                 |
 | 5    | BRANCH   | Branch point (followed by VarInt child count)  |
-
----
 
 ## 5. Trie Encoding
 
@@ -218,8 +208,6 @@ A terminal is followed by a BRANCH exactly when the subtree has not yet
 reached its end. Lookup (section 8) is guided by the key and so never
 needs this, but any reader that enumerates keys does.
 
----
-
 ## 6. Value Store
 
 When `has_values` is set, the value store follows the trie data. It
@@ -247,8 +235,6 @@ Each value is encoded as:
 | 7   | blob    | VarInt length + raw bytes                      |
 | 8   | array   | (reserved)                                     |
 | 9   | dict    | (reserved)                                     |
-
----
 
 ## 7. VarInt Encoding
 
@@ -280,8 +266,6 @@ Value  Zigzag  Bytes
  1     2       0x02
 -2     3       0x03
 ```
-
----
 
 ## 8. Lookup Algorithm
 
@@ -320,8 +304,6 @@ When a value index is found:
 String and blob values use zero-copy when the buffer is byte-aligned:
 the decoded value points directly into the source buffer.
 
----
-
 ## 9. Integrity Check
 
 The last 4 bytes of a `.trp` file contain a CRC-32 checksum (big-endian)
@@ -336,8 +318,6 @@ Final XOR:         0xFFFFFFFF
 `tp_dict_open()` verifies the CRC. `tp_dict_open_unchecked()` skips
 verification for trusted data (faster).
 
----
-
 ## 10. Symbol Analysis
 
 The encoder automatically determines the optimal `bits_per_symbol`:
@@ -351,8 +331,6 @@ The encoder automatically determines the optimal `bits_per_symbol`:
 For English lowercase keys (26 letters + 6 controls = 32), `bps=5`.
 For ASCII keys with digits and punctuation, `bps=7` is typical.
 
----
-
 ## 11. Addressing Modes
 
 The format supports three addressing modes (stored in header flags):
@@ -365,8 +343,6 @@ The format supports three addressing modes (stored in header flags):
 
 The current implementation (v1.0) uses bit addressing for the trie and
 byte addressing for values.
-
----
 
 ## 12. ROM-ability
 
@@ -382,8 +358,6 @@ The `.trp` format is designed for read-only memory:
 
 This makes TriePack suitable for embedded systems where the dictionary
 can be compiled into firmware and stored in flash or ROM.
-
----
 
 ## 13. Encoding Pipeline
 
@@ -406,8 +380,6 @@ The full encoding pipeline in `tp_encoder_build()`:
 14. Recompute CRC-32 over patched data
 15. Return buffer to caller
 ```
-
----
 
 ## 14. API Summary
 
@@ -433,8 +405,6 @@ tp_dict_get_info(dict, &info);            // format metadata
 tp_dict_close(&dict);                     // free
 ```
 
----
-
 ## 15. Future Work
 
 - **Suffix table**: Cross-branch deduplication of common endings
@@ -442,8 +412,6 @@ tp_dict_close(&dict);                     // free
 - **Huffman symbols**: Frequency-based variable-width symbol encoding
   for large dictionaries.
 - **Nested dict values**: Store sub-dictionaries as values.
-
----
 
 ## See Also
 

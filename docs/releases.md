@@ -13,8 +13,6 @@ What changed in each version. Downloads are on the
 the full history lives in
 [CHANGELOG.md](https://github.com/deftio/triepack/blob/main/CHANGELOG.md).
 
----
-
 ## v1.3.1 — 2026-09-16
 
 ### Fixed

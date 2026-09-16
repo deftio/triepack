@@ -12,8 +12,6 @@ algorithms. For the byte-level binary format, see the
 [Format Specification](../internals/format-spec.md). For the bitstream
 primitives, see the [Bitstream Specification](../internals/bitstream-spec.md).
 
----
-
 ## 1. The Core Idea: Prefix Tries
 
 A **trie** (from "retrieval") is a tree where each edge is labeled with a
@@ -57,8 +55,6 @@ Additionally, trie lookup is O(key-length), not O(1)-amortized like a hash
 table. But tries have no worst-case hash collisions, no rehashing, and no
 pointer-chasing through chains -- the decoder walks a sequential bit
 stream with skip pointers.
-
----
 
 ## 2. Bit-Level Symbol Packing
 
@@ -113,8 +109,6 @@ Six symbol codes are reserved for trie structure, not data:
 These control codes are mixed into the same symbol stream as data
 characters. The decoder reads one `bps`-bit symbol at a time and checks
 whether it's a control code or a data character.
-
----
 
 ## 3. The Encoding Process
 
@@ -184,8 +178,6 @@ Pass 2 (write):
 
 The result is a flat bit stream that can be navigated with skip pointers.
 
----
-
 ## 4. The Lookup Algorithm
 
 Looking up a key is a walk through the bit stream, matching one character
@@ -242,8 +234,6 @@ lookup("axe"):
 
 The decoder returns `TP_ERR_NOT_FOUND` immediately. Only the common prefix
 up to the mismatch point is examined.
-
----
 
 ## 5. The Value Store
 
@@ -310,8 +300,6 @@ copying. This is possible because:
 The caller must keep the source buffer alive for as long as decoded
 string values are in use.
 
----
-
 ## 6. CRC-32 Integrity
 
 The last 4 bytes of a `.trp` file contain a CRC-32 checksum computed
@@ -334,8 +322,6 @@ truncation, or transmission problems.
 
 The CRC uses the standard reflected polynomial (0xEDB88320), matching
 zlib and Ethernet.
-
----
 
 ## 7. ROM Deployment
 
@@ -390,8 +376,6 @@ tp_bs_read_bits_at(rom_buffer, bit_offset, 5, &val);
 These are safe to call from interrupt handlers and bare-metal
 environments.
 
----
-
 ## 8. JSON Support
 
 The optional `triepack_json` library encodes JSON documents into `.trp`
@@ -440,8 +424,6 @@ tp_json_lookup_path(j, "scores[1]", &val);
 tp_json_close(&j);
 ```
 
----
-
 ## 9. Alignment and Embedded Use
 
 When deploying TriePack on embedded systems or in ROM, memory alignment
@@ -481,8 +463,6 @@ prioritizes compression density. If a future use case requires word-aligned
 access to the data section (e.g., DMA transfers), optional alignment padding
 can be added as a format extension.
 
----
-
 ## 10. Comparison with Other Formats
 
 | Feature | TriePack | JSON | MessagePack | Protocol Buffers | SQLite |
@@ -501,8 +481,6 @@ It is not a general-purpose serialization format (use MessagePack or
 Protocol Buffers for that) and does not support in-place mutation (use
 SQLite for read-write workloads). Its sweet spot is static or rarely-
 updated dictionaries where compact size and fast lookup matter.
-
----
 
 ## 11. Tools
 
@@ -532,10 +510,6 @@ enhancement. The JavaScript binding already supports full encode/decode,
 making this a natural fit -- either as a pure client-side drag-and-drop
 page or a lightweight server-side tool. This is separate from the CLI
 tool and is tracked as a future enhancement.
-
----
-
----
 
 ## 12. Bitstream Primer: Arbitrary-Width Bit Fields
 
@@ -621,8 +595,6 @@ No object, no cursor, no heap. Safe for interrupt handlers.
 
 For the complete bitstream reference, see the
 [Bitstream Specification](../internals/bitstream-spec.md).
-
----
 
 ## 13. Performance Benchmarks
 
@@ -743,8 +715,6 @@ gcc -O2 -o run_benchmarks tools/run_benchmarks.c \
   -ltriepack_json -ltriepack_core -ltriepack_bitstream
 ./run_benchmarks tests/data
 ```
-
----
 
 ## Next Steps
 

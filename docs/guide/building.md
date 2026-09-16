@@ -83,8 +83,6 @@ cmake --install build --prefix /usr/local
 This installs headers to `<prefix>/include/triepack/` and libraries to
 `<prefix>/lib/`.
 
----
-
 # Testing
 
 TriePack has comprehensive test suites across C, C++, Python, and
