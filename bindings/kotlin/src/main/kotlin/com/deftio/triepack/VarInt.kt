@@ -15,14 +15,15 @@ private const val VARINT_MAX_GROUPS = 10
  * Write an unsigned LEB128 VarInt.
  */
 fun writeVarUint(writer: BitWriter, value: Long) {
-    require(value >= 0) { "writeVarUint: negative value" }
+    // The Long carries a uint64 bit pattern, so a "negative" value is just one
+    // above Long.MAX_VALUE. Shift and test unsigned throughout.
     var v = value
     do {
         var byte = (v and 0x7FL).toInt()
         v = v ushr 7
-        if (v > 0) byte = byte or 0x80
+        if (v != 0L) byte = byte or 0x80
         writer.writeU8(byte)
-    } while (v > 0)
+    } while (v != 0L)
 }
 
 /**
@@ -44,11 +45,9 @@ fun readVarUint(reader: BitReader): Long {
  * Write a signed zigzag VarInt.
  */
 fun writeVarInt(writer: BitWriter, value: Long) {
-    val raw = if (value >= 0) {
-        value * 2
-    } else {
-        (-value) * 2 - 1
-    }
+    // Zigzag on the bit pattern: negating overflows at Long.MIN_VALUE and
+    // doubling overflows near Long.MAX_VALUE, both silently.
+    val raw = (value shl 1) xor (value shr 63)
     writeVarUint(writer, raw)
 }
 
@@ -57,11 +56,7 @@ fun writeVarInt(writer: BitWriter, value: Long) {
  */
 fun readVarInt(reader: BitReader): Long {
     val raw = readVarUint(reader)
-    return if ((raw and 1L) != 0L) {
-        -(raw ushr 1) - 1
-    } else {
-        raw ushr 1
-    }
+    return (raw ushr 1) xor -(raw and 1L)
 }
 
 /**
@@ -73,6 +68,6 @@ fun varUintBits(value: Long): Int {
     do {
         bits += 8
         v = v ushr 7
-    } while (v > 0)
+    } while (v != 0L)
     return bits
 }

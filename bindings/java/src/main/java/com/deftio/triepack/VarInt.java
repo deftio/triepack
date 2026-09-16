@@ -20,13 +20,12 @@ public class VarInt {
      * Write an unsigned LEB128 VarInt.
      */
     public static void writeVarUint(BitWriter writer, long value) {
-        if (value < 0) {
-            throw new IllegalArgumentException("writeVarUint: negative value");
-        }
+        // The long carries a uint64 bit pattern, so a "negative" value is just
+        // one above Long.MAX_VALUE. Shift and test unsigned throughout.
         while (true) {
             int b = (int) (value & 0x7F);
             value >>>= 7;
-            if (value > 0) {
+            if (value != 0) {
                 b |= 0x80;
             }
             writer.writeU8(b);
@@ -57,12 +56,9 @@ public class VarInt {
      * Write a signed zigzag VarInt.
      */
     public static void writeVarInt(BitWriter writer, long value) {
-        long raw;
-        if (value >= 0) {
-            raw = value * 2;
-        } else {
-            raw = (-value) * 2 - 1;
-        }
+        // Zigzag on the bit pattern: negating overflows at Long.MIN_VALUE and
+        // doubling overflows near Long.MAX_VALUE, both silently.
+        long raw = (value << 1) ^ (value >> 63);
         writeVarUint(writer, raw);
     }
 
@@ -71,10 +67,7 @@ public class VarInt {
      */
     public static long readVarInt(BitReader reader) {
         long raw = readVarUint(reader);
-        if ((raw & 1) != 0) {
-            return -(raw >>> 1) - 1;
-        }
-        return raw >>> 1;
+        return (raw >>> 1) ^ -(raw & 1);
     }
 
     /**

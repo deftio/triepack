@@ -36,23 +36,18 @@ enum VarInt {
     }
 
     /// Write a signed zigzag VarInt.
+    ///
+    /// Zigzag is computed on the bit pattern: negating traps at Int64.min, and
+    /// doubling traps near Int64.max.
     static func writeInt(_ writer: BitWriter, _ value: Int64) {
-        let raw: UInt64
-        if value >= 0 {
-            raw = UInt64(value) * 2
-        } else {
-            raw = UInt64(-value) * 2 - 1
-        }
+        let raw = (UInt64(bitPattern: value) << 1) ^ UInt64(bitPattern: value >> 63)
         writeUInt(writer, raw)
     }
 
     /// Read a signed zigzag VarInt.
     static func readInt(_ reader: BitReader) throws -> Int64 {
         let raw = try readUInt(reader)
-        if raw & 1 != 0 {
-            return -Int64(raw >> 1) - 1
-        }
-        return Int64(raw >> 1)
+        return Int64(bitPattern: raw >> 1) ^ -Int64(raw & 1)
     }
 
     /// Return the number of bits needed to encode val as a VarInt.
