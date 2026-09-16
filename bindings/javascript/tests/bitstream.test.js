@@ -170,3 +170,29 @@ describe('BitReader', () => {
         expect(r.isAligned()).toBe(false);
     });
 });
+
+describe('alignToByte when already aligned', () => {
+    const { BitWriter, BitReader } = require('../src/bitstream');
+
+    // Aligning an already-aligned cursor must not skip a byte. values.js
+    // calls this before every blob and string, so an off-by-one here would
+    // corrupt every value that happens to start on a byte boundary.
+    test('reader stays put', () => {
+        const r = new BitReader(new Uint8Array([0xAB, 0xCD]));
+        r.readBits(8);
+        expect(r.position).toBe(8);
+        r.alignToByte();
+        expect(r.position).toBe(8);
+        expect(r.readU8()).toBe(0xCD);
+    });
+
+    test('writer stays put', () => {
+        const w = new BitWriter();
+        w.writeBits(0xAB, 8);
+        const before = w.position;
+        w.alignToByte();
+        expect(w.position).toBe(before);
+        w.writeBits(0xCD, 8);
+        expect(Array.from(w.toUint8Array().subarray(0, 2))).toEqual([0xAB, 0xCD]);
+    });
+});

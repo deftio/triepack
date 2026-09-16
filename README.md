@@ -1,4 +1,4 @@
-# triepack v1.3.1
+# triepack v1.3.2
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/v/release/deftio/triepack?sort=semver&logo=github&logoColor=white&label=GitHub&color=24292F)](https://github.com/deftio/triepack/releases)
@@ -256,6 +256,7 @@ Each layer can be used independently. `triepack_wrapper` provides C++11 RAII wra
 | `BUILD_JSON` | ON | Build JSON library |
 | `BUILD_DOCS` | OFF | Build Doxygen documentation |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage instrumentation |
+| `ENABLE_SANITIZERS` | OFF | Build with AddressSanitizer and UndefinedBehaviorSanitizer |
 
 ## File Format
 
@@ -283,13 +284,15 @@ See `docs/internals/` for format details.
 
 **v1.3.1.** Core C library (bitstream, trie codec, JSON), C++ wrapper, and 8
 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin,
-Java) are implemented. C/C++, Python and JavaScript maintain **100% line
-coverage**.
+Java) are implemented. Python and JavaScript are at **100% line coverage**;
+C/C++ is at **99.5% lines and 100% of functions**, the remainder being guards
+only a corrupt dictionary reaches. CI enforces a floor and runs the whole
+suite under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 All ten implementations run a [shared conformance
 suite](tests/conformance/README.md): for each of 50 cases every one must
 decode the same C-generated fixture to the same values *and* re-encode it byte
-for byte, and reject the same 11 malformed buffers. About 1,550 tests in total.
+for byte, and reject the same 11 malformed buffers. About 1,600 tests in total.
 
 `scripts/make-release.sh --check` builds and tests all ten targets locally;
 `scripts/test-ci-linux.sh` runs the ubuntu-only jobs in a container.

@@ -9,7 +9,7 @@ import triepack
 
 
 def test_version():
-    assert triepack.__version__ == "1.3.1"
+    assert triepack.__version__ == "1.3.2"
 
 
 def test_empty_object():
@@ -418,3 +418,52 @@ def test_version_metadata_shape():
         "format_version_minor": 0,
         "max_alphabet_size": 249,
     }
+
+
+def test_alphabet_larger_than_the_format_allows_is_rejected():
+    """The trie config packs symbol_count into 8 header bits, so the alphabet
+    plus the 6 control codes has to fit in 255. A wider alphabet used to
+    produce a buffer with a valid CRC that decoded to nothing, so the encoder
+    has to refuse it rather than lose the keys.
+
+    Keys are given as bytes: str keys are UTF-8 encoded, which cannot reach
+    250 distinct byte values however they are chosen."""
+    entries = {bytes([b]): b for b in range(1, 256)}
+    with pytest.raises(ValueError, match="too many distinct byte values"):
+        triepack.encode(entries)
+
+
+def test_alphabet_at_the_limit_still_encodes():
+    """249 symbols is the documented maximum and must keep working. The keys
+    are not valid UTF-8, so this checks encoding only — decode returns str."""
+    entries = {bytes([b]): b for b in range(1, 250)}
+    buf = triepack.encode(entries)
+    assert buf[:4] == b"TRP\x00"
+    assert triepack.version()["max_alphabet_size"] == 249
+
+
+def test_terminal_without_the_branch_it_promises_is_rejected():
+    """A terminal whose subtree has not ended must be followed by a BRANCH.
+    Corrupting that symbol has to be caught rather than walked past."""
+    import triepack.crc32 as crc32mod
+
+    buf = bytearray(triepack.encode({"he": 1, "hello": 2}))
+
+    # Flip bits through the trie body until one lands on the BRANCH symbol
+    # that follows the terminal for "he". The CRC is repaired each time so
+    # the failure comes from the walk, not the checksum.
+    saw_malformed = False
+    for byte in range(32, len(buf) - 4):
+        for bit in range(8):
+            trial = bytearray(buf)
+            trial[byte] ^= 1 << bit
+            crc = crc32mod.crc32(bytes(trial[:-4]))
+            trial[-4:] = crc.to_bytes(4, "big")
+            try:
+                triepack.decode(bytes(trial))
+            except ValueError as exc:
+                if "expected BRANCH after terminal" in str(exc):
+                    saw_malformed = True
+            except Exception:
+                pass
+    assert saw_malformed, "no corruption reached the BRANCH-after-terminal check"

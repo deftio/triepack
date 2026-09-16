@@ -2,7 +2,7 @@
 
 """triepack — Native Python implementation of the Triepack .trp binary format."""
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 from .decoder import decode
 from .encoder import MAX_ALPHABET_SIZE, encode

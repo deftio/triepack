@@ -810,6 +810,10 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
     if (rc != TP_OK) {
         tp_bs_reader_destroy(&reader);
         free(stack);
+        /* Each key was allocated on its own; freeing just the array leaks
+           every key the walk got through before the input went bad. */
+        for (size_t i = 0; i < entry_count; i++)
+            free(entries[i].key);
         free(entries);
         tp_dict_close(&dict);
         return rc;

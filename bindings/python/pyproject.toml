@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "triepack"
-version = "1.3.1"
+version = "1.3.2"
 description = "Compressed trie dictionary format (.trp) — compact binary key-value storage with fast lookups and prefix search. Pure Python, no dependencies."
 readme = "README.md"
 requires-python = ">=3.8"

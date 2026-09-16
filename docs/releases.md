@@ -13,6 +13,64 @@ What changed in each version. Downloads are on the
 the full history lives in
 [CHANGELOG.md](https://github.com/deftio/triepack/blob/main/CHANGELOG.md).
 
+## v1.3.2 — 2026-09-16
+
+### Added
+- **Sanitizer build and CI job.** `-DENABLE_SANITIZERS=ON` builds with
+  AddressSanitizer and UndefinedBehaviorSanitizer, and CI runs the whole suite
+  under both on every push, with LeakSanitizer on. The format parses untrusted
+  bytes and several tests deliberately walk corrupted dictionaries; those only
+  prove anything when a bad read aborts instead of quietly returning garbage.
+  The option refuses to combine with `ENABLE_COVERAGE`, whose instrumentation
+  it fights.
+- `scripts/test-ci-linux.sh` grew `sanitizers` and `coverage` targets, so both
+  new CI jobs can be run locally. LeakSanitizer is Linux-only, which makes the
+  container the only place the leak half runs at all.
+- **`tests/test_core_iterate.c`** — iteration and prefix descent, the code
+  issue #1 got wrong. Covers dictionaries with no value store, keys and
+  prefixes longer than the iterator's 256-byte buffer, a prefix that is itself
+  a stored key, nesting past the frame stack, a header that disagrees with its
+  own trie, and a sweep that flips every bit of the body in turn.
+- Corruption sweeps in `test_json_decode.c`, repairing the CRC after each flip
+  so the trie walk is what has to catch the damage rather than the checksum.
+- C++ wrapper tests for moved-from handles, the length-taking `add` overload,
+  blob equality, and the alphabet limit surfacing through `build()`.
+- Python tests for the alphabet limit — reachable there because the Python
+  encoder accepts raw `bytes` keys — and for the BRANCH-after-terminal check.
+- JavaScript tests pinning the invariant that makes its alphabet guard
+  unreachable: keys are strings, so the bytes are always UTF-8, which spans at
+  most 243 distinct values against a ceiling of 249.
+
+### Changed
+- The coverage workflow now prints a per-file table into the job summary and
+  fails below 97% lines or 80% branches. It previously generated a report and
+  uploaded it as an artifact that nothing read.
+- Documented the iterator's 256-frame depth limit, which stops a pathologically
+  nested dictionary with `TP_ERR_OVERFLOW`; lookup is not frame-bound and still
+  reaches those keys.
+
+### Fixed
+- **Memory leak decoding a truncated or corrupt JSON dictionary.**
+  `extract_entries` allocates each key separately; its error path freed the
+  entry array but not the keys, so every key the walk got through before the
+  input went bad was leaked. Found by the new sanitizer job — the existing
+  `test_json_decode_progressive_truncation` had been exercising the leak since
+  it was written, with nothing watching for it.
+- `tools/check-coverage.sh` did not clear gcov counters between runs, so a
+  second run reported the union of both and gave a different number from the
+  first. It also defaulted to a 100% threshold it could no longer meet, called
+  the project "TXZ", and used GNU-only `grep -oP`, which fails on macOS.
+- `scripts/test-ci-linux.sh` piped `ctest` into `tail`, so the pipeline
+  reported `tail`'s exit status and a failing job looked like a passing one.
+  That is why the leak above went unnoticed on the first sanitizer run. All
+  four container jobs now set `pipefail`.
+- The testing guide claimed 100% line coverage for C/C++, Python and
+  JavaScript. Measured, it was 97.9%, 99% and 99.6%. Python and JavaScript are
+  now genuinely at 100%; C/C++ is at 99.5% lines and 100% of functions, and the
+  guide says what the remainder is and why.
+- Removed `package-manager-cache` from `setup-node@v4` in `publish.yml`. It is
+  a v5 input, ignored with a warning on v4, and there is no lockfile to cache.
+
 ## v1.3.1 — 2026-09-16
 
 ### Fixed

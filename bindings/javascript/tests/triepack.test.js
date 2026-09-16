@@ -1,6 +1,6 @@
 'use strict';
 
-const { encode, decode } = require('../src/index');
+const { encode, decode, MAX_ALPHABET_SIZE } = require('../src/index');
 
 describe('triepack encode/decode roundtrip', () => {
     test('empty object', () => {
@@ -488,5 +488,94 @@ describe('version metadata', () => {
             formatVersionMinor: 0,
             maxAlphabetSize: 249,
         });
+    });
+});
+
+describe('alphabet limits', () => {
+    // The trie config packs symbol_count into 8 header bits, so the alphabet
+    // plus the 6 control codes has to fit in 255. Keys here are JS strings,
+    // which are always UTF-8 encoded — and UTF-8 simply cannot produce enough
+    // distinct byte values to reach that ceiling. This test pins the invariant
+    // that makes the encoder's guard unreachable rather than pretending to
+    // trigger it.
+    test('UTF-8 keys cannot exceed the format alphabet', () => {
+        const used = new Set();
+        for (let cp = 0; cp <= 0x10ffff; cp++) {
+            if (cp >= 0xd800 && cp <= 0xdfff) continue; // lone surrogates
+            for (const b of Buffer.from(String.fromCodePoint(cp), 'utf8')) {
+                used.add(b);
+            }
+        }
+        expect(used.size).toBeLessThanOrEqual(MAX_ALPHABET_SIZE);
+        expect(used.size + 6).toBeLessThanOrEqual(255);
+    });
+
+    test('a key using many distinct bytes still round-trips', () => {
+        // Spread one key across every UTF-8 lead and continuation byte we
+        // can reach, which is the widest alphabet a caller can actually ask
+        // for from JavaScript.
+        let wide = '';
+        for (let cp = 0x80; cp < 0x80 + 512; cp++) wide += String.fromCodePoint(cp);
+        const data = { [wide]: 1, a: 2 };
+        expect(decode(encode(data))).toEqual(data);
+    });
+});
+
+describe('corrupted trie structure', () => {
+    const { crc32 } = require('../src/crc32');
+
+    function repairCrc(buf) {
+        const crc = crc32(buf.subarray(0, buf.length - 4));
+        const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+        view.setUint32(buf.length - 4, crc >>> 0, false);
+        return buf;
+    }
+
+    // A terminal is followed by a BRANCH exactly when its subtree has not
+    // ended. Flipping bits through the trie eventually lands on that symbol,
+    // and the decoder has to say so rather than walk into the value store.
+    test('a terminal missing its BRANCH is rejected', () => {
+        const clean = encode({ he: 1, hello: 2, help: 3 });
+        let sawMalformed = false;
+
+        for (let byte = 32; byte < clean.length - 4; byte++) {
+            for (let bit = 0; bit < 8; bit++) {
+                const trial = Uint8Array.from(clean);
+                trial[byte] ^= 1 << bit;
+                repairCrc(trial);
+                try {
+                    decode(trial);
+                } catch (err) {
+                    if (/expected BRANCH after terminal/.test(err.message)) {
+                        sawMalformed = true;
+                    }
+                }
+            }
+        }
+
+        expect(sawMalformed).toBe(true);
+    });
+
+    // Whatever the corruption, decoding must end — with a value or an error,
+    // never a hang or a read past the buffer.
+    test('every single-bit corruption terminates', () => {
+        const clean = encode({ alpha: 1, alphabet: 2, beta: 'text', b: true, bc: null });
+        let decodedOk = 0;
+
+        for (let byte = 4; byte < clean.length - 4; byte++) {
+            for (let bit = 0; bit < 8; bit++) {
+                const trial = Uint8Array.from(clean);
+                trial[byte] ^= 1 << bit;
+                repairCrc(trial);
+                try {
+                    decode(trial);
+                    decodedOk++;
+                } catch (err) {
+                    expect(err).toBeInstanceOf(Error);
+                }
+            }
+        }
+
+        expect(decodedOk).toBeGreaterThan(0);
     });
 });

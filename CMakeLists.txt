@@ -19,6 +19,7 @@ option(BUILD_EXAMPLES "Build example programs"     ON)
 option(BUILD_JSON     "Build JSON library"         ON)
 option(BUILD_DOCS     "Build Doxygen docs"         OFF)
 option(ENABLE_COVERAGE "Enable code coverage"      OFF)
+option(ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
 # ── Standards ────────────────────────────────────────────────────────────
 set(CMAKE_C_STANDARD 99)
@@ -42,6 +43,18 @@ include(GNUInstallDirs)
 if(ENABLE_COVERAGE)
     add_compile_options(--coverage)
     add_link_options(--coverage)
+endif()
+
+# ── Sanitizers ───────────────────────────────────────────────────────────
+# triepack parses untrusted binary input, so the tests that walk corrupted
+# dictionaries only prove anything when a bad read actually aborts. Not
+# combinable with coverage: the instrumentation fights over the same runtime.
+if(ENABLE_SANITIZERS)
+    if(ENABLE_COVERAGE)
+        message(FATAL_ERROR "ENABLE_SANITIZERS and ENABLE_COVERAGE cannot be used together")
+    endif()
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address,undefined)
 endif()
 
 # ── Version header ───────────────────────────────────────────────────────

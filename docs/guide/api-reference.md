@@ -806,6 +806,14 @@ Advances to the next entry. Returns `TP_ERR_EOF` when done. The `key`
 pointer is valid until the next call to `tp_iter_next()` or
 `tp_iter_destroy()`.
 
+The walk keeps one frame per open branch, capped at 256. A dictionary whose
+keys nest deeper than that — a chain like `a`, `aa`, `aaa`, each extending
+the last — stops with `TP_ERR_OVERFLOW` once the stack is full, after
+yielding everything above the cap. Lookup is not frame-bound, so
+`tp_dict_lookup()` still reaches those keys; only whole-dictionary iteration
+is limited. Keys nested that deeply are pathological rather than merely
+long: a key of any length costs one frame, and 256 is the *branching* depth.
+
 ```c
 tp_result tp_iter_reset(tp_iterator *it);
 ```
@@ -919,6 +927,11 @@ tp_result tp_dict_find_prefix(const tp_dict *dict, const char *prefix,
 ```
 Returns an iterator over all keys that start with `prefix`. Results are
 in lexicographic order. Use `tp_iter_next()` to consume.
+
+A prefix that is itself a stored key yields that key first, then everything
+below it. A prefix no key starts with yields an iterator that returns
+`TP_ERR_EOF` immediately rather than an error, so callers do not have to
+distinguish "no matches" from "lookup failed".
 
 ### Fuzzy Search
 
