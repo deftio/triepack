@@ -61,6 +61,10 @@ endif()
 triepack_add_c_test(test_cross_language test_cross_language.c triepack_core)
 target_compile_definitions(test_cross_language PRIVATE FIXTURE_DIR="${CMAKE_SOURCE_DIR}")
 
+# Cross-language conformance corpus (tests/conformance/)
+triepack_add_c_test(test_conformance test_conformance.c triepack_core)
+target_compile_definitions(test_conformance PRIVATE FIXTURE_DIR="${CMAKE_SOURCE_DIR}")
+
 # C++ wrapper tests
 triepack_add_cpp_test(test_wrapper_bitstream test_wrapper_bitstream.cpp triepack_wrapper)
 triepack_add_cpp_test(test_wrapper_core      test_wrapper_core.cpp      triepack_wrapper)
