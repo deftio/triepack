@@ -39,7 +39,9 @@ sealed class TpValue {
             return value.contentEquals(other.value)
         }
 
-        override fun hashCode(): Int = value.contentHashCode()
+        // Qualified: inside TpValue's scope, a bare `Int` resolves to the
+        // nested TpValue.Int, not kotlin.Int.
+        override fun hashCode(): kotlin.Int = value.contentHashCode()
     }
 }
 
