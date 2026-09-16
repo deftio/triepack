@@ -165,7 +165,14 @@ fun decode(buffer: ByteArray): Map<String, TpValue?> {
 
     reader.seek(dataStart)
     val bps = reader.readBits(4).toInt()
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    require(bps in 1..8) { "Invalid trie config: bits_per_symbol must be 1..8, got $bps" }
     val symbolCount = reader.readBits(8).toInt()
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    require(symbolCount >= NUM_CONTROL_CODES && symbolCount <= (1 shl bps)) {
+        "Invalid trie config: symbol_count out of range: $symbolCount"
+    }
 
     // Read control codes
     val ctrlCodes = IntArray(NUM_CONTROL_CODES)

@@ -13,6 +13,7 @@ pub mod encoder;
 pub mod values;
 pub mod varint;
 
+pub use encoder::MAX_ALPHABET_SIZE;
 pub use values::Value;
 
 use std::collections::HashMap;
@@ -37,6 +38,9 @@ pub enum TriePackError {
     Truncated,
     /// Malformed UTF-8 in key or string value.
     InvalidUtf8,
+    /// Keys use more distinct byte values than the format can address.
+    /// Carries the alphabet size that was rejected.
+    Alphabet(usize),
 }
 
 impl fmt::Display for TriePackError {
@@ -50,6 +54,12 @@ impl fmt::Display for TriePackError {
             TriePackError::Corrupt => write!(f, "CRC-32 integrity check failed"),
             TriePackError::Truncated => write!(f, "Data too short for .trp format"),
             TriePackError::InvalidUtf8 => write!(f, "Invalid UTF-8"),
+            TriePackError::Alphabet(n) => write!(
+                f,
+                "Keys use too many distinct byte values ({}); the format allows at most {}",
+                n,
+                encoder::MAX_ALPHABET_SIZE
+            ),
         }
     }
 }
@@ -62,6 +72,12 @@ impl std::error::Error for TriePackError {}
 /// byte-identical to the C reference encoder.
 pub fn encode(data: &HashMap<String, Value>) -> Vec<u8> {
     encoder::encode(data)
+}
+
+/// Encode key-value data, reporting the alphabet limit as an error instead of
+/// panicking. See [`encode`] and [`MAX_ALPHABET_SIZE`].
+pub fn try_encode(data: &HashMap<String, Value>) -> Result<Vec<u8>, TriePackError> {
+    encoder::try_encode(data)
 }
 
 /// Decode a .trp binary buffer into key-value data.

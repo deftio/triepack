@@ -22,6 +22,9 @@ public enum TriepackError: Error, Equatable {
     case overflow
     case eof
     case invalidData(String)
+    /// Keys use more distinct byte values than the format can address.
+    /// The payload is the alphabet size that was rejected.
+    case alphabetTooLarge(Int)
 }
 
 /// Native Swift implementation of the Triepack .trp binary format.

@@ -70,7 +70,14 @@ def decode(buffer):
 
     reader.seek(data_start)
     bps = reader.read_bits(4)
+    # Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    # byte; 0 would make the trie unreadable.
+    if bps < 1 or bps > 8:
+        raise ValueError(f"Invalid trie config: bits_per_symbol must be 1..8, got {bps}")
     symbol_count = reader.read_bits(8)
+    # Must leave room for the control codes and fit in bits_per_symbol.
+    if symbol_count < NUM_CONTROL_CODES or symbol_count > (1 << bps):
+        raise ValueError(f"Invalid trie config: symbol_count out of range: {symbol_count}")
 
     # Read control codes
     ctrl_codes = [0] * NUM_CONTROL_CODES

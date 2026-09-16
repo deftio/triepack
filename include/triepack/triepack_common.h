@@ -51,11 +51,14 @@ typedef enum {
     TP_ERR_INVALID_UTF8 = -7,     /**< Malformed UTF-8 */
 
     /* Dictionary errors */
-    TP_ERR_BAD_MAGIC = -10, /**< Not a .trp file */
-    TP_ERR_VERSION = -11,   /**< Unsupported format version */
-    TP_ERR_CORRUPT = -12,   /**< Integrity check failed */
-    TP_ERR_NOT_FOUND = -13, /**< Key not in dictionary */
-    TP_ERR_TRUNCATED = -14, /**< Data shorter than header claims */
+    TP_ERR_BAD_MAGIC = -10,   /**< Not a .trp file */
+    TP_ERR_VERSION = -11,     /**< Unsupported format version */
+    TP_ERR_CORRUPT = -12,     /**< Integrity check failed */
+    TP_ERR_NOT_FOUND = -13,   /**< Key not in dictionary */
+    TP_ERR_TRUNCATED = -14,   /**< Data shorter than header claims */
+    TP_ERR_ALPHABET = -15,    /**< Keys use more distinct bytes than the format
+                                   can address (see TP_MAX_ALPHABET_SIZE) */
+    TP_ERR_UNSUPPORTED = -16, /**< Operation is declared but not implemented */
 
     /* JSON errors */
     TP_ERR_JSON_SYNTAX = -20, /**< Malformed JSON */
@@ -127,7 +130,20 @@ typedef enum { TP_CHECKSUM_CRC32 = 0, TP_CHECKSUM_SHA256, TP_CHECKSUM_XXHASH64 }
 
 /* ── Format constants ────────────────────────────────────────────────── */
 
-#define TP_HEADER_SIZE       32 /**< Fixed header size in bytes */
+#define TP_HEADER_SIZE 32 /**< Fixed header size in bytes */
+
+/**
+ * @brief Largest number of distinct byte values the keys may use.
+ *
+ * The trie config packs symbol_count into 8 header bits, and symbol_count is
+ * the alphabet size plus the 6 control codes, so the alphabet cannot exceed
+ * 255 - 6 = 249 distinct byte values. Encoding keys that use more returns
+ * TP_ERR_ALPHABET rather than producing a dictionary that cannot be read.
+ *
+ * ASCII and most single-language UTF-8 text stay far below this; reaching it
+ * takes keys drawn from raw bytes or from many scripts at once.
+ */
+#define TP_MAX_ALPHABET_SIZE 249
 #define TP_MAX_NESTING_DEPTH 32 /**< Maximum nesting depth for JSON */
 #define TP_VARINT_MAX_GROUPS 10 /**< Maximum VarInt continuation groups */
 

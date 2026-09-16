@@ -76,7 +76,16 @@ function decode(buffer) {
 
     // bits_per_symbol (4 bits) + symbol_count (8 bits)
     const bps = reader.readBits(4);
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    if (bps < 1 || bps > 8) {
+        throw new Error('Invalid trie config: bits_per_symbol must be 1..8, got ' + bps);
+    }
     const symbolCount = reader.readBits(8);
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    if (symbolCount < NUM_CONTROL_CODES || symbolCount > (1 << bps)) {
+        throw new Error('Invalid trie config: symbol_count out of range: ' + symbolCount);
+    }
 
     // Read control codes
     const ctrlCodes = new Uint32Array(NUM_CONTROL_CODES);

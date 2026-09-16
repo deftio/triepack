@@ -19,6 +19,10 @@ static tp_result parse_trie_config(tp_bitstream_reader *r, tp_dict *dict)
     rc = tp_bs_read_bits(r, 4, &val);
     if (rc != TP_OK)
         return rc;
+    /* Symbol codes index 256-entry maps, so a symbol may not be wider than a
+       byte; 0 would make the trie unreadable. */
+    if (val < 1 || val > 8)
+        return TP_ERR_ALPHABET;
     dict->sym.bits_per_symbol = (uint8_t)val;
     dict->info.bits_per_symbol = (uint8_t)val;
 
@@ -26,6 +30,9 @@ static tp_result parse_trie_config(tp_bitstream_reader *r, tp_dict *dict)
     rc = tp_bs_read_bits(r, 8, &val);
     if (rc != TP_OK)
         return rc;
+    /* Must leave room for the control codes and fit in bits_per_symbol. */
+    if (val < TP_NUM_CONTROL_CODES || val > (1u << dict->sym.bits_per_symbol))
+        return TP_ERR_ALPHABET;
     dict->sym.symbol_count = (uint16_t)val;
 
     /* special_symbol_map: 6 control codes */

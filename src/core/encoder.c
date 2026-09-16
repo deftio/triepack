@@ -568,6 +568,13 @@ tp_result tp_encoder_build(tp_encoder *enc, uint8_t **buf, size_t *len)
     /* Analyze symbols and build maps */
     analyze_symbols(enc);
 
+    /* The trie config packs symbol_count into 8 header bits. An alphabet
+       wider than TP_MAX_ALPHABET_SIZE overflows that field, which used to
+       produce a buffer with a valid CRC whose every lookup silently failed.
+       Refuse to build it instead. */
+    if (enc->sym.symbol_count > 255)
+        return TP_ERR_ALPHABET;
+
     /* Create writer */
     tp_bitstream_writer *w = NULL;
     tp_result rc = tp_bs_writer_create(&w, 256, 0);

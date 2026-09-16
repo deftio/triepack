@@ -39,6 +39,10 @@ const char *tp_result_str(tp_result result)
         return "key not found";
     case TP_ERR_TRUNCATED:
         return "data truncated";
+    case TP_ERR_ALPHABET:
+        return "keys use too many distinct byte values";
+    case TP_ERR_UNSUPPORTED:
+        return "operation not implemented";
     case TP_ERR_JSON_SYNTAX:
         return "JSON syntax error";
     case TP_ERR_JSON_DEPTH:

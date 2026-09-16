@@ -70,7 +70,16 @@ func triepackDecode(_ buffer: Data) throws -> [String: TriepackValue] {
 
     reader.seek(dataStart)
     let bps = Int(try reader.readBits(4))
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    guard (1...8).contains(bps) else {
+        throw TriepackError.invalidData("Invalid trie config: bits_per_symbol must be 1...8, got \(bps)")
+    }
     let symbolCount = Int(try reader.readBits(8))
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    guard symbolCount >= numControlCodes && symbolCount <= (1 << bps) else {
+        throw TriepackError.invalidData("Invalid trie config: symbol_count out of range: \(symbolCount)")
+    }
 
     // Read control codes
     var ctrlCodes = [Int](repeating: 0, count: numControlCodes)

@@ -18,6 +18,12 @@ private let ctrlSkip = 2
 private let ctrlBranch = 5
 private let numControlCodes = 6
 
+/// Largest number of distinct byte values the keys may use.
+///
+/// `symbol_count` is an 8-bit header field holding the alphabet plus the
+/// control codes, so the alphabet cannot exceed `255 - 6`.
+public let triepackMaxAlphabetSize = 255 - numControlCodes // 249
+
 /// Internal context for trie encoding.
 private struct EncodeContext {
     let entries: [([UInt8], TriepackValue)]
@@ -68,6 +74,12 @@ func triepackEncode(_ data: [String: TriepackValue]) throws -> Data {
 
     let alphabetSize = used.filter { $0 }.count
     let totalSymbols = alphabetSize + numControlCodes
+    // The trie config packs symbol_count into 8 header bits, so the alphabet
+    // plus the 6 control codes must fit in 255. Encoding a wider alphabet used
+    // to produce a buffer with a valid CRC that decoded to nothing.
+    guard totalSymbols <= 255 else {
+        throw TriepackError.alphabetTooLarge(alphabetSize)
+    }
     var bps = 1
     while (1 << bps) < totalSymbols {
         bps += 1

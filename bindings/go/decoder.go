@@ -61,12 +61,21 @@ func decodeData(buffer []byte) (map[string]interface{}, error) {
 		return nil, err
 	}
 	bps := int(bpsBits)
+	// Symbol codes index 256-entry maps, so a symbol may not be wider than a
+	// byte; 0 would make the trie unreadable.
+	if bps < 1 || bps > 8 {
+		return nil, fmt.Errorf("invalid trie config: bits_per_symbol must be 1..8, got %d", bps)
+	}
 
 	symCountBits, err := reader.ReadBits(8)
 	if err != nil {
 		return nil, err
 	}
 	symbolCount := int(symCountBits)
+	// Must leave room for the control codes and fit in bits_per_symbol.
+	if symbolCount < numControlCodes || symbolCount > (1<<uint(bps)) {
+		return nil, fmt.Errorf("invalid trie config: symbol_count out of range: %d", symbolCount)
+	}
 
 	// Read control codes
 	var ctrlCodes [numControlCodes]int

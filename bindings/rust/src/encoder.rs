@@ -8,6 +8,7 @@ use crate::bitstream::BitWriter;
 use crate::crc32::crc32;
 use crate::values::{encode_value, Value};
 use crate::varint::{var_uint_bits, write_var_uint};
+use crate::TriePackError;
 
 // Format constants (match core_internal.h)
 const TP_MAGIC: [u8; 4] = [0x54, 0x52, 0x50, 0x00]; // "TRP\0"
@@ -21,6 +22,14 @@ const CTRL_END_VAL: usize = 1;
 const CTRL_SKIP: usize = 2;
 const CTRL_BRANCH: usize = 5;
 const NUM_CONTROL_CODES: usize = 6;
+
+/// Largest number of distinct byte values the keys may use.
+///
+/// `symbol_count` is an 8-bit header field holding the alphabet plus the
+/// control codes, so the alphabet cannot exceed `255 - 6`. Keys are `String`,
+/// so valid UTF-8 already caps the alphabet below this; the check exists so a
+/// buffer that cannot be read is never produced.
+pub const MAX_ALPHABET_SIZE: usize = 255 - NUM_CONTROL_CODES; // 249
 
 /// Internal entry: sorted key bytes + value reference index.
 struct Entry {
@@ -43,7 +52,22 @@ struct EncCtx {
 /// Keys are sorted by their UTF-8 byte representation. Duplicate keys are
 /// deduplicated (last value wins, but since HashMap has unique keys this is
 /// a no-op). The output is byte-identical to the C reference encoder.
+///
+/// # Panics
+///
+/// Panics if the keys together use more than [`MAX_ALPHABET_SIZE`] distinct
+/// byte values. Valid UTF-8 cannot reach that many, so this is unreachable
+/// for `String` keys; use [`try_encode`] if you would rather handle it.
 pub fn encode(data: &HashMap<String, Value>) -> Vec<u8> {
+    match try_encode(data) {
+        Ok(buf) => buf,
+        Err(e) => panic!("encode failed: {}", e),
+    }
+}
+
+/// Encode a HashMap<String, Value> into the .trp binary format, reporting the
+/// alphabet limit as an error instead of panicking. See [`encode`].
+pub fn try_encode(data: &HashMap<String, Value>) -> Result<Vec<u8>, TriePackError> {
     // Collect entries as (key_bytes, value), sort by key_bytes
     let mut pairs: Vec<(Vec<u8>, &Value)> = data
         .iter()
@@ -75,6 +99,13 @@ pub fn encode(data: &HashMap<String, Value>) -> Vec<u8> {
 
     let alphabet_size: usize = used.iter().filter(|&&u| u).count();
     let total_symbols = alphabet_size + NUM_CONTROL_CODES;
+
+    // The trie config packs symbol_count into 8 header bits, so the alphabet
+    // plus the 6 control codes must fit in 255. Encoding a wider alphabet used
+    // to produce a buffer with a valid CRC that decoded to nothing.
+    if total_symbols > 255 {
+        return Err(TriePackError::Alphabet(alphabet_size));
+    }
 
     // Determine bits_per_symbol
     let mut bps: usize = 1;
@@ -189,7 +220,7 @@ pub fn encode(data: &HashMap<String, Value>) -> Vec<u8> {
     let crc_val = crc32(&out_buf[..crc_data_len]);
     patch_u32(&mut out_buf, crc_data_len, crc_val);
 
-    out_buf
+    Ok(out_buf)
 }
 
 /// Patch a big-endian u32 at the given byte offset.

@@ -6,7 +6,7 @@
 
 'use strict';
 
-const { encode } = require('./encoder');
+const { encode, MAX_ALPHABET_SIZE } = require('./encoder');
 const { decode } = require('./decoder');
 
-module.exports = { encode, decode };
+module.exports = { encode, decode, MAX_ALPHABET_SIZE };

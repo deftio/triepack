@@ -81,7 +81,16 @@ pub fn decode(buffer: &[u8]) -> Result<HashMap<String, Value>, TriePackError> {
 
     reader.seek(data_start);
     let bps = reader.read_bits(4)? as usize;
+    // Symbol codes index 256-entry maps, so a symbol may not be wider than a
+    // byte; 0 would make the trie unreadable.
+    if !(1..=8).contains(&bps) {
+        return Err(TriePackError::Alphabet(bps));
+    }
     let symbol_count = reader.read_bits(8)? as usize;
+    // Must leave room for the control codes and fit in bits_per_symbol.
+    if symbol_count < NUM_CONTROL_CODES || symbol_count > (1usize << bps) {
+        return Err(TriePackError::Alphabet(symbol_count));
+    }
 
     // Read control codes
     let mut ctrl_codes = [0u32; NUM_CONTROL_CODES];

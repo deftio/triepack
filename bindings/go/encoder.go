@@ -2,7 +2,10 @@
 
 package triepack
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Format constants (match core_internal.h).
 var tpMagic = []byte{0x54, 0x52, 0x50, 0x00} // "TRP\0"
@@ -24,6 +27,11 @@ const (
 	ctrlBranch      = 5
 	numControlCodes = 6
 )
+
+// MaxAlphabetSize is the largest number of distinct byte values the keys may
+// use. symbol_count is an 8-bit header field holding the alphabet plus the
+// control codes, so the alphabet cannot exceed 255 - 6.
+const MaxAlphabetSize = 255 - numControlCodes // 249
 
 // trieEntry holds a key (as bytes) and its associated value.
 type trieEntry struct {
@@ -87,6 +95,14 @@ func encodeData(data map[string]interface{}) ([]byte, error) {
 		}
 	}
 	totalSymbols := alphabetSize + numControlCodes
+	// The trie config packs symbol_count into 8 header bits, so the alphabet
+	// plus the 6 control codes must fit in 255. Encoding a wider alphabet used
+	// to produce a buffer with a valid CRC that decoded to nothing.
+	if totalSymbols > 255 {
+		return nil, fmt.Errorf(
+			"keys use too many distinct byte values (%d); the format allows at most %d",
+			alphabetSize, MaxAlphabetSize)
+	}
 	bps := 1
 	for (1 << uint(bps)) < totalSymbols {
 		bps++
@@ -150,7 +166,7 @@ func encodeData(data map[string]interface{}) ([]byte, error) {
 		if cd < 256 {
 			byteVal = reverseMap[cd]
 		}
-		writeVarUint(w, byteVal)
+		writeVarUint(w, uint64(byteVal))
 	}
 
 	trieDataOffset := w.Position() - dataStart
@@ -268,7 +284,7 @@ func trieSubtreeSize(ctx *encodeCtx, start, end, prefixLen int, valueIdx []int) 
 	if hasTerminal && childCount == 0 {
 		if hasValues && entries[start].val != nil {
 			bits += bps
-			bits += varUintBits(valueIdx[0])
+			bits += varUintBits(uint64(valueIdx[0]))
 		} else {
 			bits += bps
 		}
@@ -276,13 +292,13 @@ func trieSubtreeSize(ctx *encodeCtx, start, end, prefixLen int, valueIdx []int) 
 	} else if hasTerminal && childCount > 0 {
 		if hasValues && entries[start].val != nil {
 			bits += bps
-			bits += varUintBits(valueIdx[0])
+			bits += varUintBits(uint64(valueIdx[0]))
 		} else {
 			bits += bps
 		}
 		valueIdx[0]++
 		bits += bps
-		bits += varUintBits(childCount)
+		bits += varUintBits(uint64(childCount))
 
 		cs = childrenStart
 		childI := 0
@@ -295,7 +311,7 @@ func trieSubtreeSize(ctx *encodeCtx, start, end, prefixLen int, valueIdx []int) 
 			if childI < childCount-1 {
 				childSz := trieSubtreeSize(ctx, cs, ce, common, valueIdx)
 				bits += bps
-				bits += varUintBits(childSz)
+				bits += varUintBits(uint64(childSz))
 				bits += childSz
 			} else {
 				bits += trieSubtreeSize(ctx, cs, ce, common, valueIdx)
@@ -305,7 +321,7 @@ func trieSubtreeSize(ctx *encodeCtx, start, end, prefixLen int, valueIdx []int) 
 		}
 	} else { // not hasTerminal, childCount > 0
 		bits += bps
-		bits += varUintBits(childCount)
+		bits += varUintBits(uint64(childCount))
 
 		cs = childrenStart
 		childI := 0
@@ -318,7 +334,7 @@ func trieSubtreeSize(ctx *encodeCtx, start, end, prefixLen int, valueIdx []int) 
 			if childI < childCount-1 {
 				childSz := trieSubtreeSize(ctx, cs, ce, common, valueIdx)
 				bits += bps
-				bits += varUintBits(childSz)
+				bits += varUintBits(uint64(childSz))
 				bits += childSz
 			} else {
 				bits += trieSubtreeSize(ctx, cs, ce, common, valueIdx)
@@ -391,7 +407,7 @@ func trieWrite(ctx *encodeCtx, w *BitWriter, start, end, prefixLen int, valueIdx
 	if hasTerminal {
 		if hasValues && entries[start].val != nil {
 			w.WriteBits(uint64(ctrlCodes[ctrlEndVal]), bps)
-			writeVarUint(w, valueIdx[0])
+			writeVarUint(w, uint64(valueIdx[0]))
 		} else {
 			w.WriteBits(uint64(ctrlCodes[ctrlEnd]), bps)
 		}
@@ -404,7 +420,7 @@ func trieWrite(ctx *encodeCtx, w *BitWriter, start, end, prefixLen int, valueIdx
 
 	// BRANCH
 	w.WriteBits(uint64(ctrlCodes[ctrlBranch]), bps)
-	writeVarUint(w, childCount)
+	writeVarUint(w, uint64(childCount))
 
 	cs = childrenStart
 	childI := 0
@@ -419,7 +435,7 @@ func trieWrite(ctx *encodeCtx, w *BitWriter, start, end, prefixLen int, valueIdx
 			viCopy := []int{valueIdx[0]}
 			childSz := trieSubtreeSize(ctx, cs, ce, common, viCopy)
 			w.WriteBits(uint64(ctrlCodes[ctrlSkip]), bps)
-			writeVarUint(w, childSz)
+			writeVarUint(w, uint64(childSz))
 		}
 
 		trieWrite(ctx, w, cs, ce, common, valueIdx)
