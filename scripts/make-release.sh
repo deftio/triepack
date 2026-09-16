@@ -21,6 +21,8 @@
 #                     genuinely unavailable. A missing toolchain is otherwise
 #                     a failure: a release must be tested on every target.
 #                     Targets: c, js, ts, python, go, rust, swift, java, kotlin
+#                     java and kotlin need no toolchain installed — see
+#                     scripts/test-jvm.sh.
 #   --dry-run         Print the git/gh commands instead of running them.
 #   --yes             Do not prompt before the PR, merge and tag steps.
 #
@@ -264,13 +266,28 @@ run_target rust "Rust" cargo gate_rust
 gate_swift() { cd bindings/swift && swift test; }
 run_target swift "Swift" swift gate_swift
 
-# -- Java ------------------------------------------------------------------
-gate_java() { cd bindings/java && gradle --quiet --console=plain test; }
-run_target java "Java" gradle gate_java
+# -- Java and Kotlin -------------------------------------------------------
+# Gradle when it is installed, matching CI. Otherwise scripts/test-jvm.sh,
+# which compiles with javac/kotlinc directly and fetches whatever is missing
+# into .jvm-toolchain/ — so neither target has to be skipped for want of a
+# build system.
+gate_java() {
+    if have gradle; then
+        cd bindings/java && gradle --quiet --console=plain test
+    else
+        ./scripts/test-jvm.sh java
+    fi
+}
+run_target java "Java" curl gate_java
 
-# -- Kotlin ----------------------------------------------------------------
-gate_kotlin() { cd bindings/kotlin && gradle --quiet --console=plain test; }
-run_target kotlin "Kotlin" gradle gate_kotlin
+gate_kotlin() {
+    if have gradle; then
+        cd bindings/kotlin && gradle --quiet --console=plain test
+    else
+        ./scripts/test-jvm.sh kotlin
+    fi
+}
+run_target kotlin "Kotlin" curl gate_kotlin
 
 # --------------------------------------------------------------------------
 # 4. Gate summary

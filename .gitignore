@@ -62,3 +62,6 @@ bindings/swift/.swiftpm/
 
 # scripts/make-release.sh build directory
 build-release/
+
+# scripts/test-jvm.sh downloads (JDK, JUnit, kotlinc)
+.jvm-toolchain/
