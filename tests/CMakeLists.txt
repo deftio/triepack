@@ -41,6 +41,7 @@ triepack_add_c_test(test_core_roundtrip    test_core_roundtrip.c    triepack_cor
 triepack_add_c_test(test_core_lookup       test_core_lookup.c       triepack_core)
 triepack_add_c_test(test_core_values       test_core_values.c       triepack_core)
 triepack_add_c_test(test_core_edge_cases   test_core_edge_cases.c   triepack_core)
+triepack_add_c_test(test_core_limits      test_core_limits.c       triepack_core)
 triepack_add_c_test(test_core_integrity    test_core_integrity.c    triepack_core)
 
 # Core internals test (needs access to src/core/ for core_internal.h)
