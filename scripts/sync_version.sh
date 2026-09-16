@@ -19,8 +19,10 @@
 #   bindings/rust/Cargo.toml                crate version
 #   bindings/java/build.gradle              Gradle version
 #   bindings/kotlin/build.gradle.kts        Gradle version
-#   bindings/kotlin/.../TriePack.kt         VERSION constant
-#   bindings/kotlin/.../TriePackTest.kt     the VERSION assertion
+#   the VERSION constant each binding reports through version():
+#     bindings/javascript/src/index.js      bindings/go/triepack.go
+#     bindings/rust/src/lib.rs              bindings/swift/.../Triepack.swift
+#     bindings/java/.../TriePack.java       bindings/kotlin/.../TriePack.kt
 #   docs/_config.yml                        version shown in the site header
 #   README.md                               title line
 #
@@ -156,13 +158,29 @@ update_file "bindings/java/build.gradle" "bindings/java/build.gradle" \
 update_file "bindings/kotlin/build.gradle.kts" "bindings/kotlin/build.gradle.kts" \
     "s|^(version = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
 
+update_file "bindings/javascript src/index.js VERSION" \
+    "bindings/javascript/src/index.js" \
+    "s|(const VERSION = ')${SEMVER}(')|\${1}${VERSION}\${2}|"
+
+update_file "bindings/go triepack.go Version" \
+    "bindings/go/triepack.go" \
+    "s|(const Version = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+update_file "bindings/rust src/lib.rs VERSION" \
+    "bindings/rust/src/lib.rs" \
+    "s|(pub const VERSION: &str = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+update_file "bindings/swift Triepack.swift version" \
+    "bindings/swift/Sources/Triepack/Triepack.swift" \
+    "s|(public static let version = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+update_file "bindings/java TriePack.java VERSION" \
+    "bindings/java/src/main/java/com/deftio/triepack/TriePack.java" \
+    "s|(public static final String VERSION = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
 update_file "bindings/kotlin TriePack.kt VERSION" \
     "bindings/kotlin/src/main/kotlin/com/deftio/triepack/TriePack.kt" \
     "s|(const val VERSION = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
-
-update_file "bindings/kotlin TriePackTest.kt version assertion" \
-    "bindings/kotlin/src/test/kotlin/com/deftio/triepack/TriePackTest.kt" \
-    "s|(assertEquals\\(\")${SEMVER}(\", VERSION\\))|\${1}${VERSION}\${2}|"
 
 # --------------------------------------------------------------------------
 # Docs site and README

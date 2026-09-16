@@ -4,6 +4,7 @@
  */
 
 #include "bitstream_internal.h"
+#include "triepack/triepack_version.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +53,23 @@ const char *tp_result_str(tp_result result)
     default:
         return "unknown error";
     }
+}
+
+/* ── Version metadata ────────────────────────────────────────────────── */
+
+tp_version_info tp_version(void)
+{
+    tp_version_info v;
+    v.name = "triepack";
+    v.implementation = "c";
+    v.version = TP_VERSION_STRING;
+    v.version_major = (uint8_t)TP_VERSION_MAJOR;
+    v.version_minor = (uint8_t)TP_VERSION_MINOR;
+    v.version_patch = (uint8_t)TP_VERSION_PATCH;
+    v.format_version_major = (uint8_t)TP_FORMAT_VERSION_MAJOR;
+    v.format_version_minor = (uint8_t)TP_FORMAT_VERSION_MINOR;
+    v.max_alphabet_size = (uint16_t)TP_MAX_ALPHABET_SIZE;
+    return v;
 }
 
 /* ── Value helpers ───────────────────────────────────────────────────── */

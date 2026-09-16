@@ -7,8 +7,10 @@
  */
 
 #include "triepack/triepack.h"
+#include "triepack/triepack_version.h"
 #include "unity.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -147,9 +149,65 @@ static void test_empty_string_value_round_trips(void)
     free(buf);
 }
 
+/* ── Version metadata ────────────────────────────────────────────────── */
+
+/* The version a build reports has to equal triepack-version.txt, the single
+   source of truth. Reading the file rather than a copy of the string is the
+   point: a stale constant fails. */
+static void read_declared_version(char *out, size_t cap)
+{
+    const char *candidates[] = {FIXTURE_DIR "/triepack-version.txt", "triepack-version.txt",
+                                "../triepack-version.txt"};
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        FILE *f = fopen(candidates[i], "rb");
+        if (!f)
+            continue;
+        if (fgets(out, (int)cap, f)) {
+            fclose(f);
+            size_t n = strlen(out);
+            while (n > 0 && (out[n - 1] == '\n' || out[n - 1] == '\r' || out[n - 1] == ' '))
+                out[--n] = '\0';
+            return;
+        }
+        fclose(f);
+    }
+    out[0] = '\0';
+}
+
+static void test_version_matches_source_of_truth(void)
+{
+    char declared[64];
+    read_declared_version(declared, sizeof(declared));
+    TEST_ASSERT_TRUE_MESSAGE(declared[0] != '\0', "cannot read triepack-version.txt");
+
+    tp_version_info v = tp_version();
+    TEST_ASSERT_EQUAL_STRING(declared, v.version);
+    TEST_ASSERT_EQUAL_STRING(declared, TP_VERSION_STRING);
+}
+
+static void test_version_metadata_shape(void)
+{
+    char declared[64];
+    read_declared_version(declared, sizeof(declared));
+    unsigned major = 0, minor = 0, patch = 0;
+    TEST_ASSERT_EQUAL_INT(3, sscanf(declared, "%u.%u.%u", &major, &minor, &patch));
+
+    tp_version_info v = tp_version();
+    TEST_ASSERT_EQUAL_STRING("triepack", v.name);
+    TEST_ASSERT_EQUAL_STRING("c", v.implementation);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)major, v.version_major);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)minor, v.version_minor);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)patch, v.version_patch);
+    TEST_ASSERT_EQUAL_UINT8(TP_FORMAT_VERSION_MAJOR, v.format_version_major);
+    TEST_ASSERT_EQUAL_UINT8(TP_FORMAT_VERSION_MINOR, v.format_version_minor);
+    TEST_ASSERT_EQUAL_UINT16(TP_MAX_ALPHABET_SIZE, v.max_alphabet_size);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_version_matches_source_of_truth);
+    RUN_TEST(test_version_metadata_shape);
     RUN_TEST(test_alphabet_at_limit_builds_and_reads);
     RUN_TEST(test_alphabet_over_limit_is_refused);
     RUN_TEST(test_alphabet_error_has_a_message);

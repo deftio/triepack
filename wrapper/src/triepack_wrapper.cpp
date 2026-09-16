@@ -20,6 +20,23 @@ const char *message(Status status)
     return tp_result_str(static_cast<tp_result>(status));
 }
 
+VersionInfo version()
+{
+    /* Same numbers the C library reports; only the implementation differs. */
+    tp_version_info c = tp_version();
+    VersionInfo v;
+    v.name = c.name;
+    v.implementation = "c++";
+    v.version = c.version;
+    v.version_major = c.version_major;
+    v.version_minor = c.version_minor;
+    v.version_patch = c.version_patch;
+    v.format_version_major = c.format_version_major;
+    v.format_version_minor = c.format_version_minor;
+    v.max_alphabet_size = c.max_alphabet_size;
+    return v;
+}
+
 namespace
 {
 

@@ -452,3 +452,41 @@ describe('triepack encode/decode roundtrip', () => {
         });
     });
 });
+
+// The version a build reports has to equal triepack-version.txt, the single
+// source of truth. Reading the file here rather than a copy of the string is
+// the point: a stale constant fails.
+describe('version metadata', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const { version, VERSION } = require('../src/index');
+
+    const declared = fs
+        .readFileSync(path.resolve(__dirname, '../../../triepack-version.txt'), 'utf8')
+        .trim();
+
+    test('reports the version in triepack-version.txt', () => {
+        expect(VERSION).toBe(declared);
+        expect(version().version).toBe(declared);
+    });
+
+    test('package.json agrees', () => {
+        expect(require('../package.json').version).toBe(declared);
+    });
+
+    test('carries the metadata every implementation reports', () => {
+        const v = version();
+        const [major, minor, patch] = declared.split('.').map(Number);
+        expect(v).toEqual({
+            name: 'triepack',
+            implementation: 'javascript',
+            version: declared,
+            versionMajor: major,
+            versionMinor: minor,
+            versionPatch: patch,
+            formatVersionMajor: 1,
+            formatVersionMinor: 0,
+            maxAlphabetSize: 249,
+        });
+    });
+});

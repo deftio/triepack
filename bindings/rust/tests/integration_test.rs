@@ -506,3 +506,45 @@ fn test_header_declares_exactly_the_bits_written() {
     assert_eq!(value_store_offset, total_data_bits);
     assert_eq!(buf.len(), 32 + total_data_bits.div_ceil(8) + 4);
 }
+
+// ---------------------------------------------------------------------------
+// Version metadata
+//
+// The version a build reports has to equal triepack-version.txt, the single
+// source of truth. Reading the file rather than a copy of the string is the
+// point: a stale constant fails.
+// ---------------------------------------------------------------------------
+
+fn declared_version() -> String {
+    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.push("..");
+    p.push("..");
+    p.push("triepack-version.txt");
+    std::fs::read_to_string(&p)
+        .unwrap_or_else(|e| panic!("{}: {}", p.display(), e))
+        .trim()
+        .to_string()
+}
+
+#[test]
+fn version_matches_source_of_truth() {
+    let want = declared_version();
+    assert_eq!(triepack::VERSION, want);
+    assert_eq!(triepack::version().version, want);
+    assert_eq!(env!("CARGO_PKG_VERSION"), want, "Cargo.toml disagrees");
+}
+
+#[test]
+fn version_metadata_shape() {
+    let want = declared_version();
+    let parts: Vec<u8> = want.split('.').map(|p| p.parse().unwrap()).collect();
+    let got = triepack::version();
+    assert_eq!(got.name, "triepack");
+    assert_eq!(got.implementation, "rust");
+    assert_eq!(got.version_major, parts[0]);
+    assert_eq!(got.version_minor, parts[1]);
+    assert_eq!(got.version_patch, parts[2]);
+    assert_eq!(got.format_version_major, 1);
+    assert_eq!(got.format_version_minor, 0);
+    assert_eq!(got.max_alphabet_size, 249);
+}

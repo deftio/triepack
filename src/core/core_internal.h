@@ -18,9 +18,6 @@
 #define TP_MAGIC_2 0x50
 #define TP_MAGIC_3 0x00
 
-#define TP_FORMAT_VERSION_MAJOR 1
-#define TP_FORMAT_VERSION_MINOR 0
-
 /* ── Control codes ──────────────────────────────────────────────────── */
 
 #define TP_CTRL_END          0

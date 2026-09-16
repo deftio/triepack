@@ -427,12 +427,24 @@ void test_move_iterator(void)
 
 /* ── Status strings ──────────────────────────────────────────────────── */
 
+void test_version_metadata(void)
+{
+    triepack::VersionInfo v = triepack::version();
+    TEST_ASSERT_EQUAL_STRING("triepack", v.name);
+    TEST_ASSERT_EQUAL_STRING("c++", v.implementation);
+    /* Same numbers the C library reports; only the implementation differs. */
+    TEST_ASSERT_EQUAL_UINT(1, v.format_version_major);
+    TEST_ASSERT_EQUAL_UINT(0, v.format_version_minor);
+    TEST_ASSERT_EQUAL_size_t(triepack::kMaxAlphabetSize, v.max_alphabet_size);
+    TEST_ASSERT_NOT_NULL(v.version);
+    TEST_ASSERT_TRUE(std::strlen(v.version) >= 5); /* at least "1.2.0" */
+}
+
 void test_status_messages(void)
 {
     TEST_ASSERT_EQUAL_STRING("OK", triepack::message(Status::Ok));
     TEST_ASSERT_EQUAL_STRING("key not found", triepack::message(Status::NotFound));
-    TEST_ASSERT_EQUAL_STRING("operation not implemented",
-                             triepack::message(Status::Unsupported));
+    TEST_ASSERT_EQUAL_STRING("operation not implemented", triepack::message(Status::Unsupported));
     TEST_ASSERT_EQUAL_size_t(249, triepack::kMaxAlphabetSize);
 }
 
@@ -470,6 +482,7 @@ int main(void)
     RUN_TEST(test_move_dict);
     RUN_TEST(test_move_iterator);
     /* Status */
+    RUN_TEST(test_version_metadata);
     RUN_TEST(test_status_messages);
     return UNITY_END();
 }

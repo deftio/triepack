@@ -21,7 +21,7 @@ class TriePackTest {
 
     @Test
     fun testVersion() {
-        assertEquals("1.2.0", VERSION)
+        assertEquals(declaredVersion(), VERSION)
     }
 
     @Test
@@ -409,5 +409,44 @@ class TriePackTest {
         // section plus its byte padding and the 4-byte CRC is the buffer.
         assertEquals(valueStoreOffset, totalDataBits)
         assertEquals(32 + (totalDataBits + 7) / 8 + 4, buf.size)
+    }
+
+
+    // ── Version metadata ──────────────────────────────────────────────
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private fun declaredVersion(): String {
+        var dir: java.io.File? = java.io.File("").absoluteFile
+        while (dir != null) {
+            val candidate = java.io.File(dir, "triepack-version.txt")
+            if (candidate.isFile) return candidate.readText().trim()
+            dir = dir.parentFile
+        }
+        error("cannot locate triepack-version.txt")
+    }
+
+    @Test
+    fun testVersionMatchesSourceOfTruth() {
+        val want = declaredVersion()
+        assertEquals(want, VERSION)
+        assertEquals(want, version().version)
+    }
+
+    @Test
+    fun testVersionMetadataShape() {
+        val want = declaredVersion()
+        val parts = want.split(".").map { it.toInt() }
+        val got = version()
+        assertEquals("triepack", got.name)
+        assertEquals("kotlin", got.implementation)
+        assertEquals(parts[0], got.versionMajor)
+        assertEquals(parts[1], got.versionMinor)
+        assertEquals(parts[2], got.versionPatch)
+        assertEquals(1, got.formatVersionMajor)
+        assertEquals(0, got.formatVersionMinor)
+        assertEquals(249, got.maxAlphabetSize)
     }
 }

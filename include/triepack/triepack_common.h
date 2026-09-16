@@ -147,6 +147,43 @@ typedef enum { TP_CHECKSUM_CRC32 = 0, TP_CHECKSUM_SHA256, TP_CHECKSUM_XXHASH64 }
 #define TP_MAX_NESTING_DEPTH 32 /**< Maximum nesting depth for JSON */
 #define TP_VARINT_MAX_GROUPS 10 /**< Maximum VarInt continuation groups */
 
+/**
+ * @brief Version of the on-disk .trp format this library writes.
+ *
+ * Distinct from the library version: it changes only when the bytes change,
+ * and a reader accepts any minor version of the same major.
+ */
+#define TP_FORMAT_VERSION_MAJOR 1
+#define TP_FORMAT_VERSION_MINOR 0
+
+/* ── Version metadata ────────────────────────────────────────────────── */
+
+/**
+ * @brief What this build of triepack is.
+ *
+ * Every implementation exposes the same fields, so a polyglot system can ask
+ * each one what it is and compare answers. See tp_version().
+ */
+typedef struct tp_version_info {
+    const char *name;           /**< Always "triepack" */
+    const char *implementation; /**< Which implementation answered: "c" */
+    const char *version;        /**< Library version, e.g. "1.2.0" */
+    uint8_t version_major;
+    uint8_t version_minor;
+    uint8_t version_patch;
+    uint8_t format_version_major; /**< .trp format written */
+    uint8_t format_version_minor;
+    uint16_t max_alphabet_size; /**< Distinct key bytes the format can address */
+} tp_version_info;
+
+/**
+ * @brief Return metadata about this build.
+ *
+ * The version derives from triepack-version.txt at build time, so it cannot
+ * drift from the release.
+ */
+tp_version_info tp_version(void);
+
 /* ── Value construction helpers ───────────────────────────────────────── */
 
 /** Create a null value. */

@@ -1,6 +1,7 @@
 # Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
 
 import math
+import os
 
 import pytest
 
@@ -380,3 +381,40 @@ def test_header_declares_exactly_the_bits_written():
     # plus its byte padding and the 4-byte CRC is the buffer.
     assert value_store_offset == total_data_bits
     assert len(buf) == 32 + (total_data_bits + 7) // 8 + 4
+
+
+# -- Version metadata ------------------------------------------------------
+#
+# The version a build reports has to equal triepack-version.txt, the single
+# source of truth. Reading the file rather than a copy of the string is the
+# point: a stale constant fails.
+
+VERSION_FILE = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "triepack-version.txt"
+)
+
+
+def declared_version():
+    with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
+
+def test_version_matches_the_source_of_truth():
+    assert triepack.__version__ == declared_version()
+    assert triepack.version()["version"] == declared_version()
+
+
+def test_version_metadata_shape():
+    declared = declared_version()
+    major, minor, patch = (int(p) for p in declared.split("."))
+    assert triepack.version() == {
+        "name": "triepack",
+        "implementation": "python",
+        "version": declared,
+        "version_major": major,
+        "version_minor": minor,
+        "version_patch": patch,
+        "format_version_major": 1,
+        "format_version_minor": 0,
+        "max_alphabet_size": 249,
+    }

@@ -6,6 +6,11 @@ cmake_minimum_required(VERSION 3.16)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/triepack-version.txt" TRIEPACK_VERSION)
 string(STRIP "${TRIEPACK_VERSION}" TRIEPACK_VERSION)
 
+# Without this, editing the version file leaves the generated header stale:
+# file(READ) runs at configure time and nothing tells CMake to re-run.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             "${CMAKE_CURRENT_SOURCE_DIR}/triepack-version.txt")
+
 project(triepack VERSION ${TRIEPACK_VERSION} LANGUAGES C CXX)
 
 # ── Options ──────────────────────────────────────────────────────────────

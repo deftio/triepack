@@ -327,4 +327,42 @@ final class TriepackTests: XCTestCase {
         XCTAssertEqual(valueStoreOffset, totalDataBits)
         XCTAssertEqual(buf.count, 32 + (totalDataBits + 7) / 8 + 4)
     }
+
+    // MARK: - Version metadata
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private func declaredVersion() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // TriepackTests/
+            .deletingLastPathComponent()   // Tests/
+            .deletingLastPathComponent()   // swift/
+            .deletingLastPathComponent()   // bindings/
+            .deletingLastPathComponent()   // repository root
+            .appendingPathComponent("triepack-version.txt")
+        return try String(contentsOf: url, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func testVersionMatchesSourceOfTruth() throws {
+        let want = try declaredVersion()
+        XCTAssertEqual(Triepack.version, want)
+        XCTAssertEqual(Triepack.versionInfo().version, want)
+    }
+
+    func testVersionMetadataShape() throws {
+        let want = try declaredVersion()
+        let parts = want.split(separator: ".").map { Int($0)! }
+        let got = Triepack.versionInfo()
+        XCTAssertEqual(got.name, "triepack")
+        XCTAssertEqual(got.implementation, "swift")
+        XCTAssertEqual(got.versionMajor, parts[0])
+        XCTAssertEqual(got.versionMinor, parts[1])
+        XCTAssertEqual(got.versionPatch, parts[2])
+        XCTAssertEqual(got.formatVersionMajor, 1)
+        XCTAssertEqual(got.formatVersionMinor, 0)
+        XCTAssertEqual(got.maxAlphabetSize, 249)
+    }
 }

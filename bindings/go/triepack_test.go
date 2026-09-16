@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"testing"
 )
@@ -649,5 +650,49 @@ func TestAlphabetLimit(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// The version a build reports has to equal triepack-version.txt, the single
+// source of truth. Reading the file rather than a copy of the string is the
+// point: a stale constant fails.
+func declaredVersion(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile("../../triepack-version.txt")
+	if err != nil {
+		t.Fatalf("cannot read triepack-version.txt: %v", err)
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func TestVersionMatchesSourceOfTruth(t *testing.T) {
+	want := declaredVersion(t)
+	if Version != want {
+		t.Fatalf("Version = %q, triepack-version.txt = %q", Version, want)
+	}
+	if got := VersionMetadata().Version; got != want {
+		t.Fatalf("VersionMetadata().Version = %q, want %q", got, want)
+	}
+}
+
+func TestVersionMetadataShape(t *testing.T) {
+	want := declaredVersion(t)
+	var major, minor, patch int
+	fmt.Sscanf(want, "%d.%d.%d", &major, &minor, &patch)
+
+	got := VersionMetadata()
+	expected := VersionInfo{
+		Name:               "triepack",
+		Implementation:     "go",
+		Version:            want,
+		VersionMajor:       major,
+		VersionMinor:       minor,
+		VersionPatch:       patch,
+		FormatVersionMajor: 1,
+		FormatVersionMinor: 0,
+		MaxAlphabetSize:    249,
+	}
+	if got != expected {
+		t.Fatalf("VersionMetadata() = %+v, want %+v", got, expected)
 	}
 }

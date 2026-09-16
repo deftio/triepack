@@ -448,4 +448,45 @@ class TriePackTest {
         return ((buf[off] & 0xFF) << 24) | ((buf[off + 1] & 0xFF) << 16)
              | ((buf[off + 2] & 0xFF) << 8) | (buf[off + 3] & 0xFF);
     }
+
+
+    // ── Version metadata ──────────────────────────────────────────────
+    //
+    // The version a build reports has to equal triepack-version.txt, the
+    // single source of truth. Reading the file rather than a copy of the
+    // string is the point: a stale constant fails.
+
+    private static String declaredVersion() throws java.io.IOException {
+        java.nio.file.Path here = java.nio.file.Paths.get("").toAbsolutePath();
+        for (java.nio.file.Path p = here; p != null; p = p.getParent()) {
+            java.nio.file.Path candidate = p.resolve("triepack-version.txt");
+            if (java.nio.file.Files.isRegularFile(candidate)) {
+                return new String(java.nio.file.Files.readAllBytes(candidate),
+                                  java.nio.charset.StandardCharsets.UTF_8).trim();
+            }
+        }
+        throw new IllegalStateException("cannot locate triepack-version.txt from " + here);
+    }
+
+    @Test
+    void testVersionMatchesSourceOfTruth() throws java.io.IOException {
+        String want = declaredVersion();
+        assertEquals(want, TriePack.VERSION);
+        assertEquals(want, TriePack.version().version);
+    }
+
+    @Test
+    void testVersionMetadataShape() throws java.io.IOException {
+        String want = declaredVersion();
+        String[] parts = want.split("\\.");
+        TriePack.VersionInfo got = TriePack.version();
+        assertEquals("triepack", got.name);
+        assertEquals("java", got.implementation);
+        assertEquals(Integer.parseInt(parts[0]), got.versionMajor);
+        assertEquals(Integer.parseInt(parts[1]), got.versionMinor);
+        assertEquals(Integer.parseInt(parts[2]), got.versionPatch);
+        assertEquals(1, got.formatVersionMajor);
+        assertEquals(0, got.formatVersionMinor);
+        assertEquals(249, got.maxAlphabetSize);
+    }
 }

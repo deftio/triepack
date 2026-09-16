@@ -42,6 +42,26 @@ const char *message(Status status);
 /// Largest number of distinct byte values the keys may use.
 extern const size_t kMaxAlphabetSize;
 
+/**
+ * Metadata about a triepack build. Every implementation reports the same
+ * fields, so a polyglot system can ask each one what it is.
+ */
+struct VersionInfo {
+    const char *name;           ///< Always "triepack"
+    const char *implementation; ///< "c++"
+    const char *version;        ///< Library version, e.g. "1.2.0"
+    unsigned version_major;
+    unsigned version_minor;
+    unsigned version_patch;
+    unsigned format_version_major; ///< .trp format written
+    unsigned format_version_minor;
+    size_t max_alphabet_size;
+};
+
+/// Return metadata about this build. The version derives from
+/// triepack-version.txt at build time, so it cannot drift from the release.
+VersionInfo version();
+
 /// The eight value types the format carries.
 enum class Type { Null, Bool, Int, UInt, Float32, Float64, String, Blob };
 
