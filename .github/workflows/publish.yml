@@ -41,6 +41,11 @@ jobs:
       - name: The docs changelog is in sync
         run: ./scripts/sync_changelog.sh --check
 
+      # A registry will not let a version be replaced, so refuse before any
+      # publishing job starts.
+      - name: Not already published
+        run: ./scripts/check_versions.sh
+
   # ---------------------------------------------------------------------------
   # 2. Re-run every target. Nothing is published unless all of this is green.
   # ---------------------------------------------------------------------------

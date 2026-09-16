@@ -219,6 +219,11 @@ ok "triepack-version.txt declares ${VERSION}"
 grep -q "^## \[${VERSION}\]" CHANGELOG.md \
     || die "CHANGELOG.md has no '## [${VERSION}]' section — write the release notes first"
 
+# The repository agreeing with itself is not enough. A version already on a
+# registry cannot be replaced, so check the outside world before building
+# anything: git tags, GitHub releases, npm.
+./scripts/check_versions.sh || die "the declared version is not clear to release"
+
 # --------------------------------------------------------------------------
 # 3. Build and test every target
 # --------------------------------------------------------------------------
