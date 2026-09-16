@@ -1,0 +1,4 @@
+# The test suite reads fixtures from tests/conformance/ in the repository, so
+# it cannot run from an unpacked sdist. Shipping tests that are guaranteed to
+# fail is worse than not shipping them; run them from a checkout instead.
+prune tests

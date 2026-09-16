@@ -73,9 +73,7 @@ free(buf);
 ### Python
 
 ```bash
-# Install (from source, PyPI package coming soon)
-cd bindings/python
-pip install -e .
+pip install triepack
 ```
 
 ```python
@@ -89,13 +87,11 @@ print(result)  # {'hello': 42, 'world': 'foo'}
 ### JavaScript
 
 ```bash
-# Install (from source, npm package coming soon)
-cd bindings/javascript
-npm install
+npm install triepack
 ```
 
 ```js
-const { encode, decode } = require('./src/index');
+const { encode, decode } = require('triepack');
 
 const buf = encode({ hello: 42, world: 'foo' });
 const result = decode(buf);

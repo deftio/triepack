@@ -2,21 +2,36 @@
 
 Native Kotlin implementation of the Triepack `.trp` binary format.
 
-## Status
+Reads and writes the same bytes as the C reference library and every other
+Triepack implementation, checked by the [shared conformance
+suite](https://github.com/deftio/triepack/tree/main/tests/conformance).
 
-Not yet implemented.
+## Use
 
-## Build
+```kotlin
+import com.deftio.triepack.*
 
-```bash
-./gradlew build
+val data = mapOf<String, TpValue?>(
+    "hello" to TpValue.UInt(42),
+    "world" to TpValue.Str("foo"),
+)
+
+val buf = encode(data)
+val result = decode(buf)
 ```
 
-## Test
+## Build and test
 
 ```bash
-./gradlew test
+gradle build
+gradle test
 ```
+
+## Links
+
+- [Documentation](https://deftio.github.io/triepack/)
+- [API reference](https://deftio.github.io/triepack/guide/api-reference/)
+- [Source and issues](https://github.com/deftio/triepack)
 
 ## License
 

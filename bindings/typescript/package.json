@@ -1,7 +1,8 @@
 {
-  "name": "triepack",
-  "version": "0.1.0",
-  "description": "TypeScript wrapper for the Triepack .trp binary format (delegates to JS implementation)",
+  "name": "triepack-typescript",
+  "version": "1.1.0",
+  "private": true,
+  "description": "In-repo TypeScript wrapper over the JavaScript binding. Not published: the npm package 'triepack' ships the JavaScript implementation with its own type declarations (bindings/javascript/src/index.d.ts).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

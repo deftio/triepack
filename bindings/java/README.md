@@ -2,21 +2,35 @@
 
 Native Java implementation of the Triepack `.trp` binary format.
 
-## Status
+Reads and writes the same bytes as the C reference library and every other
+Triepack implementation, checked by the [shared conformance
+suite](https://github.com/deftio/triepack/tree/main/tests/conformance).
 
-Not yet implemented.
+## Use
 
-## Build
+```java
+import com.deftio.triepack.*;
 
-```bash
-./gradlew build
+Map<String, TpValue> data = new LinkedHashMap<>();
+data.put("hello", TpValue.ofUInt(42));
+data.put("world", TpValue.ofString("foo"));
+
+byte[] buf = TriePack.encode(data);
+Map<String, TpValue> result = TriePack.decode(buf);
 ```
 
-## Test
+## Build and test
 
 ```bash
-./gradlew test
+gradle build
+gradle test
 ```
+
+## Links
+
+- [Documentation](https://deftio.github.io/triepack/)
+- [API reference](https://deftio.github.io/triepack/guide/api-reference/)
+- [Source and issues](https://github.com/deftio/triepack)
 
 ## License
 
