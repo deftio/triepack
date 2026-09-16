@@ -64,7 +64,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   version-sync:
-    name: Version strings are in sync
+    name: Derived files are in sync
     runs-on: ubuntu-latest
 
     steps:
@@ -72,9 +72,14 @@ jobs:
         uses: actions/checkout@v4
 
       # triepack-version.txt is the single source of truth; every package
-      # manifest and the docs site derive from it.
-      - name: Check
+      # manifest, every binding's version() and the docs site derive from it.
+      - name: Versions
         run: ./scripts/sync_version.sh --check
+
+      # CHANGELOG.md is the single source of truth for what changed in each
+      # version; docs/releases.md is generated from it.
+      - name: Changelog
+        run: ./scripts/sync_changelog.sh --check
 
   conformance-fixtures:
     name: Conformance corpus is in sync

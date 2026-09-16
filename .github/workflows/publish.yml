@@ -38,6 +38,9 @@ jobs:
       - name: Every version string is in sync
         run: ./scripts/sync_version.sh --check
 
+      - name: The docs changelog is in sync
+        run: ./scripts/sync_changelog.sh --check
+
   # ---------------------------------------------------------------------------
   # 2. Re-run every target. Nothing is published unless all of this is green.
   # ---------------------------------------------------------------------------

@@ -70,16 +70,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`triepack-version.txt`, one source of truth for the release version.**
   CMake reads it directly and the CLI prints the header CMake generates from
-  it; `scripts/sync_version.sh` propagates it to every package manifest, the
-  Kotlin `VERSION` constant, the Python `__version__`, the docs site header and
-  the README, with `--check` failing on drift. CI runs `--check` on every push.
-  All bindings move from 0.1.0 to 1.1.0 to match the C library. The on-disk
-  *format* version is deliberately not synced.
+  it; `scripts/sync_version.sh` propagates it to every package manifest, every
+  binding's `VERSION` constant, the docs site header and the README, with
+  `--check` failing on drift. CI runs `--check` on every push, and each
+  binding's tests read the file and assert that what they report matches, so a
+  stale constant fails in that language rather than shipping. All bindings move
+  from 0.1.0 to match the C library. The on-disk *format* version is
+  deliberately not synced.
+- **`version()` in every implementation** — C (`tp_version`), C++, JavaScript,
+  Python, Go, Rust, Swift, Java and Kotlin all report the same metadata: name,
+  which implementation answered, the library version and its parts, the `.trp`
+  format version they write, and the alphabet ceiling. A polyglot system can
+  ask each one what it is and compare.
+- **`scripts/sync_changelog.sh`** — `docs/releases.md` was a hand-written
+  second copy of the changelog, saying the same things in different words.
+  It is now generated from `CHANGELOG.md`, with `--check` in CI.
+- **`scripts/test-jvm.sh`** — builds and tests the Java and Kotlin bindings
+  with `javac`/`kotlinc` and the JUnit console launcher, fetching a JDK, JUnit
+  and the Kotlin compiler into a gitignored cache rather than installing
+  anything. The local release gate now covers all nine targets on a machine
+  with no JVM toolchain.
 - **`scripts/make-release.sh`** — builds and tests every target, and only if
-  all of it is green drives the release: version bump on a release branch, PR,
-  wait for CI, squash-merge, tag. `--check` runs the gate alone; `--dry-run`
-  prints the git and gh commands. A missing toolchain fails rather than
-  silently skipping. See `RELEASE.md`.
+  all of it is green drives the release: PR if the version bump has not landed
+  yet, wait for CI, squash-merge, tag. It *reads* the version and never sets
+  it; passing `--version` is an error that says so. A version bump is an
+  ordinary reviewed change, which keeps the shipped version the one that was
+  reviewed and makes the script safe to run as a check. `--check` runs the gate
+  alone; `--dry-run` prints the git and gh commands. See `RELEASE.md`.
 - **npm publishing.** The `triepack` package is built from
   `bindings/javascript`, ships bundled TypeScript declarations
   (`src/index.d.ts`), and publishes from `publish.yml` only after the whole
