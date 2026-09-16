@@ -429,6 +429,76 @@ tp_result tp_dict_get_info(const tp_dict *dict, tp_dict_info *info)
 
 /* ── Iteration ──────────────────────────────────────────────────────── */
 
+/**
+ * The trie stream does not say where a subtree ends, so the walk carries the
+ * bound: a child with a SKIP ends at child_start + skip, the last child ends
+ * where its parent does, and the root ends at the value store. A terminal is
+ * followed by a BRANCH exactly when its subtree has not reached that bound.
+ */
+
+static tp_result iter_key_reserve(tp_iterator *it, size_t needed)
+{
+    if (needed <= it->key_buf_cap)
+        return TP_OK;
+    size_t cap = it->key_buf_cap ? it->key_buf_cap : 256;
+    while (cap < needed)
+        cap *= 2;
+    char *grown = realloc(it->key_buf, cap);
+    if (!grown)
+        return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
+    it->key_buf = grown;
+    it->key_buf_cap = cap;
+    return TP_OK;
+}
+
+static tp_result iter_push_key(tp_iterator *it, uint8_t byte)
+{
+    tp_result rc = iter_key_reserve(it, it->key_len + 1);
+    if (rc != TP_OK)
+        return rc; /* LCOV_EXCL_LINE */
+    it->key_buf[it->key_len++] = (char)byte;
+    return TP_OK;
+}
+
+/** Decode the value at store index `index`, keeping the cursor in step. */
+static tp_result iter_value_at(tp_iterator *it, uint64_t index, tp_value *val)
+{
+    if (!it->dict->info.has_values) {
+        *val = tp_value_null();
+        return TP_OK;
+    }
+
+    tp_bitstream_reader *r = NULL;
+    tp_result rc = tp_bs_reader_create(&r, it->dict->buf, (uint64_t)it->dict->len * 8);
+    if (rc != TP_OK)
+        return rc; /* LCOV_EXCL_LINE */
+
+    if (index != it->value_index) {
+        /* Cursor is elsewhere — walk the store from the start. */
+        rc = tp_bs_reader_seek(r, it->dict->value_start);
+        for (uint64_t i = 0; rc == TP_OK && i < index; i++) {
+            tp_value skip;
+            rc = tp_value_decode(r, &skip, it->dict->buf);
+        }
+        if (rc != TP_OK) {
+            tp_bs_reader_destroy(&r);
+            return rc;
+        }
+        it->value_pos = tp_bs_reader_position(r);
+        it->value_index = index;
+    }
+
+    rc = tp_bs_reader_seek(r, it->value_pos);
+    if (rc == TP_OK)
+        rc = tp_value_decode(r, val, it->dict->buf);
+    if (rc == TP_OK) {
+        it->value_pos = tp_bs_reader_position(r);
+        it->value_index = index + 1;
+    }
+    tp_bs_reader_destroy(&r);
+    return rc;
+}
+
 tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out)
 {
     if (!dict || !out)
@@ -439,8 +509,6 @@ tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out)
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     it->dict = dict;
-    it->pos = dict->trie_start;
-    it->done = false;
     it->key_buf = malloc(256);
     if (!it->key_buf) {
         /* LCOV_EXCL_START */
@@ -449,9 +517,10 @@ tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out)
         /* LCOV_EXCL_STOP */
     }
     it->key_buf_cap = 256;
-    it->key_len = 0;
-    it->stack_top = -1;
-    it->started = false;
+    it->root_pos = dict->trie_start;
+    it->root_end = dict->value_start;
+    it->root_key_len = 0;
+    tp_iter_reset(it);
     *out = it;
     return TP_OK;
 }
@@ -460,30 +529,195 @@ tp_result tp_iter_next(tp_iterator *it, const char **key, size_t *key_len, tp_va
 {
     if (!it)
         return TP_ERR_INVALID_PARAM;
-
     if (it->done)
         return TP_ERR_EOF;
+    if (it->dict->info.num_keys == 0) {
+        it->done = true;
+        return TP_ERR_EOF;
+    }
 
-    /* Simple iteration: scan through all keys using sequential lookup */
-    /* For v0.1, we just do a linear scan of sorted entries from the encoder.
-       A proper implementation would walk the trie directly. Since we don't
-       store the sorted entry list in the dict, we return EOF for now. */
-    it->done = true;
-    (void)key;
-    (void)key_len;
-    (void)val;
-    return TP_ERR_EOF;
+    const tp_symbol_info *sym = &it->dict->sym;
+    uint8_t bps = sym->bits_per_symbol;
+
+    tp_bitstream_reader *r = NULL;
+    tp_result rc = tp_bs_reader_create(&r, it->dict->buf, (uint64_t)it->dict->len * 8);
+    if (rc != TP_OK)
+        return rc; /* LCOV_EXCL_LINE */
+
+    uint64_t subtree_end;
+    bool descending;
+
+    if (!it->started) {
+        it->started = true;
+        it->pos = it->root_pos;
+        it->key_len = it->root_key_len;
+        subtree_end = it->root_end;
+        descending = true;
+    } else {
+        subtree_end = 0;
+        descending = false;
+    }
+
+#define ITER_FAIL(code)           \
+    do {                          \
+        tp_bs_reader_destroy(&r); \
+        it->done = true;          \
+        return (code);            \
+    } while (0)
+
+    for (;;) {
+        if (!descending) {
+            /* Move to the next unvisited sibling, unwinding finished frames. */
+            while (it->stack_top >= 0 && it->stack[it->stack_top].remaining == 0)
+                it->stack_top--;
+            if (it->stack_top < 0) {
+                tp_bs_reader_destroy(&r);
+                it->done = true;
+                return TP_ERR_EOF;
+            }
+
+            tp_iter_frame *f = &it->stack[it->stack_top];
+            it->key_len = f->key_prefix_len;
+            rc = tp_bs_reader_seek(r, f->next_child_pos);
+            if (rc != TP_OK)
+                ITER_FAIL(rc); /* LCOV_EXCL_LINE */
+
+            if (f->remaining > 1) {
+                /* Every child but the last is introduced by SKIP + distance,
+                   which is also where the following sibling begins. */
+                uint64_t skip_sym;
+                rc = tp_bs_read_bits(r, bps, &skip_sym);
+                if (rc != TP_OK)
+                    ITER_FAIL(rc);
+                if ((uint32_t)skip_sym != sym->ctrl_codes[TP_CTRL_SKIP])
+                    ITER_FAIL(TP_ERR_CORRUPT);
+                uint64_t dist;
+                rc = tp_bs_read_varint_u(r, &dist);
+                if (rc != TP_OK)
+                    ITER_FAIL(rc);
+                it->pos = tp_bs_reader_position(r);
+                subtree_end = it->pos + dist;
+                f->next_child_pos = it->pos + dist;
+            } else {
+                it->pos = f->next_child_pos;
+                subtree_end = f->subtree_end;
+            }
+            f->remaining--;
+            descending = true;
+        }
+
+        rc = tp_bs_reader_seek(r, it->pos);
+        if (rc != TP_OK)
+            ITER_FAIL(rc); /* LCOV_EXCL_LINE */
+
+        /* Walk down this subtree until it yields a key or a branch. */
+        bool emitted = false;
+        while (tp_bs_reader_position(r) < subtree_end) {
+            uint64_t raw;
+            rc = tp_bs_read_bits(r, bps, &raw);
+            if (rc != TP_OK)
+                ITER_FAIL(rc);
+            uint32_t code = (uint32_t)raw;
+
+            bool terminal =
+                (code == sym->ctrl_codes[TP_CTRL_END] || code == sym->ctrl_codes[TP_CTRL_END_VAL]);
+
+            if (terminal) {
+                /* END carries no index because its value is null; END_VAL
+                   names the slot in the value store. */
+                bool has_index = (code == sym->ctrl_codes[TP_CTRL_END_VAL]);
+                uint64_t vi = 0;
+                if (has_index) {
+                    rc = tp_bs_read_varint_u(r, &vi);
+                    if (rc != TP_OK)
+                        ITER_FAIL(rc);
+                }
+
+                /* A BRANCH follows exactly when the subtree continues. */
+                if (tp_bs_reader_position(r) < subtree_end) {
+                    uint64_t bsym;
+                    rc = tp_bs_read_bits(r, bps, &bsym);
+                    if (rc != TP_OK)
+                        ITER_FAIL(rc);
+                    if ((uint32_t)bsym != sym->ctrl_codes[TP_CTRL_BRANCH])
+                        ITER_FAIL(TP_ERR_CORRUPT);
+                    uint64_t nchildren;
+                    rc = tp_bs_read_varint_u(r, &nchildren);
+                    if (rc != TP_OK)
+                        ITER_FAIL(rc);
+                    if (it->stack_top + 1 >= TP_ITER_MAX_DEPTH)
+                        ITER_FAIL(TP_ERR_OVERFLOW);
+                    tp_iter_frame *nf = &it->stack[++it->stack_top];
+                    nf->subtree_end = subtree_end;
+                    nf->next_child_pos = tp_bs_reader_position(r);
+                    nf->remaining = (uint32_t)nchildren;
+                    nf->key_prefix_len = it->key_len;
+                }
+
+                tp_value decoded = tp_value_null();
+                if (has_index) {
+                    rc = iter_value_at(it, vi, &decoded);
+                    if (rc != TP_OK)
+                        ITER_FAIL(rc);
+                }
+                if (val)
+                    *val = decoded;
+                if (key)
+                    *key = it->key_buf;
+                if (key_len)
+                    *key_len = it->key_len;
+                emitted = true;
+                break;
+            }
+
+            if (code == sym->ctrl_codes[TP_CTRL_BRANCH]) {
+                uint64_t nchildren;
+                rc = tp_bs_read_varint_u(r, &nchildren);
+                if (rc != TP_OK)
+                    ITER_FAIL(rc);
+                if (it->stack_top + 1 >= TP_ITER_MAX_DEPTH)
+                    ITER_FAIL(TP_ERR_OVERFLOW);
+                tp_iter_frame *nf = &it->stack[++it->stack_top];
+                nf->subtree_end = subtree_end;
+                nf->next_child_pos = tp_bs_reader_position(r);
+                nf->remaining = (uint32_t)nchildren;
+                nf->key_prefix_len = it->key_len;
+                descending = false;
+                break;
+            }
+
+            /* Regular symbol: extends the key. */
+            if (code < 256 && sym->code_is_ctrl[code])
+                ITER_FAIL(TP_ERR_CORRUPT);
+            rc = iter_push_key(it, code < 256 ? sym->reverse_map[code] : 0);
+            if (rc != TP_OK)
+                ITER_FAIL(rc); /* LCOV_EXCL_LINE */
+        }
+
+        if (emitted) {
+            tp_bs_reader_destroy(&r);
+            return TP_OK;
+        }
+        if (descending) {
+            /* Ran to the subtree end without a terminal: try the next sibling. */
+            descending = false;
+        }
+    }
+
+#undef ITER_FAIL
 }
 
 tp_result tp_iter_reset(tp_iterator *it)
 {
     if (!it)
         return TP_ERR_INVALID_PARAM;
-    it->pos = it->dict->trie_start;
+    it->pos = it->root_pos;
     it->done = false;
-    it->key_len = 0;
+    it->key_len = it->root_key_len;
     it->stack_top = -1;
     it->started = false;
+    it->value_pos = it->dict->value_start;
+    it->value_index = 0;
     return TP_OK;
 }
 
@@ -501,11 +735,188 @@ tp_result tp_iter_destroy(tp_iterator **it)
 
 /* ── Search ─────────────────────────────────────────────────────────── */
 
+/**
+ * Walk down the trie consuming `prefix`, and report the subtree that holds
+ * every key starting with it.
+ *
+ * On success *sub_pos / *sub_end bound that subtree. TP_ERR_NOT_FOUND means no
+ * key has the prefix.
+ */
+static tp_result descend_to_prefix(const tp_dict *dict, const uint8_t *prefix, size_t prefix_len,
+                                   uint64_t *sub_pos, uint64_t *sub_end)
+{
+    const tp_symbol_info *sym = &dict->sym;
+    uint8_t bps = sym->bits_per_symbol;
+
+    tp_bitstream_reader *r = NULL;
+    tp_result rc = tp_bs_reader_create(&r, dict->buf, (uint64_t)dict->len * 8);
+    if (rc != TP_OK)
+        return rc; /* LCOV_EXCL_LINE */
+
+    uint64_t pos = dict->trie_start;
+    uint64_t end = dict->value_start;
+    size_t matched = 0;
+
+#define PREFIX_FAIL(code)         \
+    do {                          \
+        tp_bs_reader_destroy(&r); \
+        return (code);            \
+    } while (0)
+
+    for (;;) {
+        if (matched == prefix_len) {
+            *sub_pos = pos;
+            *sub_end = end;
+            tp_bs_reader_destroy(&r);
+            return TP_OK;
+        }
+        if (pos >= end)
+            PREFIX_FAIL(TP_ERR_NOT_FOUND);
+
+        rc = tp_bs_reader_seek(r, pos);
+        if (rc != TP_OK)
+            PREFIX_FAIL(rc); /* LCOV_EXCL_LINE */
+
+        uint64_t raw;
+        rc = tp_bs_read_bits(r, bps, &raw);
+        if (rc != TP_OK)
+            PREFIX_FAIL(rc);
+        uint32_t code = (uint32_t)raw;
+
+        bool at_branch = false;
+        if (code == sym->ctrl_codes[TP_CTRL_END] || code == sym->ctrl_codes[TP_CTRL_END_VAL]) {
+            if (code == sym->ctrl_codes[TP_CTRL_END_VAL]) {
+                uint64_t vi;
+                rc = tp_bs_read_varint_u(r, &vi);
+                if (rc != TP_OK)
+                    PREFIX_FAIL(rc);
+            }
+            /* The prefix is longer than this key, so it can only continue
+               through the BRANCH that follows — if the subtree continues. */
+            if (tp_bs_reader_position(r) >= end)
+                PREFIX_FAIL(TP_ERR_NOT_FOUND);
+            rc = tp_bs_read_bits(r, bps, &raw);
+            if (rc != TP_OK)
+                PREFIX_FAIL(rc);
+            if ((uint32_t)raw != sym->ctrl_codes[TP_CTRL_BRANCH])
+                PREFIX_FAIL(TP_ERR_CORRUPT);
+            at_branch = true;
+        } else if (code == sym->ctrl_codes[TP_CTRL_BRANCH]) {
+            at_branch = true;
+        }
+
+        if (!at_branch) {
+            /* Literal symbol: it has to be the prefix byte we are looking for. */
+            if (code < 256 && sym->code_is_ctrl[code])
+                PREFIX_FAIL(TP_ERR_CORRUPT);
+            uint8_t byte = code < 256 ? sym->reverse_map[code] : 0;
+            if (byte != prefix[matched])
+                PREFIX_FAIL(TP_ERR_NOT_FOUND);
+            matched++;
+            pos = tp_bs_reader_position(r);
+            continue;
+        }
+
+        /* At a BRANCH: take the child whose first symbol is the prefix byte. */
+        uint64_t nchildren;
+        rc = tp_bs_read_varint_u(r, &nchildren);
+        if (rc != TP_OK)
+            PREFIX_FAIL(rc);
+
+        uint64_t child_preamble = tp_bs_reader_position(r);
+        uint32_t want = sym->symbol_map[prefix[matched]];
+        bool descended = false;
+
+        for (uint64_t c = 0; c < nchildren; c++) {
+            rc = tp_bs_reader_seek(r, child_preamble);
+            if (rc != TP_OK)
+                PREFIX_FAIL(rc); /* LCOV_EXCL_LINE */
+
+            uint64_t child_start, child_end;
+            if (c + 1 < nchildren) {
+                uint64_t skip_sym;
+                rc = tp_bs_read_bits(r, bps, &skip_sym);
+                if (rc != TP_OK)
+                    PREFIX_FAIL(rc);
+                if ((uint32_t)skip_sym != sym->ctrl_codes[TP_CTRL_SKIP])
+                    PREFIX_FAIL(TP_ERR_CORRUPT);
+                uint64_t dist;
+                rc = tp_bs_read_varint_u(r, &dist);
+                if (rc != TP_OK)
+                    PREFIX_FAIL(rc);
+                child_start = tp_bs_reader_position(r);
+                child_end = child_start + dist;
+                child_preamble = child_start + dist;
+            } else {
+                child_start = child_preamble;
+                child_end = end;
+            }
+
+            uint64_t first;
+            rc = tp_bs_read_bits_at(dict->buf, child_start, bps, &first);
+            if (rc != TP_OK)
+                PREFIX_FAIL(rc); /* LCOV_EXCL_LINE */
+
+            if ((uint32_t)first == want) {
+                pos = child_start;
+                end = child_end;
+                descended = true;
+                break;
+            }
+        }
+
+        if (!descended)
+            PREFIX_FAIL(TP_ERR_NOT_FOUND);
+    }
+
+#undef PREFIX_FAIL
+}
+
 tp_result tp_dict_find_prefix(const tp_dict *dict, const char *prefix, tp_iterator **out)
 {
     if (!dict || !prefix || !out)
         return TP_ERR_INVALID_PARAM;
-    return tp_dict_iterate(dict, out);
+
+    tp_iterator *it = NULL;
+    tp_result rc = tp_dict_iterate(dict, &it);
+    if (rc != TP_OK)
+        return rc; /* LCOV_EXCL_LINE */
+
+    size_t prefix_len = strlen(prefix);
+    if (prefix_len == 0 || dict->info.num_keys == 0) {
+        *out = it;
+        return TP_OK;
+    }
+
+    uint64_t sub_pos = 0, sub_end = 0;
+    rc = descend_to_prefix(dict, (const uint8_t *)prefix, prefix_len, &sub_pos, &sub_end);
+    if (rc == TP_ERR_NOT_FOUND) {
+        /* No key has this prefix: hand back an iterator that yields nothing. */
+        it->done = true;
+        *out = it;
+        return TP_OK;
+    }
+    if (rc != TP_OK) {
+        tp_iter_destroy(&it);
+        return rc;
+    }
+
+    /* Seed the iterator with the prefix already in place, then let it walk
+       only the subtree below it. */
+    if (iter_key_reserve(it, prefix_len) != TP_OK) {
+        /* LCOV_EXCL_START */
+        tp_iter_destroy(&it);
+        return TP_ERR_ALLOC;
+        /* LCOV_EXCL_STOP */
+    }
+    memcpy(it->key_buf, prefix, prefix_len);
+    it->root_pos = sub_pos;
+    it->root_end = sub_end;
+    it->root_key_len = prefix_len;
+
+    tp_iter_reset(it);
+    *out = it;
+    return TP_OK;
 }
 
 tp_result tp_dict_find_fuzzy(const tp_dict *dict, const char *query, uint8_t max_dist,
@@ -513,8 +924,13 @@ tp_result tp_dict_find_fuzzy(const tp_dict *dict, const char *query, uint8_t max
 {
     if (!dict || !query || !out)
         return TP_ERR_INVALID_PARAM;
+    /* Bounded edit-distance search over the trie is not implemented. Saying so
+       beats handing back an iterator over every key, which — now that
+       iteration works — would look like a successful fuzzy match for
+       anything. */
     (void)max_dist;
-    return tp_dict_iterate(dict, out);
+    *out = NULL;
+    return TP_ERR_UNSUPPORTED;
 }
 
 tp_result tp_iter_get_distance(const tp_iterator *it, uint8_t *dist)

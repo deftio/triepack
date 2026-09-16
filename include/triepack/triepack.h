@@ -122,13 +122,20 @@ tp_result tp_dict_get_info(const tp_dict *dict, tp_dict_info *info);
 
 /* ── Iteration ───────────────────────────────────────────────────────── */
 
-/** Create an iterator over all keys in the dictionary. */
+/**
+ * @brief Create an iterator over all keys in the dictionary.
+ *
+ * Keys come out in lexicographic byte order. The iterator borrows @p dict,
+ * which must outlive it.
+ */
 tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out);
 
 /**
  * @brief Advance to the next key/value pair.
  *
- * Returns TP_ERR_EOF when there are no more entries.
+ * @p key points into the iterator's own buffer and stays valid until the next
+ * call; string and blob values point into the dictionary buffer. Returns
+ * TP_ERR_EOF when there are no more entries.
  */
 tp_result tp_iter_next(tp_iterator *it, const char **key, size_t *key_len, tp_value *val);
 
@@ -140,7 +147,13 @@ tp_result tp_iter_destroy(tp_iterator **it);
 
 /* ── Search ──────────────────────────────────────────────────────────── */
 
-/** Find all keys with the given prefix; results via iterator. */
+/**
+ * @brief Find all keys with the given prefix; results via iterator.
+ *
+ * The descent costs one pass over the prefix, not over the dictionary. An
+ * empty prefix iterates everything; a prefix no key has yields an iterator
+ * that returns TP_ERR_EOF on the first call.
+ */
 tp_result tp_dict_find_prefix(const tp_dict *dict, const char *prefix, tp_iterator **out);
 
 /**
@@ -150,6 +163,8 @@ tp_result tp_dict_find_prefix(const tp_dict *dict, const char *prefix, tp_iterat
  * @param query     Query string to match against.
  * @param max_dist  Maximum Levenshtein distance (0..2 recommended).
  * @param out       Receives an iterator over matching keys.
+ *
+ * @note Not implemented: returns TP_ERR_UNSUPPORTED.
  */
 tp_result tp_dict_find_fuzzy(const tp_dict *dict, const char *query, uint8_t max_dist,
                              tp_iterator **out);
