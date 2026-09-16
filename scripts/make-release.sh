@@ -7,16 +7,19 @@
 # squash-merge, tag. Pushing the tag is what triggers the GitHub Release and
 # the npm publish, so nothing reaches a registry that has not passed CI.
 #
-#   ./scripts/make-release.sh --check              # local gate only, no git actions
-#   ./scripts/make-release.sh --version 1.2.0      # full release
-#   ./scripts/make-release.sh --version 1.2.0 --dry-run
+#   ./scripts/make-release.sh --check      # local gate only, no git actions
+#   ./scripts/make-release.sh              # release whatever the file declares
+#   ./scripts/make-release.sh --dry-run
+#
+# The version comes from triepack-version.txt and nowhere else. To release a
+# new version, edit that file, run scripts/sync_version.sh, and land the
+# result through the normal review flow — then run this. This script reads the
+# version; it never decides it.
 #
 # Options:
-#   --version X.Y.Z   Version to release. Written to triepack-version.txt and
-#                     propagated by scripts/sync_version.sh.
 #   --check           Run the build/test gate and stop. No commits, no PR, no
-#                     tag. Use this any time; it is also what --version runs
-#                     before touching git.
+#                     tag. Use this any time; it is also what a real release
+#                     runs before touching git.
 #   --skip a,b,c      Targets to skip, comma-separated, when a toolchain is
 #                     genuinely unavailable. A missing toolchain is otherwise
 #                     a failure: a release must be tested on every target.
@@ -58,12 +61,15 @@ ALL_TARGETS=(c js ts python go rust swift java kotlin)
 # --------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --version)
-            VERSION="${2:-}"
-            [[ -z "${VERSION}" ]] && { echo "--version needs X.Y.Z" >&2; exit 2; }
-            shift 2
+        --version|--version=*)
+            echo -e "${RED}make-release.sh does not set the version.${NC}" >&2
+            echo "The version lives in triepack-version.txt. To release a new one:" >&2
+            echo "  1. edit triepack-version.txt" >&2
+            echo "  2. ./scripts/sync_version.sh" >&2
+            echo "  3. commit and land it through review" >&2
+            echo "  4. ./scripts/make-release.sh" >&2
+            exit 2
             ;;
-        --version=*) VERSION="${1#*=}"; shift ;;
         --check)     CHECK_ONLY=1; shift ;;
         --skip)
             SKIP_LIST="${2:-}"
@@ -85,15 +91,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ ${CHECK_ONLY} -eq 0 && -z "${VERSION}" ]]; then
-    echo -e "${RED}Give --version X.Y.Z, or --check to run the gate only.${NC}" >&2
-    exit 2
-fi
-
-if [[ -n "${VERSION}" && ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo -e "${RED}Version must be X.Y.Z, got '${VERSION}'${NC}" >&2
-    exit 2
-fi
 
 # --------------------------------------------------------------------------
 # Helpers
@@ -181,22 +178,24 @@ fi
 # --------------------------------------------------------------------------
 # 2. Version
 # --------------------------------------------------------------------------
-if [[ -n "${VERSION}" ]]; then
-    step "Setting version to ${VERSION}"
-    CURRENT=$(head -1 triepack-version.txt | tr -d '[:space:]')
-    if [[ "${CURRENT}" == "${VERSION}" ]]; then
-        ok "triepack-version.txt already reads ${VERSION}"
-    else
-        echo "${VERSION}" > triepack-version.txt
-        ok "triepack-version.txt: ${CURRENT} -> ${VERSION}"
-    fi
-    ./scripts/sync_version.sh | sed 's/^/  /'
-else
-    step "Checking version consistency"
-    VERSION=$(head -1 triepack-version.txt | tr -d '[:space:]')
-    ./scripts/sync_version.sh --check | sed 's/^/  /' \
-        || die "version strings have drifted; run ./scripts/sync_version.sh"
-fi
+step "Reading the version"
+
+VERSION=$(head -1 triepack-version.txt | tr -d '[:space:]')
+[[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    || die "triepack-version.txt must hold a bare X.Y.Z version, got '${VERSION}'"
+ok "triepack-version.txt declares ${VERSION}"
+
+# Every manifest, constant and page has to already agree. This script does not
+# fix drift: a version bump is a reviewed change like any other.
+./scripts/sync_version.sh --check | sed 's/^/  /' \
+    || die "version strings have drifted; run ./scripts/sync_version.sh and commit the result"
+
+# CHANGELOG.md is the single source of truth for what changed in each version.
+./scripts/sync_changelog.sh --check | sed 's/^/  /' \
+    || die "docs/releases.md is stale; run ./scripts/sync_changelog.sh and commit the result"
+
+grep -q "^## \[${VERSION}\]" CHANGELOG.md \
+    || die "CHANGELOG.md has no '## [${VERSION}]' section — write the release notes first"
 
 # --------------------------------------------------------------------------
 # 3. Build and test every target
@@ -308,41 +307,32 @@ fi
 # --------------------------------------------------------------------------
 # 5. Release branch, PR, CI, squash-merge
 # --------------------------------------------------------------------------
-step "Preparing the release commit"
+step "Checking the release state"
 
 DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null || echo main)
-RELEASE_BRANCH="release/v${VERSION}"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 TAG="v${VERSION}"
 
 if git rev-parse "${TAG}" >/dev/null 2>&1; then
-    die "tag ${TAG} already exists"
+    die "tag ${TAG} already exists — bump triepack-version.txt for a new release"
 fi
+ok "tag ${TAG} is free"
 
-if [[ -z "$(git status --porcelain)" ]]; then
-    ok "nothing to commit — version files already match ${VERSION}"
-    COMMIT_NEEDED=0
-else
-    COMMIT_NEEDED=1
-    git --no-pager diff --stat | sed 's/^/  /'
-    confirm "Commit these version changes?" || die "declined"
-fi
-
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# The version bump is an ordinary reviewed change, so by release time it is
+# usually already on the default branch and there is nothing to do but tag.
+# Running from a branch that still carries it is also fine: that branch is
+# taken through review first.
 if [[ "${CURRENT_BRANCH}" == "${DEFAULT_BRANCH}" ]]; then
-    run_git git checkout -b "${RELEASE_BRANCH}"
-    ok "created ${RELEASE_BRANCH}"
+    NEEDS_PR=0
+    ok "on ${DEFAULT_BRANCH}; ${VERSION} is already landed"
 else
-    RELEASE_BRANCH="${CURRENT_BRANCH}"
-    ok "releasing from the current branch ${RELEASE_BRANCH}"
+    NEEDS_PR=1
+    ok "on ${CURRENT_BRANCH}, which still has to land"
 fi
 
-if [[ ${COMMIT_NEEDED} -eq 1 ]]; then
-    run_git git add -A
-    run_git git commit -m "Bump version to ${VERSION}"
-    ok "committed the version bump"
-fi
-
+if [[ ${NEEDS_PR} -eq 1 ]]; then
 step "Opening the pull request"
+RELEASE_BRANCH="${CURRENT_BRANCH}"
 run_git git push -u origin "${RELEASE_BRANCH}"
 
 if [[ ${DRY_RUN} -eq 1 ]]; then
@@ -381,12 +371,15 @@ step "Merging"
 confirm "Squash-merge the release PR into ${DEFAULT_BRANCH}?" || die "declined"
 run_git gh pr merge --squash --delete-branch
 
+run_git git checkout "${DEFAULT_BRANCH}"
+run_git git pull --ff-only origin "${DEFAULT_BRANCH}"
+
+fi  # NEEDS_PR
+
 # --------------------------------------------------------------------------
 # 6. Tag — this is what publishes
 # --------------------------------------------------------------------------
 step "Tagging ${TAG}"
-run_git git checkout "${DEFAULT_BRANCH}"
-run_git git pull --ff-only origin "${DEFAULT_BRANCH}"
 
 confirm "Tag ${TAG} and push? This publishes the GitHub Release and npm package." \
     || die "declined — merge is done; tag manually when ready"
