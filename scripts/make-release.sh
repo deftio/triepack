@@ -270,28 +270,22 @@ run_target swift "Swift" swift gate_swift
 # which compiles with javac/kotlinc directly and fetches whatever is missing
 # into .jvm-toolchain/ — so neither target has to be skipped for want of a
 # build system.
-gate_java() {
-    if have gradle; then
-        cd bindings/java && gradle --quiet --console=plain test
-    else
-        ./scripts/test-jvm.sh java
-    fi
-}
-run_target java "Java" curl gate_java
+# --gradle runs the real build.gradle files, which is what CI does. The direct
+# javac/kotlinc path compiles the same sources without touching those files,
+# so it cannot catch a problem in them — and it did not catch the Kotlin
+# plugin refusing JVM target 21.
+gate_java() { ./scripts/test-jvm.sh --gradle java; }
+run_target java "Java (Gradle)" curl gate_java
 
-gate_kotlin() {
-    if have gradle; then
-        cd bindings/kotlin && gradle --quiet --console=plain test
-    else
-        ./scripts/test-jvm.sh kotlin
-    fi
-}
-run_target kotlin "Kotlin" curl gate_kotlin
+gate_kotlin() { ./scripts/test-jvm.sh --gradle kotlin; }
+run_target kotlin "Kotlin (Gradle)" curl gate_kotlin
 
 # --------------------------------------------------------------------------
 # 4. Gate summary
 # --------------------------------------------------------------------------
 step "Gate summary"
+echo -e "  ${YELLOW}Not covered here: the ubuntu-only CI jobs (gcc zero-warning gate,${NC}"
+echo -e "  ${YELLOW}Swift on Linux). Run ./scripts/test-ci-linux.sh for those.${NC}"
 if [[ ${#SKIPPED[@]} -gt 0 ]]; then
     echo -e "  ${YELLOW}Skipped targets: ${SKIPPED[*]}${NC}"
     echo -e "  ${YELLOW}These were NOT tested. CI will still run them on the PR.${NC}"

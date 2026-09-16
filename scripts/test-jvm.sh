@@ -15,9 +15,15 @@
 #   JUnit        junit-platform-console-standalone, ~2.6 MB
 #   kotlinc      the Kotlin compiler, ~80 MB, only for the Kotlin target
 #
-#   ./scripts/test-jvm.sh            # both bindings
+#   ./scripts/test-jvm.sh            # both bindings, javac/kotlinc directly
 #   ./scripts/test-jvm.sh java
 #   ./scripts/test-jvm.sh kotlin
+#   ./scripts/test-jvm.sh --gradle   # build with Gradle, exactly as CI does
+#
+# --gradle fetches Gradle into the same cache and runs the real build.gradle
+# files. Slower, but it is what CI runs: the direct path compiles the same
+# sources without ever touching those files, so it cannot catch a problem in
+# them.
 #
 # Set JAVA_HOME to use a JDK you already have. Set TRIEPACK_JVM_CACHE to put
 # the downloads somewhere other than .jvm-toolchain/ in the repository.
@@ -41,7 +47,17 @@ JDK_FEATURE=21
 JUNIT_VERSION="1.10.0"
 KOTLIN_VERSION="1.9.24"
 
-TARGET="${1:-both}"
+USE_GRADLE=0
+GRADLE_VERSION="8.10"   # keep in step with .github/workflows/
+ARGS=()
+for a in "$@"; do
+    case "$a" in
+        --gradle) USE_GRADLE=1 ;;
+        *)        ARGS+=("$a") ;;
+    esac
+done
+
+TARGET="${ARGS[0]:-both}"
 case "${TARGET}" in
     java|kotlin|both) ;;
     -h|--help)
@@ -163,6 +179,54 @@ run_suite() {
     fi
     ok "${label}: ${passed} tests"
 }
+
+# --------------------------------------------------------------------------
+# Gradle path — the real build files, as CI runs them
+# --------------------------------------------------------------------------
+if [[ ${USE_GRADLE} -eq 1 ]]; then
+    GRADLE_DIR="${CACHE}/gradle-${GRADLE_VERSION}"
+    if [[ ! -x "${GRADLE_DIR}/bin/gradle" ]]; then
+        info "fetching Gradle ${GRADLE_VERSION} (~130 MB, once)"
+        curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            -o "${CACHE}/gradle.zip" || die "Gradle download failed"
+        (cd "${CACHE}" && unzip -q -o gradle.zip && rm -f gradle.zip)
+    fi
+    ok "Gradle ${GRADLE_VERSION}"
+
+    run_gradle() {
+        local label="$1" dir="$2"
+        echo -e "\n${BOLD}${label} (Gradle)${NC}"
+        local out
+        if ! out=$(cd "${dir}" && JAVA_HOME="${JAVA_HOME_RESOLVED}" \
+                   "${GRADLE_DIR}/bin/gradle" --no-daemon --console=plain test 2>&1); then
+            echo "${out}" | tail -30
+            die "${label} Gradle build failed"
+        fi
+        # Gradle reports pass/fail per test; count from the JUnit XML it writes.
+        local counts
+        counts=$(python3 - "${dir}/build/test-results/test" <<'PYCOUNT'
+import glob, sys, xml.etree.ElementTree as ET
+t = f = 0
+for p in glob.glob(sys.argv[1] + "/*.xml"):
+    r = ET.parse(p).getroot()
+    t += int(r.get("tests", 0))
+    f += int(r.get("failures", 0)) + int(r.get("errors", 0))
+print("%d %d" % (t, f))
+PYCOUNT
+)
+        local total failed
+        total=$(echo "${counts}" | cut -d' ' -f1)
+        failed=$(echo "${counts}" | cut -d' ' -f2)
+        [[ "${failed}" == "0" && "${total}" -gt 0 ]] || die "${label}: ${failed} failed of ${total}"
+        ok "${label}: ${total} tests"
+    }
+
+    [[ "${TARGET}" == "java"   || "${TARGET}" == "both" ]] && run_gradle "Java"   "bindings/java"
+    [[ "${TARGET}" == "kotlin" || "${TARGET}" == "both" ]] && run_gradle "Kotlin" "bindings/kotlin"
+
+    echo -e "\n${GREEN}${BOLD}JVM bindings pass (Gradle).${NC}"
+    exit 0
+fi
 
 # --------------------------------------------------------------------------
 # Java
