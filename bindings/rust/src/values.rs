@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn test_float64() {
-        let val = Value::Float64(3.14159);
-        let result = roundtrip(&val);
-        if let Value::Float64(f) = result {
-            assert!((f - 3.14159).abs() < 1e-10);
-        } else {
-            panic!("Expected Float64");
+        // The bit pattern is preserved exactly, so this needs no tolerance
+        // and no destructuring — an unreachable match arm would just read as
+        // an uncovered branch.
+        for f in [3.14159f64, -0.0, f64::MIN, f64::MAX, f64::INFINITY] {
+            let val = Value::Float64(f);
+            assert_eq!(roundtrip(&val), val, "round-trip of {}", f);
         }
     }
 

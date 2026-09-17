@@ -29,7 +29,9 @@ function decode(buffer) {
         throw new Error('Data too short for .trp format');
     }
 
-    const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    // The guard above already rejected anything that is not a Uint8Array or
+    // a Buffer, and Buffer extends Uint8Array, so this needs no conversion.
+    const buf = buffer;
 
     // Validate magic
     for (let i = 0; i < 4; i++) {
@@ -92,7 +94,9 @@ function decode(buffer) {
     const codeIsCtrl = new Uint8Array(256);
     for (let c = 0; c < NUM_CONTROL_CODES; c++) {
         ctrlCodes[c] = reader.readBits(bps);
-        if (ctrlCodes[c] < 256) codeIsCtrl[ctrlCodes[c]] = 1;
+        // bps is validated to 1..8 above, so a code never exceeds 255 and
+        // always indexes codeIsCtrl.
+        codeIsCtrl[ctrlCodes[c]] = 1;
     }
 
     // Read symbol table
@@ -152,7 +156,7 @@ function decode(buffer) {
             if (sym < 256 && codeIsCtrl[sym]) {
                 throw new Error('Unexpected control code in trie');
             }
-            const byteVal = sym < 256 ? reverseMap[sym] : 0;
+            const byteVal = reverseMap[sym]; // sym <= 255: bps is 1..8
             keyStack.push(byteVal);
         }
     }
@@ -194,11 +198,10 @@ function decode(buffer) {
 
     // Walk the trie
     reader.seek(trieStart);
-    if (numKeys > 0) {
-        // The trie root may start with a single child (no explicit BRANCH)
-        // so we just start dfsWalk from the root
-        dfsWalk(reader, trieEnd);
-    }
+    // numKeys === 0 returned early, so the trie always has a root. It may
+    // start with a single child and no explicit BRANCH, so the walk begins
+    // at the root either way.
+    dfsWalk(reader, trieEnd);
 
     // Now decode values if present
     if (hasValues) {

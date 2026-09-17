@@ -292,7 +292,7 @@ static tp_result parse_object(json_parser *p)
     if (p->depth > TP_MAX_NESTING_DEPTH)
         return TP_ERR_JSON_DEPTH;
 
-    if (!expect(p, '{'))
+    if (!expect(p, '{')) /* LCOV_EXCL_BR_LINE */
         return TP_ERR_JSON_SYNTAX; /* LCOV_EXCL_LINE */
 
     if (peek(p) == '}') {
@@ -344,7 +344,7 @@ static tp_result parse_array(json_parser *p)
     if (p->depth > TP_MAX_NESTING_DEPTH)
         return TP_ERR_JSON_DEPTH;
 
-    if (!expect(p, '['))
+    if (!expect(p, '[')) /* LCOV_EXCL_BR_LINE */
         return TP_ERR_JSON_SYNTAX; /* LCOV_EXCL_LINE */
 
     if (peek(p) == ']') {
@@ -443,7 +443,7 @@ tp_result tp_json_encode(const char *json_str, size_t json_len, uint8_t **buf, s
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_encoder *enc = NULL;
     tp_result rc = tp_encoder_create(&enc);
-    if (rc != TP_OK)
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
         return rc; /* LCOV_EXCL_LINE */
 
     json_parser parser;
@@ -486,7 +486,7 @@ tp_result tp_json_encode(const char *json_str, size_t json_len, uint8_t **buf, s
     /* Store root type metadata */
     tp_value root_val = tp_value_uint(root_type);
     rc = tp_encoder_add(enc, TP_JSON_META_ROOT, &root_val);
-    if (rc != TP_OK) {
+    if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         tp_encoder_destroy(&enc);
         return rc;

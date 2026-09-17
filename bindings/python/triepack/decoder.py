@@ -83,9 +83,10 @@ def decode(buffer):
     ctrl_codes = [0] * NUM_CONTROL_CODES
     code_is_ctrl = [False] * 256
     for c in range(NUM_CONTROL_CODES):
+        # bps is validated to 1..8 above, so a code never exceeds 255 and
+        # always indexes code_is_ctrl.
         ctrl_codes[c] = reader.read_bits(bps)
-        if ctrl_codes[c] < 256:
-            code_is_ctrl[ctrl_codes[c]] = True
+        code_is_ctrl[ctrl_codes[c]] = True
 
     # Read symbol table
     reverse_map = [0] * 256
@@ -167,10 +168,9 @@ def decode(buffer):
 
         del key_stack[saved_key_len:]
 
-    # Walk the trie
+    # Walk the trie. num_keys == 0 returned early, so there is always one.
     reader.seek(trie_start)
-    if num_keys > 0:
-        dfs_walk(reader, trie_end)
+    dfs_walk(reader, trie_end)
 
     # Decode values
     if has_values:

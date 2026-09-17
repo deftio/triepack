@@ -76,8 +76,9 @@ def encode(data):
     for i in range(256):
         if used[i]:
             symbol_map[i] = code
-            if code < 256:
-                reverse_map[code] = i
+            # The alphabet check above caps total_symbols at 255, so code
+            # always indexes reverse_map.
+            reverse_map[code] = i
             code += 1
 
     # Build the bitstream

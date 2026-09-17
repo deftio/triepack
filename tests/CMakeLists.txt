@@ -45,6 +45,7 @@ triepack_add_c_test(test_core_limits      test_core_limits.c       triepack_core
 target_compile_definitions(test_core_limits PRIVATE FIXTURE_DIR="${CMAKE_SOURCE_DIR}")
 triepack_add_c_test(test_core_integrity    test_core_integrity.c    triepack_core)
 triepack_add_c_test(test_core_iterate      test_core_iterate.c      triepack_core)
+triepack_add_c_test(test_guards           test_guards.c            triepack_core)
 
 # Core internals test (needs access to src/core/ for core_internal.h)
 triepack_add_c_test(test_core_internal     test_core_internal.c     triepack_core)

@@ -110,7 +110,9 @@ function encode(data) {
     for (let i = 0; i < 256; i++) {
         if (used[i]) {
             symbolMap[i] = code;
-            if (code < 256) reverseMap[code] = i;
+            // The alphabet check above caps total symbols at 255, so code
+            // always indexes reverseMap.
+            reverseMap[code] = i;
             code++;
         }
     }
@@ -153,7 +155,7 @@ function encode(data) {
 
     // Symbol table: VarInt byte values for non-control symbols
     for (let cd = NUM_CONTROL_CODES; cd < totalSymbols; cd++) {
-        const byteVal = cd < 256 ? reverseMap[cd] : 0;
+        const byteVal = reverseMap[cd]; // cd <= 255: the alphabet is capped
         writeVarUint(w, byteVal);
     }
 

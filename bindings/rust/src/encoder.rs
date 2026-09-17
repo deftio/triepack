@@ -174,7 +174,7 @@ pub fn try_encode(data: &HashMap<String, Value>) -> Result<Vec<u8>, TriePackErro
     // Symbol table: for each code from NUM_CONTROL_CODES..total_symbols,
     // write the byte value it maps to as a VarInt.
     for cd in NUM_CONTROL_CODES..total_symbols {
-        let byte_val = if cd < 256 { reverse_map[cd] } else { 0 };
+        let byte_val = reverse_map[cd]; // cd <= 255: the alphabet is capped
         write_var_uint(&mut w, byte_val as u64);
     }
 

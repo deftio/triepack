@@ -22,7 +22,7 @@ tp_result tp_bs_read_varint_u(tp_bitstream_reader *r, uint64_t *out)
         /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
         uint64_t byte_val;
         tp_result rc = tp_bs_read_bits(r, 8, &byte_val);
-        if (rc != TP_OK)
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
             return rc; /* LCOV_EXCL_LINE */
 
         val |= (byte_val & 0x7F) << shift;
@@ -69,7 +69,7 @@ tp_result tp_bs_write_varint_u(tp_bitstream_writer *w, uint64_t value)
             byte_val = (uint8_t)(byte_val | 0x80u);
 
         tp_result rc = tp_bs_write_bits(w, byte_val, 8);
-        if (rc != TP_OK)
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
             return rc; /* LCOV_EXCL_LINE */
     } while (value != 0);
 
