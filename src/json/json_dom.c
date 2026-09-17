@@ -20,7 +20,7 @@ tp_result tp_json_open(tp_json **out, const uint8_t *buf, size_t buf_len)
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_json *j = calloc(1, sizeof(*j));
-    if (!j) /* LCOV_EXCL_BR_LINE */
+    if (!j)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     /* Make our own copy of the buffer so the caller doesn't need to keep it alive */

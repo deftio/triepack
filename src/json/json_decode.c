@@ -50,7 +50,7 @@ static tp_result sb_grow(strbuf *sb, size_t need)
         new_cap *= 2;
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     char *p = realloc(sb->data, new_cap);
-    if (!p) /* LCOV_EXCL_BR_LINE */
+    if (!p)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
     sb->data = p;
     sb->cap = new_cap;
@@ -61,7 +61,7 @@ static tp_result sb_append(strbuf *sb, const char *s, size_t n)
 {
     tp_result rc = sb_grow(sb, n);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     memcpy(sb->data + sb->len, s, n);
     sb->len += n;
     return TP_OK;
@@ -107,7 +107,7 @@ static tp_result sb_append_json_string(strbuf *sb, const char *str, size_t len)
 {
     tp_result rc = sb_appendc(sb, '"');
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)str[i];
         switch (c) {
@@ -142,7 +142,7 @@ static tp_result sb_append_json_string(strbuf *sb, const char *str, size_t len)
             }
         }
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
     return sb_appendc(sb, '"');
 }
@@ -199,7 +199,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 static bool is_array_index(const char *key, size_t key_len, size_t pos)
 {
     if (pos >= key_len) /* LCOV_EXCL_BR_LINE */
-        return false; /* LCOV_EXCL_LINE */
+        return false;   /* LCOV_EXCL_LINE */
     return key[pos] == '[';
 }
 
@@ -209,7 +209,7 @@ static size_t next_segment(const char *key, size_t key_len, size_t pos, bool *is
 {
     *is_idx = false;
     if (pos >= key_len) /* LCOV_EXCL_BR_LINE */
-        return 0; /* LCOV_EXCL_LINE */
+        return 0;       /* LCOV_EXCL_LINE */
     if (key[pos] == '[') {
         *is_idx = true;
         size_t end = pos + 1;
@@ -228,16 +228,16 @@ static size_t next_segment(const char *key, size_t key_len, size_t pos, bool *is
 
 static tp_result emit_indent(strbuf *sb, const char *indent, int depth)
 {
-    if (!indent) /* LCOV_EXCL_BR_LINE */
+    if (!indent)      /* LCOV_EXCL_BR_LINE */
         return TP_OK; /* LCOV_EXCL_LINE */
     tp_result rc = sb_appendc(sb, '\n');
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     size_t ilen = strlen(indent);
     for (int i = 0; i < depth; i++) {
         rc = sb_append(sb, indent, ilen);
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
     return TP_OK;
 }
@@ -262,7 +262,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             continue;
         /* Skip metadata keys — already filtered by extract_entries */
         if (entries[i].key_len > 0 && entries[i].key[0] == '\x01') /* LCOV_EXCL_BR_LINE */
-            continue; /* LCOV_EXCL_LINE */
+            continue;                                              /* LCOV_EXCL_LINE */
 
         size_t pos = prefix_len;
         if (pos < entries[i].key_len && entries[i].key[pos] == '.')
@@ -304,7 +304,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         if (prefix_len > 0 && memcmp(entries[i].key, prefix, prefix_len) != 0)
             continue;
         if (entries[i].key_len > 0 && entries[i].key[0] == '\x01') /* LCOV_EXCL_BR_LINE */
-            continue; /* LCOV_EXCL_LINE */
+            continue;                                              /* LCOV_EXCL_LINE */
 
         size_t pos = prefix_len;
         if (pos < entries[i].key_len && entries[i].key[pos] == '.')
@@ -385,7 +385,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             const flat_entry *se = &entries[segments[s].seg_start];
             size_t sp = prefix_len;
             if (sp < se->key_len && se->key[sp] == '.') /* LCOV_EXCL_BR_LINE */
-                sp++; /* LCOV_EXCL_LINE */
+                sp++;                                   /* LCOV_EXCL_LINE */
             bool si;
             size_t sl = next_segment(se->key, se->key_len, sp, &si);
 

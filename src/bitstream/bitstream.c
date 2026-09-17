@@ -168,7 +168,7 @@ tp_result tp_bs_reader_create(tp_bitstream_reader **out, const uint8_t *buf, uin
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_bitstream_reader *r = calloc(1, sizeof(*r));
-    if (!r) /* LCOV_EXCL_BR_LINE */
+    if (!r)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     r->buf = buf;

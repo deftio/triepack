@@ -98,26 +98,26 @@ tp_result tp_bs_write_utf8(tp_bitstream_writer *w, uint32_t cp)
     } else if (cp <= 0x7FF) {
         tp_result rc = tp_bs_write_u8(w, (uint8_t)(0xC0 | (cp >> 6)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         return tp_bs_write_u8(w, (uint8_t)(0x80 | (cp & 0x3F)));
     } else if (cp <= 0xFFFF) {
         tp_result rc = tp_bs_write_u8(w, (uint8_t)(0xE0 | (cp >> 12)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         rc = tp_bs_write_u8(w, (uint8_t)(0x80 | ((cp >> 6) & 0x3F)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         return tp_bs_write_u8(w, (uint8_t)(0x80 | (cp & 0x3F)));
     } else if (cp <= 0x10FFFF) {
         tp_result rc = tp_bs_write_u8(w, (uint8_t)(0xF0 | (cp >> 18)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         rc = tp_bs_write_u8(w, (uint8_t)(0x80 | ((cp >> 12) & 0x3F)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         rc = tp_bs_write_u8(w, (uint8_t)(0x80 | ((cp >> 6) & 0x3F)));
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         return tp_bs_write_u8(w, (uint8_t)(0x80 | (cp & 0x3F)));
     }
 

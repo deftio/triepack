@@ -19,7 +19,7 @@ static tp_result value_deep_copy(tp_value *v)
     if (v->type == TP_STRING && v->data.string_val.str) {
         size_t len = v->data.string_val.str_len;
         char *copy = malloc(len + 1);
-        if (!copy) /* LCOV_EXCL_BR_LINE */
+        if (!copy)               /* LCOV_EXCL_BR_LINE */
             return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
         memcpy(copy, v->data.string_val.str, len);
         copy[len] = '\0';
@@ -30,7 +30,7 @@ static tp_result value_deep_copy(tp_value *v)
            the encoder free memory it does not own. */
         size_t len = v->data.blob_val.len;
         uint8_t *copy = malloc(len > 0 ? len : 1);
-        if (!copy) /* LCOV_EXCL_BR_LINE */
+        if (!copy)               /* LCOV_EXCL_BR_LINE */
             return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
         if (len > 0)
             memcpy(copy, v->data.blob_val.data, len);
@@ -84,7 +84,7 @@ tp_result tp_encoder_create_ex(tp_encoder **out, const tp_encoder_options *opts)
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_encoder *enc = calloc(1, sizeof(*enc));
-    if (!enc) /* LCOV_EXCL_BR_LINE */
+    if (!enc)                /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     enc->opts = *opts;
@@ -130,7 +130,7 @@ tp_result tp_encoder_add_n(tp_encoder *enc, const char *key, size_t key_len, con
     if (enc->count >= enc->entries_cap) {
         size_t new_cap = enc->entries_cap == 0 ? 16 : enc->entries_cap * 2;
         tp_entry *new_entries = realloc(enc->entries, new_cap * sizeof(tp_entry));
-        if (!new_entries) /* LCOV_EXCL_BR_LINE */
+        if (!new_entries)        /* LCOV_EXCL_BR_LINE */
             return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
         enc->entries = new_entries;
         enc->entries_cap = new_cap;
@@ -138,7 +138,7 @@ tp_result tp_encoder_add_n(tp_encoder *enc, const char *key, size_t key_len, con
 
     /* Copy key */
     char *key_copy = malloc(key_len + 1);
-    if (!key_copy) /* LCOV_EXCL_BR_LINE */
+    if (!key_copy)           /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
     memcpy(key_copy, key, key_len);
     key_copy[key_len] = '\0';
@@ -456,7 +456,7 @@ static tp_result trie_write(const tp_encoder *enc, tp_bitstream_writer *w, uint3
         uint32_t code = enc->sym.symbol_map[ch];
         rc = tp_bs_write_bits(w, code, bps);
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
 
     /* Check if any entry terminates exactly at 'common' */
@@ -487,14 +487,14 @@ static tp_result trie_write(const tp_encoder *enc, tp_bitstream_writer *w, uint3
         if (has_values && enc->entries[terminal_entry].val.type != TP_NULL) {
             rc = tp_bs_write_bits(w, enc->sym.ctrl_codes[TP_CTRL_END_VAL], bps);
             if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-                return rc; /* LCOV_EXCL_LINE */
+                return rc;   /* LCOV_EXCL_LINE */
             rc = tp_bs_write_varint_u(w, *value_idx);
             if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-                return rc; /* LCOV_EXCL_LINE */
+                return rc;   /* LCOV_EXCL_LINE */
         } else {
             rc = tp_bs_write_bits(w, enc->sym.ctrl_codes[TP_CTRL_END], bps);
             if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-                return rc; /* LCOV_EXCL_LINE */
+                return rc;   /* LCOV_EXCL_LINE */
         }
         (*value_idx)++;
     }
@@ -506,10 +506,10 @@ static tp_result trie_write(const tp_encoder *enc, tp_bitstream_writer *w, uint3
     /* Branch */
     rc = tp_bs_write_bits(w, enc->sym.ctrl_codes[TP_CTRL_BRANCH], bps);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     rc = tp_bs_write_varint_u(w, child_count);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     /* For each child: optionally write SKIP, then recurse.
        Pass 'common' (not common+1) so each child writes its own
@@ -528,15 +528,15 @@ static tp_result trie_write(const tp_encoder *enc, tp_bitstream_writer *w, uint3
             uint64_t child_sz = trie_subtree_size(enc, cs, ce, common, has_values, &vi_copy);
             rc = tp_bs_write_bits(w, enc->sym.ctrl_codes[TP_CTRL_SKIP], bps);
             if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-                return rc; /* LCOV_EXCL_LINE */
+                return rc;   /* LCOV_EXCL_LINE */
             rc = tp_bs_write_varint_u(w, child_sz);
             if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-                return rc; /* LCOV_EXCL_LINE */
+                return rc;   /* LCOV_EXCL_LINE */
         }
 
         rc = trie_write(enc, w, cs, ce, common, has_values, value_idx);
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
 
         child_i++;
         cs = ce;
@@ -579,7 +579,7 @@ tp_result tp_encoder_build(tp_encoder *enc, uint8_t **buf, size_t *len)
     tp_bitstream_writer *w = NULL;
     tp_result rc = tp_bs_writer_create(&w, 256, 0);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     /* Write placeholder header (32 bytes) */
     tp_header hdr;
@@ -724,7 +724,7 @@ tp_result tp_encoder_build(tp_encoder *enc, uint8_t **buf, size_t *len)
     rc = tp_bs_writer_detach_buffer(w, &out_buf, &out_byte_len, &out_bit_len);
     tp_bs_writer_destroy(&w);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     /* Patch header fields in the output buffer */
     /* trie_data_offset at byte 12 (big-endian) */

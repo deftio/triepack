@@ -238,6 +238,12 @@ impl<'a> BitReader<'a> {
 
     /// Read `n` raw bytes.
     pub fn read_bytes(&mut self, n: usize) -> Result<Vec<u8>, TriePackError> {
+        // Check the length against what is actually left before allocating.
+        // Lengths come from the file, so a corrupt one can claim gigabytes,
+        // and vec![0; n] would abort the process rather than return an error.
+        if (n as u64).saturating_mul(8) > self.remaining() as u64 {
+            return Err(TriePackError::Eof);
+        }
         let mut out = vec![0u8; n];
         for byte in out.iter_mut() {
             *byte = self.read_u8()?;

@@ -42,6 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reaches those keys.
 
 ### Fixed
+- **Unbounded allocation from a corrupt length field (Rust, Python,
+  JavaScript).** String and blob lengths are read from the file, and
+  `read_bytes` allocated that many bytes before checking the stream had them.
+  A corrupt length could claim gigabytes: Rust's `vec![0; n]` **aborted the
+  process** (SIGABRT), Python raised `MemoryError` and JavaScript a
+  `RangeError` — none of them the format's own error, and all of them a
+  denial of service on untrusted input. All three now check the declared
+  length against what is left before allocating. The C implementation was
+  never affected: it hands back a pointer into the caller's buffer through
+  `tp_bs_reader_direct_ptr`, which bounds-checks and never allocates.
+  Found by CI on Linux; macOS had absorbed the oversized allocation silently.
 - **Memory leak decoding a truncated or corrupt JSON dictionary.**
   `extract_entries` allocates each key separately; its error path freed the
   entry array but not the keys, so every key the walk got through before the

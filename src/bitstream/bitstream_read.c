@@ -44,7 +44,7 @@ tp_result tp_bs_read_bits_signed_at(const uint8_t *buf, uint64_t bit_pos, unsign
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_result rc = tp_bs_read_bits_at(buf, bit_pos, n, &raw);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     /* Sign-extend */
     if (n < 64 && (raw & ((uint64_t)1 << (n - 1)))) {
@@ -68,7 +68,7 @@ tp_result tp_bs_read_varint_u_at(const uint8_t *buf, uint64_t bit_pos, uint64_t 
         uint64_t byte_val;
         tp_result rc = tp_bs_read_bits_at(buf, bit_pos + total_bits, 8, &byte_val);
         if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-            return rc; /* LCOV_EXCL_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         total_bits += 8;
 
         val |= (byte_val & 0x7F) << shift;

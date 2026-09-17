@@ -78,7 +78,7 @@ static tp_result dict_open_impl(tp_dict **out, const uint8_t *buf, size_t len, b
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, buf, (uint64_t)len * 8);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     tp_header hdr;
     rc = tp_header_read(r, &hdr);
@@ -198,7 +198,7 @@ tp_result tp_dict_lookup_n(const tp_dict *dict, const char *key, size_t key_len,
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, dict->buf, (uint64_t)dict->len * 8);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     rc = tp_bs_reader_seek(r, dict->trie_start);
     if (rc != TP_OK) {
@@ -444,7 +444,7 @@ static tp_result iter_key_reserve(tp_iterator *it, size_t needed)
     while (cap < needed)
         cap *= 2;
     char *grown = realloc(it->key_buf, cap);
-    if (!grown) /* LCOV_EXCL_BR_LINE */
+    if (!grown)              /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
     it->key_buf = grown;
     it->key_buf_cap = cap;
@@ -455,7 +455,7 @@ static tp_result iter_push_key(tp_iterator *it, uint8_t byte)
 {
     tp_result rc = iter_key_reserve(it, it->key_len + 1);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     it->key_buf[it->key_len++] = (char)byte;
     return TP_OK;
 }
@@ -471,7 +471,7 @@ static tp_result iter_value_at(tp_iterator *it, uint64_t index, tp_value *val)
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, it->dict->buf, (uint64_t)it->dict->len * 8);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     if (index != it->value_index) {
         /* Cursor is elsewhere — walk the store from the start. */
@@ -505,7 +505,7 @@ tp_result tp_dict_iterate(const tp_dict *dict, tp_iterator **out)
         return TP_ERR_INVALID_PARAM;
 
     tp_iterator *it = calloc(1, sizeof(*it));
-    if (!it) /* LCOV_EXCL_BR_LINE */
+    if (!it)                 /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     it->dict = dict;
@@ -542,7 +542,7 @@ tp_result tp_iter_next(tp_iterator *it, const char **key, size_t *key_len, tp_va
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, it->dict->buf, (uint64_t)it->dict->len * 8);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     uint64_t subtree_end;
     bool descending;
@@ -579,7 +579,7 @@ tp_result tp_iter_next(tp_iterator *it, const char **key, size_t *key_len, tp_va
             tp_iter_frame *f = &it->stack[it->stack_top];
             it->key_len = f->key_prefix_len;
             rc = tp_bs_reader_seek(r, f->next_child_pos);
-            if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            if (rc != TP_OK)   /* LCOV_EXCL_BR_LINE */
                 ITER_FAIL(rc); /* LCOV_EXCL_LINE */
 
             if (f->remaining > 1) {
@@ -690,7 +690,7 @@ tp_result tp_iter_next(tp_iterator *it, const char **key, size_t *key_len, tp_va
             if (code < 256 && sym->code_is_ctrl[code])
                 ITER_FAIL(TP_ERR_CORRUPT);
             rc = iter_push_key(it, code < 256 ? sym->reverse_map[code] : 0);
-            if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            if (rc != TP_OK)   /* LCOV_EXCL_BR_LINE */
                 ITER_FAIL(rc); /* LCOV_EXCL_LINE */
         }
 
@@ -751,7 +751,7 @@ static tp_result descend_to_prefix(const tp_dict *dict, const uint8_t *prefix, s
     tp_bitstream_reader *r = NULL;
     tp_result rc = tp_bs_reader_create(&r, dict->buf, (uint64_t)dict->len * 8);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     uint64_t pos = dict->trie_start;
     uint64_t end = dict->value_start;
@@ -774,7 +774,7 @@ static tp_result descend_to_prefix(const tp_dict *dict, const uint8_t *prefix, s
             PREFIX_FAIL(TP_ERR_NOT_FOUND);
 
         rc = tp_bs_reader_seek(r, pos);
-        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        if (rc != TP_OK)     /* LCOV_EXCL_BR_LINE */
             PREFIX_FAIL(rc); /* LCOV_EXCL_LINE */
 
         uint64_t raw;
@@ -854,7 +854,7 @@ static tp_result descend_to_prefix(const tp_dict *dict, const uint8_t *prefix, s
 
             uint64_t first;
             rc = tp_bs_read_bits_at(dict->buf, child_start, bps, &first);
-            if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            if (rc != TP_OK)     /* LCOV_EXCL_BR_LINE */
                 PREFIX_FAIL(rc); /* LCOV_EXCL_LINE */
 
             if ((uint32_t)first == want) {
@@ -880,7 +880,7 @@ tp_result tp_dict_find_prefix(const tp_dict *dict, const char *prefix, tp_iterat
     tp_iterator *it = NULL;
     tp_result rc = tp_dict_iterate(dict, &it);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     size_t prefix_len = strlen(prefix);
     if (prefix_len == 0 || dict->info.num_keys == 0) {

@@ -196,3 +196,15 @@ describe('alignToByte when already aligned', () => {
         expect(Array.from(w.toUint8Array().subarray(0, 2))).toEqual([0xAB, 0xCD]);
     });
 });
+
+describe('a huge declared length', () => {
+    const { BitReader } = require('../src/bitstream');
+
+    // A length field is read from the file, so it can claim far more bytes
+    // than exist. Allocating first and checking later throws RangeError from
+    // the allocator instead of reporting a malformed stream.
+    test('is refused before allocating', () => {
+        const r = new BitReader(new Uint8Array(4));
+        expect(() => r.readBytes(2 ** 40)).toThrow('Read past end of stream');
+    });
+});

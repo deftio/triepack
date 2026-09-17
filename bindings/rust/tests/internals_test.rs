@@ -415,3 +415,26 @@ fn a_header_pointing_past_the_buffer_is_caught() {
         let _ = decode(&trial);
     }
 }
+
+/// A length field is read from the file, so it can claim far more bytes than
+/// exist. Allocating first and checking later aborts the process on a large
+/// enough claim, which is a denial of service on untrusted input.
+#[test]
+fn a_huge_declared_length_does_not_allocate() {
+    for tag in [6u64 /* String */, 7 /* Blob */] {
+        let mut w = BitWriter::new(16);
+        w.write_bits(tag, 4);
+        write_var_uint(&mut w, u64::MAX / 8); // more than any machine has
+        w.align_to_byte();
+        w.write_bytes(&[1, 2, 3]);
+        let bytes = w.to_bytes();
+
+        let mut r = BitReader::new(&bytes);
+        assert!(matches!(decode_value(&mut r), Err(TriePackError::Eof)));
+    }
+
+    // Directly, too: read_bytes must refuse rather than try.
+    let buf = [0u8; 4];
+    let mut r = BitReader::new(&buf);
+    assert!(matches!(r.read_bytes(usize::MAX / 8), Err(TriePackError::Eof)));
+}

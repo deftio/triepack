@@ -292,7 +292,7 @@ static tp_result parse_object(json_parser *p)
     if (p->depth > TP_MAX_NESTING_DEPTH)
         return TP_ERR_JSON_DEPTH;
 
-    if (!expect(p, '{')) /* LCOV_EXCL_BR_LINE */
+    if (!expect(p, '{'))           /* LCOV_EXCL_BR_LINE */
         return TP_ERR_JSON_SYNTAX; /* LCOV_EXCL_LINE */
 
     if (peek(p) == '}') {
@@ -344,7 +344,7 @@ static tp_result parse_array(json_parser *p)
     if (p->depth > TP_MAX_NESTING_DEPTH)
         return TP_ERR_JSON_DEPTH;
 
-    if (!expect(p, '[')) /* LCOV_EXCL_BR_LINE */
+    if (!expect(p, '['))           /* LCOV_EXCL_BR_LINE */
         return TP_ERR_JSON_SYNTAX; /* LCOV_EXCL_LINE */
 
     if (peek(p) == ']') {
@@ -444,7 +444,7 @@ tp_result tp_json_encode(const char *json_str, size_t json_len, uint8_t **buf, s
     tp_encoder *enc = NULL;
     tp_result rc = tp_encoder_create(&enc);
     if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
-        return rc; /* LCOV_EXCL_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     json_parser parser;
     memset(&parser, 0, sizeof(parser));
