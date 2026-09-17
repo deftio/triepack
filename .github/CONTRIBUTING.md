@@ -98,8 +98,12 @@ why something is the way it is, not restate the code.
 ## Tests
 
 - Every bug fix comes with a regression test that fails before the fix.
-- C, C++, Python and JavaScript hold 100% line coverage; do not reduce it.
-  `./tools/check-coverage.sh` checks the C side.
+- Python and JavaScript hold 100% line coverage; C/C++ holds 99.5% of lines
+  and 100% of functions. Do not reduce either — CI fails below 97% lines or
+  80% branches. `./tools/check-coverage.sh` checks the C side.
+- Anything that parses a buffer needs to survive corruption, not just reject
+  it. Build with `-DENABLE_SANITIZERS=ON` and run the suite before sending a
+  change that touches the decoder or the bitstream.
 - A format-level change needs a conformance case, not just a unit test.
 
 ## Versioning

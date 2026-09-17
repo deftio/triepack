@@ -20,12 +20,12 @@ tp_result tp_json_open(tp_json **out, const uint8_t *buf, size_t buf_len)
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_json *j = calloc(1, sizeof(*j));
-    if (!j)
+    if (!j)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     /* Make our own copy of the buffer so the caller doesn't need to keep it alive */
     j->buf_owned = malloc(buf_len);
-    if (!j->buf_owned) {
+    if (!j->buf_owned) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         free(j);
         return TP_ERR_ALLOC;
@@ -72,8 +72,9 @@ tp_result tp_json_close(tp_json **json)
     if (!json)
         return TP_ERR_INVALID_PARAM;
     if (*json) {
-        if ((*json)->dict)
-            tp_dict_close(&(*json)->dict);
+        /* open() fails and cleans up unless the dict was created, so a live
+           tp_json always has one; close tolerates NULL anyway. */
+        tp_dict_close(&(*json)->dict);
         free((*json)->buf_owned);
         free(*json);
         *json = NULL;

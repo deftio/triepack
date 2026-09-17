@@ -140,6 +140,11 @@ class BitReader:
         return hi * 0x100000000 + lo
 
     def read_bytes(self, n):
+        # Lengths come from the file, so check against what is left before
+        # allocating: a corrupt one would otherwise raise MemoryError rather
+        # than the format's own error.
+        if n * 8 > self.remaining:
+            raise ValueError("Read past end of stream")
         out = bytearray(n)
         for i in range(n):
             out[i] = self.read_u8()

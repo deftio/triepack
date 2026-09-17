@@ -168,7 +168,7 @@ tp_result tp_bs_reader_create(tp_bitstream_reader **out, const uint8_t *buf, uin
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_bitstream_reader *r = calloc(1, sizeof(*r));
-    if (!r)
+    if (!r)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     r->buf = buf;
@@ -186,7 +186,10 @@ tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out, const uint8_t *buf
         return TP_ERR_INVALID_PARAM;
 
     size_t byte_len = (size_t)((bit_len + 7) / 8);
-    uint8_t *copy = malloc(byte_len);
+    /* calloc, not malloc: a NULL source is a documented way to get a reader
+       over a zeroed buffer, and malloc would hand back uninitialised heap.
+       When there is a source it is copied over this anyway. */
+    uint8_t *copy = calloc(1, byte_len);
     if (!copy && byte_len > 0)
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
@@ -194,7 +197,7 @@ tp_result tp_bs_reader_create_copy(tp_bitstream_reader **out, const uint8_t *buf
         memcpy(copy, buf, byte_len);
 
     tp_bitstream_reader *r = calloc(1, sizeof(*r));
-    if (!r) {
+    if (!r) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         free(copy);
         return TP_ERR_ALLOC;
@@ -246,7 +249,7 @@ tp_result tp_bs_writer_create(tp_bitstream_writer **out, size_t initial_cap, siz
     w->growth = growth;
     w->pos = 0;
     w->buf = calloc(1, w->cap);
-    if (!w->buf) {
+    if (!w->buf) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         free(w);
         return TP_ERR_ALLOC;
@@ -357,7 +360,7 @@ tp_result tp_bs_writer_detach_buffer(tp_bitstream_writer *w, uint8_t **buf, size
 
     /* Reset writer to empty state */
     w->buf = calloc(1, w->cap);
-    if (!w->buf) {
+    if (!w->buf) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         w->cap = 0;
         w->pos = 0;

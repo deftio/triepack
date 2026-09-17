@@ -83,6 +83,13 @@ function encode(data) {
     // The trie config packs symbol_count into 8 header bits, so the alphabet
     // plus the 6 control codes must fit in 255. Encoding a wider alphabet
     // used to produce a buffer with a valid CRC that decoded to nothing.
+    //
+    // Unreachable from JavaScript: keys are strings, so the bytes here always
+    // come from UTF-8, which spans at most 243 distinct values (248 with the
+    // control codes). The C and Python encoders take raw bytes and can hit
+    // this, so the check stays — see the alphabet tests in triepack.test.js,
+    // which pin the invariant that makes it dead here.
+    /* istanbul ignore next -- @preserve: see above */
     if (totalSymbols > 255) {
         throw new RangeError(
             'Keys use too many distinct byte values (' + alphabetSize +
@@ -103,7 +110,9 @@ function encode(data) {
     for (let i = 0; i < 256; i++) {
         if (used[i]) {
             symbolMap[i] = code;
-            if (code < 256) reverseMap[code] = i;
+            // The alphabet check above caps total symbols at 255, so code
+            // always indexes reverseMap.
+            reverseMap[code] = i;
             code++;
         }
     }
@@ -146,7 +155,7 @@ function encode(data) {
 
     // Symbol table: VarInt byte values for non-control symbols
     for (let cd = NUM_CONTROL_CODES; cd < totalSymbols; cd++) {
-        const byteVal = cd < 256 ? reverseMap[cd] : 0;
+        const byteVal = reverseMap[cd]; // cd <= 255: the alphabet is capped
         writeVarUint(w, byteVal);
     }
 

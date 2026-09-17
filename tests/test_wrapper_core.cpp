@@ -14,6 +14,7 @@ extern "C" {
 
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 void setUp(void) {}
@@ -448,6 +449,92 @@ void test_status_messages(void)
     TEST_ASSERT_EQUAL_size_t(249, triepack::kMaxAlphabetSize);
 }
 
+/* ── Null-handle and moved-from paths ────────────────────────────────── */
+
+/* as_string() on a non-string hands back a shared empty string rather than
+ * reinterpreting whatever is stored. */
+void test_value_string_accessor_on_wrong_type(void)
+{
+    TEST_ASSERT_TRUE(Value::integer(5).as_string().empty());
+    TEST_ASSERT_TRUE(Value::boolean(true).as_string().empty());
+    TEST_ASSERT_TRUE(Value::null().as_string().empty());
+}
+
+/* Blobs compare by content, like every other value type. */
+void test_value_blob_equality(void)
+{
+    const std::vector<uint8_t> a{1, 2, 3};
+    const std::vector<uint8_t> same{1, 2, 3};
+    const std::vector<uint8_t> shorter{1, 2};
+    const std::vector<uint8_t> different{1, 2, 4};
+
+    TEST_ASSERT_TRUE(Value::blob(a) == Value::blob(same));
+    TEST_ASSERT_TRUE(Value::blob(a) != Value::blob(different));
+    TEST_ASSERT_TRUE(Value::blob(a) != Value::blob(shorter));
+    TEST_ASSERT_TRUE(Value::blob(a) != Value::string("\x01\x02\x03"));
+}
+
+/* A null key is rejected even when the handle is live. */
+void test_encoder_add_with_length_rejects_null_key(void)
+{
+    Encoder enc;
+    assert_status(Status::InvalidParam, enc.add(nullptr, 3, Value::integer(1)));
+    TEST_ASSERT_EQUAL_size_t(0, enc.count());
+}
+
+/* A moved-from Encoder keeps its object lifetime but loses its handle. Every
+ * operation has to report InvalidParam rather than dereference it. */
+void test_moved_from_encoder_reports_invalid_param(void)
+{
+    Encoder enc;
+    Encoder taken(std::move(enc));
+
+    const Value v = Value::integer(1);
+    assert_status(Status::InvalidParam, enc.add("k", v));    /* NOLINT */
+    assert_status(Status::InvalidParam, enc.add("k", 1, v)); /* NOLINT */
+    assert_status(Status::InvalidParam, enc.reset());        /* NOLINT */
+
+    std::vector<uint8_t> out(4, 0xAA);
+    assert_status(Status::InvalidParam, enc.build(out)); /* NOLINT */
+    TEST_ASSERT_TRUE(out.empty());                       /* cleared before the handle is checked */
+
+    /* The encoder that took the handle is unaffected. */
+    assert_status(Status::Ok, taken.add("k", v));
+}
+
+/* A moved-from Iterator yields nothing instead of walking a null handle. */
+void test_moved_from_iterator_reports_invalid_param(void)
+{
+    std::vector<uint8_t> buf = build_sample();
+    Dict dict(buf.data(), buf.size());
+    Iterator it(dict);
+    Iterator taken(std::move(it));
+
+    TEST_ASSERT_FALSE(it.next());                    /* NOLINT */
+    assert_status(Status::InvalidParam, it.reset()); /* NOLINT */
+
+    /* The iterator that took the handle still walks the dictionary. */
+    TEST_ASSERT_TRUE(taken.next());
+    TEST_ASSERT_EQUAL_STRING("apple", taken.key().c_str());
+}
+
+/* More distinct bytes than the alphabet can hold is a build-time failure,
+ * not a buffer that silently loses keys. */
+void test_encoder_build_reports_alphabet_overflow(void)
+{
+    Encoder enc;
+    /* One single-byte key per non-NUL byte value: 255 symbols, past the 249
+       the format allows once the control codes are reserved. */
+    for (int b = 1; b < 256; b++) {
+        const char byte = static_cast<char>(b);
+        assert_status(Status::Ok, enc.add(std::string(&byte, 1), Value::null()));
+    }
+
+    std::vector<uint8_t> out;
+    assert_status(Status::Alphabet, enc.build(out));
+    TEST_ASSERT_TRUE(out.empty());
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -481,6 +568,13 @@ int main(void)
     RUN_TEST(test_move_assign_encoder);
     RUN_TEST(test_move_dict);
     RUN_TEST(test_move_iterator);
+    /* Null handles and moved-from objects */
+    RUN_TEST(test_value_string_accessor_on_wrong_type);
+    RUN_TEST(test_value_blob_equality);
+    RUN_TEST(test_encoder_add_with_length_rejects_null_key);
+    RUN_TEST(test_moved_from_encoder_reports_invalid_param);
+    RUN_TEST(test_moved_from_iterator_reports_invalid_param);
+    RUN_TEST(test_encoder_build_reports_alphabet_overflow);
     /* Status */
     RUN_TEST(test_version_metadata);
     RUN_TEST(test_status_messages);

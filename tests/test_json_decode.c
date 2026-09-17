@@ -816,6 +816,99 @@ void test_json_decode_complex_corruption(void)
     free(orig_buf);
 }
 
+/* ── Corrupted dictionaries ─────────────────────────────────────────── */
+
+/* Repair the trailing CRC32 so a mutated buffer still opens, which is what
+ * puts the corruption in front of the trie walk instead of the checksum. */
+static void repair_crc(uint8_t *buf, size_t len)
+{
+    uint32_t crc = tp_crc32(buf, len - 4);
+    buf[len - 4] = (uint8_t)(crc >> 24);
+    buf[len - 3] = (uint8_t)(crc >> 16);
+    buf[len - 2] = (uint8_t)(crc >> 8);
+    buf[len - 1] = (uint8_t)(crc);
+}
+
+/* extract_entries walks the trie itself to flatten a document. Every
+ * single-bit corruption of the body has to leave it returning an error or a
+ * finite string — never reading past the buffer. Under ASan this is the
+ * check that matters. */
+void test_decode_survives_single_bit_corruption(void)
+{
+    static const char json[] = "{\"name\":\"triepack\",\"tags\":[\"trie\",\"pack\"],"
+                               "\"meta\":{\"version\":2,\"stable\":true,\"ratio\":0.25},"
+                               "\"empty\":{},\"nothing\":null}";
+
+    uint8_t *clean = NULL;
+    size_t len = 0;
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_json_encode(json, strlen(json), &clean, &len));
+    TEST_ASSERT_TRUE(len > 36);
+
+    uint8_t *scratch = malloc(len);
+    TEST_ASSERT_NOT_NULL(scratch);
+
+    unsigned decoded_ok = 0;
+    for (size_t byte = 32; byte < len - 4; byte++) {
+        for (int bit = 0; bit < 8; bit++) {
+            memcpy(scratch, clean, len);
+            scratch[byte] ^= (uint8_t)(1u << bit);
+            repair_crc(scratch, len);
+
+            char *out = NULL;
+            size_t out_len = 0;
+            if (tp_json_decode(scratch, len, &out, &out_len) == TP_OK) {
+                TEST_ASSERT_NOT_NULL(out);
+                TEST_ASSERT_EQUAL_size_t(strlen(out), out_len);
+                decoded_ok++;
+                free(out);
+            } else {
+                TEST_ASSERT_NULL(out);
+            }
+
+            /* The pretty printer walks the same entries. */
+            out = NULL;
+            out_len = 0;
+            if (tp_json_decode_pretty(scratch, len, "  ", &out, &out_len) == TP_OK)
+                free(out);
+        }
+    }
+
+    /* Some flips land in value bytes and still decode, so the sweep should
+       not have been rejected wholesale at the door. */
+    TEST_ASSERT_TRUE(decoded_ok > 0);
+
+    free(scratch);
+    free(clean);
+}
+
+/* Truncating the body leaves the walk reading off the end of the trie. */
+void test_decode_truncated_body(void)
+{
+    static const char json[] = "{\"alpha\":1,\"alphabet\":2,\"beta\":[1,2,3],\"b\":{\"c\":4}}";
+
+    uint8_t *clean = NULL;
+    size_t len = 0;
+    TEST_ASSERT_EQUAL_INT(TP_OK, tp_json_encode(json, strlen(json), &clean, &len));
+
+    uint8_t *scratch = malloc(len);
+    TEST_ASSERT_NOT_NULL(scratch);
+
+    for (size_t cut = 40; cut < len; cut++) {
+        memcpy(scratch, clean, cut);
+        repair_crc(scratch, cut);
+
+        char *out = NULL;
+        size_t out_len = 0;
+        if (tp_json_decode(scratch, cut, &out, &out_len) == TP_OK)
+            free(out);
+        else
+            TEST_ASSERT_NULL(out);
+    }
+
+    free(scratch);
+    free(clean);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -864,5 +957,8 @@ int main(void)
     RUN_TEST(test_json_decode_progressive_truncation);
     RUN_TEST(test_json_decode_branch1_corruption);
     RUN_TEST(test_json_decode_complex_corruption);
+    /* Corrupted dictionaries */
+    RUN_TEST(test_decode_survives_single_bit_corruption);
+    RUN_TEST(test_decode_truncated_body);
     return UNITY_END();
 }

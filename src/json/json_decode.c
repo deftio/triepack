@@ -50,7 +50,7 @@ static tp_result sb_grow(strbuf *sb, size_t need)
         new_cap *= 2;
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     char *p = realloc(sb->data, new_cap);
-    if (!p)
+    if (!p)                  /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
     sb->data = p;
     sb->cap = new_cap;
@@ -60,8 +60,8 @@ static tp_result sb_grow(strbuf *sb, size_t need)
 static tp_result sb_append(strbuf *sb, const char *s, size_t n)
 {
     tp_result rc = sb_grow(sb, n);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     memcpy(sb->data + sb->len, s, n);
     sb->len += n;
     return TP_OK;
@@ -106,8 +106,8 @@ static int flat_entry_cmp(const void *a, const void *b)
 static tp_result sb_append_json_string(strbuf *sb, const char *str, size_t len)
 {
     tp_result rc = sb_appendc(sb, '"');
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)str[i];
         switch (c) {
@@ -141,8 +141,8 @@ static tp_result sb_append_json_string(strbuf *sb, const char *str, size_t len)
                 rc = sb_appendc(sb, (char)c);
             }
         }
-        if (rc != TP_OK)
-            return rc; /* LCOV_EXCL_LINE */
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
     return sb_appendc(sb, '"');
 }
@@ -198,8 +198,8 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 /* Check if path segment starting at pos is an array index [N] */
 static bool is_array_index(const char *key, size_t key_len, size_t pos)
 {
-    if (pos >= key_len)
-        return false; /* LCOV_EXCL_LINE */
+    if (pos >= key_len) /* LCOV_EXCL_BR_LINE */
+        return false;   /* LCOV_EXCL_LINE */
     return key[pos] == '[';
 }
 
@@ -208,8 +208,8 @@ static bool is_array_index(const char *key, size_t key_len, size_t pos)
 static size_t next_segment(const char *key, size_t key_len, size_t pos, bool *is_idx)
 {
     *is_idx = false;
-    if (pos >= key_len)
-        return 0; /* LCOV_EXCL_LINE */
+    if (pos >= key_len) /* LCOV_EXCL_BR_LINE */
+        return 0;       /* LCOV_EXCL_LINE */
     if (key[pos] == '[') {
         *is_idx = true;
         size_t end = pos + 1;
@@ -228,16 +228,16 @@ static size_t next_segment(const char *key, size_t key_len, size_t pos, bool *is
 
 static tp_result emit_indent(strbuf *sb, const char *indent, int depth)
 {
-    if (!indent)
+    if (!indent)      /* LCOV_EXCL_BR_LINE */
         return TP_OK; /* LCOV_EXCL_LINE */
     tp_result rc = sb_appendc(sb, '\n');
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     size_t ilen = strlen(indent);
     for (int i = 0; i < depth; i++) {
         rc = sb_append(sb, indent, ilen);
-        if (rc != TP_OK)
-            return rc; /* LCOV_EXCL_LINE */
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
     return TP_OK;
 }
@@ -261,8 +261,8 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         if (prefix_len > 0 && memcmp(entries[i].key, prefix, prefix_len) != 0)
             continue;
         /* Skip metadata keys — already filtered by extract_entries */
-        if (entries[i].key_len > 0 && entries[i].key[0] == '\x01')
-            continue; /* LCOV_EXCL_LINE */
+        if (entries[i].key_len > 0 && entries[i].key[0] == '\x01') /* LCOV_EXCL_BR_LINE */
+            continue;                                              /* LCOV_EXCL_LINE */
 
         size_t pos = prefix_len;
         if (pos < entries[i].key_len && entries[i].key[pos] == '.')
@@ -303,8 +303,8 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             continue;
         if (prefix_len > 0 && memcmp(entries[i].key, prefix, prefix_len) != 0)
             continue;
-        if (entries[i].key_len > 0 && entries[i].key[0] == '\x01')
-            continue; /* LCOV_EXCL_LINE */
+        if (entries[i].key_len > 0 && entries[i].key[0] == '\x01') /* LCOV_EXCL_BR_LINE */
+            continue;                                              /* LCOV_EXCL_LINE */
 
         size_t pos = prefix_len;
         if (pos < entries[i].key_len && entries[i].key[pos] == '.')
@@ -336,7 +336,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             if (num_segments >= seg_cap) {
                 seg_cap = seg_cap == 0 ? 16 : seg_cap * 2;
                 segment_info *new_segs = realloc(segments, seg_cap * sizeof(segment_info));
-                if (!new_segs) {
+                if (!new_segs) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return TP_ERR_ALLOC;
@@ -355,7 +355,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 
     if (all_array) {
         rc = sb_appendc(sb, '[');
-        if (rc != TP_OK) {
+        if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
             /* LCOV_EXCL_START */
             free(segments);
             return rc;
@@ -365,7 +365,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         for (size_t s = 0; s < num_segments; s++) {
             if (s > 0) {
                 rc = sb_appendc(sb, ',');
-                if (rc != TP_OK) {
+                if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return rc;
@@ -374,7 +374,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             }
             if (indent) {
                 rc = emit_indent(sb, indent, depth + 1);
-                if (rc != TP_OK) {
+                if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return rc;
@@ -384,8 +384,8 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 
             const flat_entry *se = &entries[segments[s].seg_start];
             size_t sp = prefix_len;
-            if (sp < se->key_len && se->key[sp] == '.')
-                sp++; /* LCOV_EXCL_LINE */
+            if (sp < se->key_len && se->key[sp] == '.') /* LCOV_EXCL_BR_LINE */
+                sp++;                                   /* LCOV_EXCL_LINE */
             bool si;
             size_t sl = next_segment(se->key, se->key_len, sp, &si);
 
@@ -428,7 +428,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             } else {
                 rc = emit_json(sb, entries, count, new_prefix, new_prefix_len, indent, depth + 1);
             }
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
@@ -438,7 +438,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 
         if (indent && num_segments > 0) {
             rc = emit_indent(sb, indent, depth);
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
@@ -448,7 +448,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         rc = sb_appendc(sb, ']');
     } else {
         rc = sb_appendc(sb, '{');
-        if (rc != TP_OK) {
+        if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
             /* LCOV_EXCL_START */
             free(segments);
             return rc;
@@ -458,7 +458,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
         for (size_t s = 0; s < num_segments; s++) {
             if (s > 0) {
                 rc = sb_appendc(sb, ',');
-                if (rc != TP_OK) {
+                if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return rc;
@@ -467,7 +467,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             }
             if (indent) {
                 rc = emit_indent(sb, indent, depth + 1);
-                if (rc != TP_OK) {
+                if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return rc;
@@ -484,14 +484,14 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 
             /* Write key */
             rc = sb_append_json_string(sb, se->key + sp, sl);
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
                 /* LCOV_EXCL_STOP */
             }
             rc = sb_appendc(sb, ':');
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
@@ -499,7 +499,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             }
             if (indent) {
                 rc = sb_appendc(sb, ' ');
-                if (rc != TP_OK) {
+                if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                     /* LCOV_EXCL_START */
                     free(segments);
                     return rc;
@@ -547,7 +547,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
             } else {
                 rc = emit_json(sb, entries, count, new_prefix, new_prefix_len, indent, depth + 1);
             }
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
@@ -557,7 +557,7 @@ static tp_result emit_json(strbuf *sb, const flat_entry *entries, size_t count, 
 
         if (indent && num_segments > 0) {
             rc = emit_indent(sb, indent, depth);
-            if (rc != TP_OK) {
+            if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 free(segments);
                 return rc;
@@ -609,7 +609,7 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
 
     /* Read the symbol info from the dict to walk the trie */
     flat_entry *entries = calloc(num_keys, sizeof(flat_entry));
-    if (!entries) {
+    if (!entries) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         tp_dict_close(&dict);
         return TP_ERR_ALLOC;
@@ -624,7 +624,7 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
     } walk_frame;
 
     walk_frame *stack = calloc(256, sizeof(walk_frame));
-    if (!stack) {
+    if (!stack) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         free(entries);
         tp_dict_close(&dict);
@@ -634,7 +634,7 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
 
     tp_bitstream_reader *reader = NULL;
     rc = tp_bs_reader_create(&reader, buf, (uint64_t)buf_len * 8);
-    if (rc != TP_OK) {
+    if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         free(stack);
         free(entries);
@@ -644,7 +644,7 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
     }
 
     rc = tp_bs_reader_seek(reader, dict->trie_start);
-    if (rc != TP_OK) {
+    if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         tp_bs_reader_destroy(&reader);
         free(stack);
@@ -763,7 +763,7 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
             if (rc != TP_OK)
                 break;
             stack_top++;
-            if (stack_top >= 256) {
+            if (stack_top >= 256) { /* LCOV_EXCL_BR_LINE */
                 /* LCOV_EXCL_START */
                 rc = TP_ERR_JSON_DEPTH;
                 break;
@@ -810,6 +810,10 @@ static tp_result extract_entries(const uint8_t *buf, size_t buf_len, flat_entry 
     if (rc != TP_OK) {
         tp_bs_reader_destroy(&reader);
         free(stack);
+        /* Each key was allocated on its own; freeing just the array leaks
+           every key the walk got through before the input went bad. */
+        for (size_t i = 0; i < entry_count; i++)
+            free(entries[i].key);
         free(entries);
         tp_dict_close(&dict);
         return rc;
@@ -883,7 +887,7 @@ static tp_result decode_impl(const uint8_t *buf, size_t buf_len, const char *ind
         free(entries[i].key);
     free(entries);
 
-    if (rc != TP_OK) {
+    if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         sb_free(&sb);
         return rc;
@@ -892,7 +896,7 @@ static tp_result decode_impl(const uint8_t *buf, size_t buf_len, const char *ind
 
     /* NUL-terminate */
     rc = sb_appendc(&sb, '\0');
-    if (rc != TP_OK) {
+    if (rc != TP_OK) { /* LCOV_EXCL_BR_LINE */
         /* LCOV_EXCL_START */
         sb_free(&sb);
         return rc;

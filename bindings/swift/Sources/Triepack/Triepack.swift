@@ -45,7 +45,7 @@ public struct VersionInfo: Equatable {
 public struct Triepack {
     /// Library version, kept in step with triepack-version.txt by
     /// scripts/sync_version.sh.
-    public static let version = "1.3.1"
+    public static let version = "1.3.2"
 
     /// Version of the on-disk .trp format this implementation writes.
     /// Distinct from the library version: it changes only when the bytes

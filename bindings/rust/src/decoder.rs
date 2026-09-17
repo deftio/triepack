@@ -195,13 +195,9 @@ fn dfs_walk(
             return Ok(());
         }
 
-        // Regular symbol
-        let byte_val = if (sym as usize) < 256 {
-            reverse_map[sym as usize]
-        } else {
-            0
-        };
-        key_stack.push(byte_val);
+        // Regular symbol. bps is validated to 1..=8 above, so sym never
+        // exceeds 255 and always indexes reverse_map.
+        key_stack.push(reverse_map[sym as usize]);
     }
 }
 
@@ -326,14 +322,14 @@ mod tests {
         let mut buf = vec![0u8; 40];
         buf[0] = 0xFF;
         let result = decode(&buf);
-        assert!(matches!(result, Err(TriePackError::BadMagic)));
+        assert_eq!(result.unwrap_err(), TriePackError::BadMagic);
     }
 
     #[test]
     fn test_truncated() {
         let buf = vec![0x54, 0x52, 0x50, 0x00]; // too short
         let result = decode(&buf);
-        assert!(matches!(result, Err(TriePackError::Truncated)));
+        assert_eq!(result.unwrap_err(), TriePackError::Truncated);
     }
 
     #[test]
@@ -345,6 +341,6 @@ mod tests {
         let last = buf.len() - 1;
         buf[last] ^= 0xFF;
         let result = decode(&buf);
-        assert!(matches!(result, Err(TriePackError::Corrupt)));
+        assert_eq!(result.unwrap_err(), TriePackError::Corrupt);
     }
 }

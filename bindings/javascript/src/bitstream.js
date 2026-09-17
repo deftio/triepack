@@ -160,6 +160,12 @@ class BitReader {
     }
 
     readBytes(n) {
+        // Lengths come from the file, so check against what is left before
+        // allocating: a corrupt one would otherwise throw RangeError rather
+        // than the format's own error.
+        if (n * 8 > this.remaining) {
+            throw new Error('Read past end of stream');
+        }
         const out = new Uint8Array(n);
         for (let i = 0; i < n; i++) {
             out[i] = this.readU8();

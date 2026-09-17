@@ -9,7 +9,9 @@ title: Testing
 
 TriePack has comprehensive test suites across C, C++, Python, JavaScript, Go,
 Rust, Swift, Kotlin, and Java, with cross-language fixture validation ensuring
-binary compatibility. C/C++, Python, and JavaScript maintain **100% line coverage**.
+binary compatibility. Python and JavaScript are at **100% line coverage**; C/C++
+is at **99.5% lines and 100% functions**, with the remainder being guards that
+only a corrupt dictionary reaches. CI enforces a floor on both.
 
 ## Running C/C++ Tests
 
@@ -48,20 +50,20 @@ npm test
 | Suite | Test Programs / Files | Total Tests | Line Coverage |
 |-------|----------------------|-------------|---------------|
 | C Bitstream | 6 | 210 | 100% |
-| C Core | 7 | 179 | 100% |
-| C JSON | 4 | 120 | 100% |
-| C Cross-Language | 2 | 9 | 100% |
-| C++ Wrappers | 3 | 47 | 100% |
+| C Core | 8 | 192 | 97-100% |
+| C JSON | 4 | 122 | 99-100% |
+| C Cross-Language | 2 | 9 | — |
+| C++ Wrappers | 3 | 54 | 99.6-100% |
 | Examples (smoke) | 7 | 7 | — |
-| **C/C++ Total** | **29** | **568** | **100%** |
-| Python | 6 | 222 | 100% |
-| JavaScript | 7 | 229 | 100% |
+| **C/C++ Total** | **30** | **594** | **99.5%** |
+| Python | 7 | 225 | 100% |
+| JavaScript | 7 | 235 | 100% |
 | Go | 3 | 166 | — |
 | Rust | 3 | 84 | — |
 | Swift | 2 | 36 | — |
 | Kotlin | 3 | 54 | — |
 | Java | 3 | 161 | — |
-| **Grand Total** | **56** | **1,558** | — |
+| **Grand Total** | **58** | **1,601** | — |
 
 Counts include the cross-language conformance suite, which contributes cases
 to every row. The C "Cross-Language" figure is small because
@@ -94,6 +96,7 @@ test framework (v2.6.0). They are organized by component.
 | `test_core_edge_cases.c` | Empty dicts, limits, corrupted CRC, suffix flag, encoder reset, contains/get_info |
 | `test_core_integrity.c` | CRC-32 validation, corruption detection |
 | `test_core_internal.c` | Internal `header.c` + `value.c`: NULL params, truncated buffer, header round-trip, value round-trip for all types |
+| `test_core_iterate.c` | Iteration and prefix descent: dictionaries with no value store, keys and prefixes longer than the iterator's buffer, a prefix that is itself a stored key, nesting past the frame stack, and single-bit corruption of every body byte |
 
 ### JSON Tests
 
@@ -102,7 +105,7 @@ test framework (v2.6.0). They are organized by component.
 | `test_json_roundtrip.c` | JSON string -> .trp -> JSON string round-trips |
 | `test_json_dom.c` | DOM open/close, path lookup, iteration, root type, corrupted buffer |
 | `test_json_edge_cases.c` | Malformed JSON, depth limits, unicode, escape sequences, trailing input, truncated strings |
-| `test_json_decode.c` | .trp -> JSON text reconstruction: flat/nested/array objects, escape chars, float32/64, uint, blob, pretty-print, large structures, truncated/corrupted buffers |
+| `test_json_decode.c` | .trp -> JSON text reconstruction: flat/nested/array objects, escape chars, float32/64, uint, blob, pretty-print, large structures, truncated/corrupted buffers, and a single-bit corruption sweep with the CRC repaired so the trie walk is what has to catch it |
 
 ### Cross-Language Tests
 
@@ -116,7 +119,7 @@ test framework (v2.6.0). They are organized by component.
 | File | What it covers |
 |------|----------------|
 | `test_wrapper_bitstream.cpp` | C++ `BitstreamReader` / `BitstreamWriter` RAII wrappers |
-| `test_wrapper_core.cpp` | C++ `Encoder` / `Dict` / `Iterator` wrappers, move semantics |
+| `test_wrapper_core.cpp` | C++ `Encoder` / `Dict` / `Iterator` wrappers, move semantics, moved-from handles, alphabet overflow |
 | `test_wrapper_json.cpp` | C++ `Json` wrapper and C API interop from C++ |
 
 ### Example Smoke Tests
@@ -141,13 +144,13 @@ The Python binding is a pure-Python native implementation (no FFI).
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `test_crc32.py` | 5 | CRC-32 known-answer tests including `"123456789"` -> `0xCBF43926` |
-| `test_bitstream.py` | 19 | `BitWriter`/`BitReader` bit-level and byte-level operations, edge cases |
+| `test_bitstream.py` | 22 | `BitWriter`/`BitReader` bit-level and byte-level operations, edge cases |
 | `test_varint.py` | 16 | VarInt unsigned/signed round-trips, zigzag mapping, encoding sizes, overflow |
-| `test_triepack.py` | 45 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling, edge cases, issue #1 regressions |
-| `test_values.py` | 7 | Value encode/decode for all types: null, bool, int, uint, float32, float64, string, blob |
+| `test_triepack.py` | 49 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, error handling, edge cases, the alphabet limit, a corruption sweep for the BRANCH-after-terminal check, issue #1 regressions |
+| `test_values.py` | 6 | Value encode/decode for all types: null, bool, int, uint, float32, float64, string, blob |
 | `test_fixtures.py` | 14 | 7 decode tests + 7 **byte-for-byte** encode match against C-generated `.trp` fixture files |
 | `test_conformance.py` | 113 | The shared conformance corpus, and rejection of malformed buffers |
-| **Total** | **222** | |
+| **Total** | **225** | |
 
 ## JavaScript Test Organization
 
@@ -156,14 +159,14 @@ The JavaScript binding is a pure-JS native implementation (no FFI).
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `triepack.test.js` | 40 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, crafted trie error paths, issue #1 regressions |
-| `bitstream.test.js` | 21 | `BitWriter`/`BitReader` bit-level and byte-level operations, u64, growth, EOF |
-| `varint.test.js` | 13 | VarInt unsigned/signed round-trips, overflow, negative rejection, the exact-integer range |
+| `triepack.test.js` | 53 | Encode/decode round-trips: all value types, shared prefixes, UTF-8 keys, magic bytes, CRC corruption, version check, crafted trie error paths, the alphabet invariant, single-bit corruption sweeps, issue #1 regressions |
+| `bitstream.test.js` | 23 | `BitWriter`/`BitReader` bit-level and byte-level operations, u64, growth, EOF, byte alignment when already aligned |
+| `varint.test.js` | 17 | VarInt unsigned/signed round-trips, overflow, negative rejection, the exact-integer range |
 | `values.test.js` | 7 | Value encode/decode: null, undefined, bool, float32, unknown tag |
-| `crc32.test.js` | 8 | CRC-32 known-answer tests, empty input, incremental |
-| `fixtures.test.js` | 24 | 7 decode + 7 encode match + 7 cross-read + 3 error tests |
+| `crc32.test.js` | 7 | CRC-32 known-answer tests, empty input, incremental |
+| `fixtures.test.js` | 15 | Decode, encode match and cross-read against the C-generated `.trp` fixtures |
 | `conformance.test.js` | 113 | The shared conformance corpus, and rejection of malformed buffers |
-| **Total** | **229** | |
+| **Total** | **235** | |
 
 ## Go Test Organization
 
@@ -303,6 +306,36 @@ they stopped being so.
    ```
 3. Run `ctest` to verify it passes.
 
+## Sanitizers
+
+The format parses untrusted bytes, and several tests deliberately walk
+corrupted dictionaries. Those tests only prove anything when a bad read
+actually aborts, so build with AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```bash
+cmake -B build-asan -DENABLE_SANITIZERS=ON -DBUILD_TESTS=ON
+cmake --build build-asan
+ctest --test-dir build-asan --output-on-failure
+```
+
+`ENABLE_SANITIZERS` cannot be combined with `ENABLE_COVERAGE` — the two
+instrumentations fight over the same runtime, and CMake refuses the
+combination rather than producing a confusing build.
+
+CI runs this on every push. LeakSanitizer is enabled there
+(`ASAN_OPTIONS=detect_leaks=1`); it is unavailable on macOS, so local runs
+check for bad reads and undefined behaviour but not leaks. To get the leak
+half locally, run the job in a container:
+
+```bash
+./scripts/test-ci-linux.sh sanitizers
+```
+
+The compaction benchmark is excluded from sanitizer runs (`-E
+compaction_benchmark`): it loops over a 10,000-word corpus, which under ASan
+is about nine minutes of measuring sanitizer overhead rather than testing
+anything. Every other example still runs.
+
 ## Code Coverage
 
 Enable coverage instrumentation and generate an HTML report:
@@ -327,23 +360,48 @@ sudo apt-get install lcov
 brew install lcov
 ```
 
+On macOS, `lcov` needs to be pointed at Apple's `llvm-cov` shim:
+
+```bash
+printf '#!/bin/sh\nexec xcrun llvm-cov gcov "$@"\n' > /tmp/llvm-gcov.sh
+chmod +x /tmp/llvm-gcov.sh
+lcov --capture --directory build --gcov-tool /tmp/llvm-gcov.sh \
+     --rc branch_coverage=1 --output-file lcov.info
+```
+
 ## Coverage Target
 
-The project maintains **100% line coverage** for C/C++, Python, and
-JavaScript:
+| Language | Measured | Lines | Branches |
+|----------|----------|-------|----------|
+| C/C++ | 3,099 lines, 255 functions | 99.5% (100% of functions) | 85.1% |
+| Python | 601 statements | 100% | — |
+| JavaScript | 7 modules | 100% | 97.3% |
+| Go | — | not measured | — |
+| Rust | — | not measured | — |
+| Swift | — | not measured | — |
+| Kotlin | — | not measured | — |
+| Java | — | not measured | — |
 
-| Language | Lines/Statements | Coverage |
-|----------|-----------------|----------|
-| C/C++ | 2,395 lines | 100% |
-| Python | 590 statements | 100% |
-| JavaScript | all files | 100% |
-| Go | — | not measured |
-| Rust | — | not measured |
-| Swift | — | not measured |
-| Kotlin | — | not measured |
-| Java | — | not measured |
+The coverage job prints this table into the workflow summary on every push
+and fails below a floor of 97% lines and 80% branches. The floor exists
+because most of what is left is error handling for corrupt input: a drop
+usually means a path stopped being exercised, not that the code got simpler.
 
-Allocation failure paths (malloc/realloc returning NULL) are excluded from
-coverage measurement via `LCOV_EXCL` markers since they require custom
-allocator injection to test. Coverage gaps in example programs and
-platform-specific fallbacks are acceptable.
+### What is not covered, and why
+
+The fifteen uncovered C lines are all guards that need a dictionary corrupted
+in one specific way — a SKIP symbol that is not a SKIP, a varint that runs off
+the end mid-descent. The corruption sweeps in `test_core_iterate.c` and
+`test_json_decode.c` flip every bit of the body in turn and reach most of
+them, but single-bit flips cannot construct every shape.
+
+Two kinds of line are excluded from measurement outright:
+
+- **Allocation failure paths** (`malloc`/`realloc` returning NULL), marked
+  with `LCOV_EXCL_LINE`. Testing them needs allocator injection.
+- **Guards that cannot fire in a given language.** The JavaScript encoder
+  checks for an alphabet wider than the format allows, but JS keys are
+  strings and therefore always UTF-8, which spans at most 243 distinct byte
+  values — 6 short of the ceiling. The check stays for parity with C and
+  Python, whose encoders take raw bytes and can reach it; it carries an
+  `istanbul ignore` and a test pins the invariant that makes it unreachable.

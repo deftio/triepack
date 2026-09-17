@@ -63,6 +63,33 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  sanitizers:
+    name: AddressSanitizer + UndefinedBehaviorSanitizer
+    runs-on: ubuntu-latest
+
+    # The format parses untrusted bytes, and several tests deliberately walk
+    # corrupted dictionaries. Those only prove anything when a bad read
+    # aborts instead of quietly returning garbage, which is what this job is
+    # for. Leak detection is on here; it is unavailable on macOS.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DENABLE_SANITIZERS=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+
+      - name: Build
+        run: cmake --build build
+
+      # The compaction benchmark loops over a 10k-word corpus; under ASan that
+      # is ~9 minutes of measuring sanitizer overhead rather than testing
+      # anything. Every other example still runs.
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure -E compaction_benchmark
+
   version-sync:
     name: Derived files are in sync
     runs-on: ubuntu-latest
@@ -155,9 +182,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-format
 
+      # tests/ is included: it was already conforming, and test code is where
+      # formatting drift otherwise goes unnoticed.
       - name: Check formatting
         run: |
-          find include src wrapper/src wrapper/include -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' | \
+          find include src wrapper/src wrapper/include tests \
+            -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' | \
             xargs clang-format --dry-run --Werror
 
   build-32bit:

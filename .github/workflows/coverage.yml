@@ -42,16 +42,65 @@ jobs:
             --rc branch_coverage=1 \
             --ignore-errors empty,empty,unused,unused
           lcov --remove lcov_raw.info \
-            "*/tests/*" "*/_deps/*" "/usr/*" \
+            "*/tests/*" "*/_deps/*" "/usr/*" "*/examples/*" \
             --output-file lcov.info \
             --rc branch_coverage=1 \
             --ignore-errors empty,empty,unused,unused
-          if [ -s lcov.info ]; then
-            genhtml lcov.info --output-directory coverage --branch-coverage
-          else
-            mkdir -p coverage
-            echo "<html><body><h1>No coverage data yet (stubs only)</h1></body></html>" > coverage/index.html
+          genhtml lcov.info --output-directory coverage --branch-coverage \
+            --ignore-errors inconsistent,category,unmapped
+
+      # A report nobody reads is not a gate. Print the per-file table into the
+      # job summary and fail if the totals slip: the suite walks corrupted
+      # input on purpose, so a drop here usually means a path stopped being
+      # exercised rather than that the code got simpler.
+      - name: Report and enforce coverage
+        env:
+          MIN_LINE_COVERAGE: "97.0"
+          MIN_BRANCH_COVERAGE: "80.0"
+        run: |
+          cd build
+          LCOV_FLAGS="--rc branch_coverage=1 --ignore-errors inconsistent,empty,unused"
+          lcov --list lcov.info $LCOV_FLAGS | tee coverage.txt
+
+          SUMMARY=$(lcov --summary lcov.info $LCOV_FLAGS 2>&1)
+          echo "$SUMMARY"
+          LINES=$(echo "$SUMMARY" | awk '/lines\.*:/ {gsub("%","",$2); print $2}')
+          BRANCHES=$(echo "$SUMMARY" | awk '/branches\.*:/ {gsub("%","",$2); print $2}')
+
+          # An unparsed total would make every comparison below vacuously
+          # true, turning the gate into a no-op. Fail loudly instead.
+          if [ -z "$LINES" ] || [ -z "$BRANCHES" ]; then
+            echo "::error::Could not parse coverage totals from lcov output"
+            exit 1
           fi
+
+          {
+            echo "## Coverage"
+            echo
+            echo "| Metric | Covered | Floor |"
+            echo "|--------|---------|-------|"
+            echo "| Lines | ${LINES}% | ${MIN_LINE_COVERAGE}% |"
+            echo "| Branches | ${BRANCHES}% | ${MIN_BRANCH_COVERAGE}% |"
+            echo
+            echo '<details><summary>Per-file</summary>'
+            echo
+            echo '```'
+            cat coverage.txt
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          fail=0
+          awk "BEGIN { exit !($LINES < $MIN_LINE_COVERAGE) }" && {
+            echo "::error::Line coverage ${LINES}% is below the ${MIN_LINE_COVERAGE}% floor"
+            fail=1
+          }
+          awk "BEGIN { exit !($BRANCHES < $MIN_BRANCH_COVERAGE) }" && {
+            echo "::error::Branch coverage ${BRANCHES}% is below the ${MIN_BRANCH_COVERAGE}% floor"
+            fail=1
+          }
+          exit $fail
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4

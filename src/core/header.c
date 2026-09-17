@@ -17,48 +17,48 @@ tp_result tp_header_write(tp_bitstream_writer *w, const tp_header *h)
     tp_result rc;
     /* Magic bytes (4) */
     rc = tp_bs_write_u8(w, h->magic[0]);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     rc = tp_bs_write_u8(w, h->magic[1]);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     rc = tp_bs_write_u8(w, h->magic[2]);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     rc = tp_bs_write_u8(w, h->magic[3]);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* Version (2) */
     rc = tp_bs_write_u8(w, h->version_major);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     rc = tp_bs_write_u8(w, h->version_minor);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* Flags (2) */
     rc = tp_bs_write_u16(w, h->flags);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* num_keys (4) */
     rc = tp_bs_write_u32(w, h->num_keys);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* trie_data_offset (4) */
     rc = tp_bs_write_u32(w, h->trie_data_offset);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* value_store_offset (4) */
     rc = tp_bs_write_u32(w, h->value_store_offset);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* suffix_table_offset (4) */
     rc = tp_bs_write_u32(w, h->suffix_table_offset);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* total_data_bits (4) */
     rc = tp_bs_write_u32(w, h->total_data_bits);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
     /* reserved (4) */
     rc = tp_bs_write_u32(w, h->reserved);
     return rc;

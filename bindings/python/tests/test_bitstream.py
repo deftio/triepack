@@ -182,3 +182,14 @@ def test_ensure_large_growth():
     w = BitWriter(initial_cap=1)
     w.write_bits(0xFFFFFFFFFFFFFFFF, 64)
     assert len(w.to_bytes()) == 8
+
+
+def test_a_huge_declared_length_does_not_allocate():
+    """A length field is read from the file, so it can claim far more bytes
+    than exist. Allocating first and checking later raises MemoryError (or
+    exhausts the machine) instead of reporting a malformed stream."""
+    from triepack.bitstream import BitReader
+
+    r = BitReader(b"\x00\x00\x00\x00")
+    with pytest.raises(ValueError, match="Read past end of stream"):
+        r.read_bytes(2**40)

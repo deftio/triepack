@@ -27,7 +27,7 @@ static tp_result ensure_capacity(tp_bitstream_writer *w, uint64_t n_bits)
 
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     uint8_t *new_buf = realloc(w->buf, new_cap);
-    if (!new_buf)
+    if (!new_buf)            /* LCOV_EXCL_BR_LINE */
         return TP_ERR_ALLOC; /* LCOV_EXCL_LINE */
 
     memset(new_buf + w->cap, 0, new_cap - w->cap);
@@ -54,8 +54,8 @@ tp_result tp_bs_write_bits(tp_bitstream_writer *w, uint64_t value, unsigned int 
         return TP_ERR_INVALID_PARAM;
 
     tp_result rc = ensure_capacity(w, n);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     for (unsigned int i = 0; i < n; i++) {
         uint8_t bit = (uint8_t)((value >> (n - 1 - i)) & 1);
@@ -87,8 +87,8 @@ tp_result tp_bs_write_bit(tp_bitstream_writer *w, uint8_t value)
         return TP_ERR_INVALID_PARAM;
 
     tp_result rc = ensure_capacity(w, 1);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     write_bit_msb(w->buf, w->pos, value & 1);
     w->pos++;
@@ -103,8 +103,8 @@ tp_result tp_bs_writer_align_to_byte(tp_bitstream_writer *w)
     if (rem != 0) {
         uint8_t pad = (uint8_t)(8 - rem);
         tp_result rc = ensure_capacity(w, pad);
-        if (rc != TP_OK)
-            return rc; /* LCOV_EXCL_LINE */
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
         /* Zero bits are already there from calloc/memset */
         w->pos += pad;
     }
@@ -140,8 +140,8 @@ tp_result tp_bs_write_bytes(tp_bitstream_writer *w, const uint8_t *buf, size_t n
 
     for (size_t i = 0; i < n; i++) {
         tp_result rc = tp_bs_write_u8(w, buf[i]);
-        if (rc != TP_OK)
-            return rc; /* LCOV_EXCL_LINE */
+        if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+            return rc;   /* LCOV_EXCL_LINE */
     }
     return TP_OK;
 }
@@ -154,8 +154,8 @@ tp_result tp_bs_writer_append_buffer(tp_bitstream_writer *w, const uint8_t *buf,
         return TP_ERR_INVALID_PARAM;
 
     tp_result rc = ensure_capacity(w, bit_len);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     for (uint64_t i = 0; i < bit_len; i++) {
         size_t byte_idx = (size_t)(i / 8);
@@ -177,8 +177,8 @@ tp_result tp_bs_copy_bits(tp_bitstream_reader *r, tp_bitstream_writer *w, uint64
         return TP_ERR_EOF;
 
     tp_result rc = ensure_capacity(w, n_bits);
-    if (rc != TP_OK)
-        return rc; /* LCOV_EXCL_LINE */
+    if (rc != TP_OK) /* LCOV_EXCL_BR_LINE */
+        return rc;   /* LCOV_EXCL_LINE */
 
     for (uint64_t i = 0; i < n_bits; i++) {
         size_t byte_idx = (size_t)(r->pos / 8);
