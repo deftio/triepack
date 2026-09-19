@@ -1,4 +1,4 @@
-"""Tests for xjarchive, written from the grammar rather than the code.
+"""Tests for terseml, written from the grammar rather than the code.
 
 GRAMMAR.md is the authority: every case below cites
 the section it comes from, and where the implementation disagrees with the
@@ -21,10 +21,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from xjarchive import (  # noqa: E402
+import terseml
+from terseml import (  # noqa: E402
     IMPLICIT_TAG,
     Element,
-    XjarchiveError,
+    TersemlError,
     decode,
     decode_document,
     encode,
@@ -126,20 +127,61 @@ def test_singleton_versus_empty_content():
     ],
 )
 def test_malformed_input_is_rejected(bad, why):
-    with pytest.raises(XjarchiveError):
+    with pytest.raises(TersemlError):
         decode(bad)
 
 
 def test_depth_is_bounded():
     """§6: a depth bound must exist and be stated."""
     deep = b"{a," * 400 + b"x" + b"}" * 400
-    with pytest.raises(XjarchiveError):
+    with pytest.raises(TersemlError):
         decode(deep)
 
 
 # ---------------------------------------------------------------------------
 # §7 -- canonical form
 # ---------------------------------------------------------------------------
+
+def test_version_tracks_triepack():
+    """terseml follows the TriePack release version while it lives in this
+    repository. A constant nobody checks is a constant that goes stale, and
+    three implementations each carrying their own copy is three chances."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "triepack-version.txt")) as f:
+        expected = f.read().strip()
+    assert terseml.__version__ == expected, (
+        f"terseml.py says {terseml.__version__}, triepack-version.txt says "
+        f"{expected} -- run ./scripts/sync_version.sh")
+
+    # The other two implementations carry the same constant; check the text
+    # rather than run two more interpreters.
+    for name, pattern in (("terseml.h", f'#define TSML_VERSION "{expected}"'),
+                          ("terseml.js", f"const VERSION = '{expected}';")):
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), name)) as f:
+            assert pattern in f.read(), f"{name} does not declare {expected}"
+
+
+def test_singleton_accepted_never_emitted():
+    """§7 rule 7. {foo} means what §4.3 says, but no encoder writes it.
+
+    Found by a differential test against the C implementation: inside {foo}
+    there is no content slot yet, so a comma there is structural. An encoder
+    that emitted the short form wrote {a,b} for the text "a,b" and the other
+    implementation read it back as an element tagged "a".
+    """
+    assert encode(b"foo") == b"{#text,foo}"
+    assert encode(Element(IMPLICIT_TAG, [], [b"foo"])) == b"{#text,foo}"
+
+    for payload in (b"a,b", b"", b"[k:v]", b"{x}", b",", b",,,"):
+        wire = encode(payload)
+        assert decode(wire).children in ([payload], []), payload
+        assert encode(decode(wire)) == wire, payload
+
+    # The short form still decodes -- it is input, not output.
+    assert decode(b"{foo}").children == [b"foo"]
+    assert encode(decode(b"{foo}")) == b"{#text,foo}"
+
 
 def test_trailing_comma_accepted_never_emitted():
     """§7 rule 2."""
@@ -264,7 +306,7 @@ def test_truncation_at_every_offset_is_rejected_or_parsed():
     for cut in range(1, len(wire)):
         try:
             decode(wire[:cut])
-        except XjarchiveError:
+        except TersemlError:
             pass
         else:
             pytest.fail(f"truncation at {cut} decoded as a whole document: {wire[:cut]!r}")
@@ -320,7 +362,7 @@ def test_shared_vectors(case):
 def test_binary_form_selection(payload, expected_form):
     """§5.1: shortest wins, ties break counted/terminated/inline. Mandatory,
     so that one document has exactly one encoding."""
-    from xjarchive import choose_form
+    from terseml import choose_form
     assert choose_form(payload) == expected_form
 
 

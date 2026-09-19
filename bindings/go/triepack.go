@@ -17,7 +17,7 @@ func Decode(buffer []byte) (map[string]interface{}, error) {
 
 // Version is kept in step with triepack-version.txt by
 // scripts/sync_version.sh.
-const Version = "1.3.2"
+const Version = "2.0.0"
 
 // Version of the on-disk .trp format this implementation writes. Distinct
 // from the library version: it changes only when the bytes change.

@@ -1,4 +1,4 @@
-# triepack v1.3.2
+# triepack v2.0.0
 
 [![CI Build & Test](https://github.com/deftio/triepack/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/triepack/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/v/release/deftio/triepack?sort=semver&logo=github&logoColor=white&label=GitHub&color=24292F)](https://github.com/deftio/triepack/releases)
@@ -207,8 +207,8 @@ each one and compare:
 
 ```js
 require('triepack').version()
-// { name: 'triepack', implementation: 'javascript', version: '1.3.1',
-//   versionMajor: 1, versionMinor: 3, versionPatch: 1,
+// { name: 'triepack', implementation: 'javascript', version: '2.0.0',
+//   versionMajor: 2, versionMinor: 0, versionPatch: 0,
 //   formatVersionMajor: 1, formatVersionMinor: 0, maxAlphabetSize: 249 }
 ```
 
@@ -282,12 +282,16 @@ See `docs/internals/` for format details.
 
 ## Project Status
 
-**v1.3.1.** Core C library (bitstream, trie codec, JSON), C++ wrapper, and 8
+**v2.0.0.** Core C library (bitstream, trie codec, JSON), C++ wrapper, and 8
 language bindings (Python, JavaScript, TypeScript, Go, Rust, Swift, Kotlin,
-Java) are implemented. Python and JavaScript are at **100% line coverage**;
-C/C++ is at **99.5% lines and 100% of functions**, the remainder being guards
-only a corrupt dictionary reaches. CI enforces a floor and runs the whole
-suite under AddressSanitizer and UndefinedBehaviorSanitizer.
+Java) are implemented. CI enforces floors of 97% lines and 80% branches on
+the C library, and runs the whole suite under AddressSanitizer and
+UndefinedBehaviorSanitizer — the leak half only exists on Linux, and it is
+what caught the leak fixed in 1.3.2.
+
+What is *not* implemented is listed in [Status](docs/status.md), which exists
+because that gap was once large and undocumented. Read it before relying on
+anything a header names.
 
 All ten implementations run a [shared conformance
 suite](tests/conformance/README.md): for each of 50 cases every one must
@@ -310,10 +314,18 @@ for byte, and reject the same 11 malformed buffers. About 1,600 tests in total.
 - [x] PyPI package for Python
 - [ ] crates.io package for Rust
 
-### v1.2 — Format Enhancements
-- [ ] Suffix table (shared ending compression)
-- [ ] Huffman symbol encoding (for large dictionaries)
-- [ ] Nested dict values (embed sub-dictionaries inline)
+### Format v2 — the next format, not a v1 extension
+The 249-symbol alphabet limit, the absent suffix table and the O(n) value
+lookup are not things v1 can be patched into. They are the subject of
+[format v2](docs/internals/format-spec-v2.md), which breaks the header:
+
+- [ ] LOUDS-encoded trie with rank/select — no alphabet limit, O(1) value lookup
+- [ ] Suffix-merged tail pool (shared endings)
+- [ ] 1 GB+ inputs within a bounded memory budget
+- [x] Bit vector, rank/select and tail pool libraries, with a measurement prototype
+
+See [the implementation plan](docs/internals/v2-implementation-plan.md) for
+sequencing across ten implementations.
 
 ### v1.3 — Tooling & Ecosystem
 - [x] `trp` CLI: encode/decode/validate/inspect
@@ -325,7 +337,7 @@ for byte, and reject the same 11 malformed buffers. About 1,600 tests in total.
 ## Contributing
 
 Bug reports and pull requests are welcome. See
-[CONTRIBUTING.md](.github/CONTRIBUTING.md) for how to build and test each
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to build and test each
 target, and for what a change to the binary format has to satisfy — every
 implementation has to agree byte for byte, which the
 [conformance suite](tests/conformance/README.md) checks.
@@ -335,6 +347,17 @@ Security issues go through [SECURITY.md](SECURITY.md) rather than the public
 tracker.
 
 Releases are cut with `./scripts/make-release.sh`; see [RELEASE.md](RELEASE.md).
+
+## terseml — a subproject, not a feature
+
+[`terseml/`](terseml/) is a separate thing that lives in this repository: a
+positional encoding for tag / attribute / content trees (`.tsml`), with a
+formal grammar and implementations in C, Python and JavaScript.
+
+It links nothing from TriePack and TriePack links nothing from it. **It is
+not published to any registry.** TriePack stores a dictionary; terseml carries
+a tree; they do not pipe into each other. See
+[the terseml page](docs/pages/terseml.md) for what it is and how to build it.
 
 ## License
 

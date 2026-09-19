@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""xjarchive -- reference encoder and decoder.
+"""terseml -- reference encoder and decoder.
 
 Implements GRAMMAR.md exactly. This is the reference:
 where the code and the grammar disagree, the grammar is right and the code is
@@ -9,22 +9,33 @@ A node is one of:
     (tag, attrs, children)   an element; attrs is a list of (key, value)
     bytes                    text
 
-Everything is bytes. A xjarchive document is a byte string and the decoder must
+Everything is bytes. A terseml document is a byte string and the decoder must
 not assume UTF-8 -- an encoding that only works for text is one that silently
 corrupts binary.
 
 Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import List, Tuple, Union
 
+# Reserved tags. The grammar has one node type; these conventions give the
+# rest of the XML infoset a home without changing it. A profile that does not
+# use them simply never emits them.
+# terseml tracks the TriePack release version for now; see terseml.h for why,
+# and expect the two to diverge once this is spun out.
+__version__ = "2.0.0"
+
 IMPLICIT_TAG = b"#text"
+COMMENT_TAG = b"#comment"
+PI_TAG = b"#pi"
+RESERVED_TAGS = (IMPLICIT_TAG, COMMENT_TAG, PI_TAG)
 MAX_DEPTH = 256
 VARINT_MAX_GROUPS = 10
 
 
-class XjarchiveError(ValueError):
+class TersemlError(ValueError):
     """Malformed input. The decoder rejects rather than guesses (grammar §6)."""
 
 
@@ -42,6 +53,16 @@ Node = Union[Element, bytes]
 # Encoding
 # ---------------------------------------------------------------------------
 
+# Escaping is a handful of bulk substitutions, not a walk. The backslash has
+# to go first or the escapes we add get escaped again.
+_ESC_CHAINS = {
+    b",{}": ((b"\\", b"\\\\"), (b",", b"\\,"), (b"{", b"\\{"), (b"}", b"\\}")),
+    b":,]": ((b"\\", b"\\\\"), (b":", b"\\:"), (b",", b"\\,"), (b"]", b"\\]")),
+    b",]": ((b"\\", b"\\\\"), (b",", b"\\,"), (b"]", b"\\]")),
+    b"{}": ((b"\\", b"\\\\"), (b"{", b"\\{"), (b"}", b"\\}")),
+}
+
+
 def _escape(raw: bytes, reserved: bytes, escape_leading: bytes = b"") -> bytes:
     """Escape exactly the reserved bytes and no others (grammar §5, §7 rule 4).
 
@@ -49,14 +70,14 @@ def _escape(raw: bytes, reserved: bytes, escape_leading: bytes = b"") -> bytes:
     bytes -- on Wikipedia text, escaping commas and brackets that never needed
     it cost 888,576 bytes and inverted a comparison.
     """
-    out = bytearray()
-    for i, b in enumerate(raw):
-        ch = bytes([b])
-        if ch == b"\\" or ch in _split(reserved) or (i == 0 and ch in _split(escape_leading)):
-            out += b"\\" + ch
-        else:
-            out += ch
-    return bytes(out)
+    for needle, repl in _ESC_CHAINS[reserved]:
+        if needle in raw:
+            raw = raw.replace(needle, repl)
+    # §4.2: a '[' is only structural as the first byte of the content slot,
+    # and nothing above can have moved it.
+    if escape_leading and raw[:1] == escape_leading:
+        raw = b"\\" + raw
+    return raw
 
 
 def _split(bs: bytes) -> set:
@@ -77,10 +98,10 @@ def _read_varint(buf: bytes, i: int):
     n = shift = groups = 0
     while True:
         if i >= len(buf):
-            raise XjarchiveError("truncated varint")
+            raise TersemlError("truncated varint")
         groups += 1
         if groups > VARINT_MAX_GROUPS:
-            raise XjarchiveError("varint longer than 10 groups")
+            raise TersemlError("varint longer than 10 groups")
         b = buf[i]
         i += 1
         n |= (b & 0x7F) << shift
@@ -142,13 +163,15 @@ def _merge_text(children: List[Node]) -> List[Node]:
 
 
 def encode(node: Node, depth: int = 0) -> bytes:
-    """Encode one node into canonical xjarchive (grammar §7)."""
+    """Encode one node into canonical terseml (grammar §7)."""
     if depth > MAX_DEPTH:
-        raise XjarchiveError(f"nesting deeper than {MAX_DEPTH}")
+        raise TersemlError(f"nesting deeper than {MAX_DEPTH}")
 
     if isinstance(node, (bytes, bytearray)):
-        # Bare text at document level is a singleton element.
-        return b"{" + _escape(bytes(node), b"{}", b"[") + b"}"
+        # §7 rule 7: bare text is written with the implicit tag spelled out.
+        # The short form {foo} would make a comma in the content structural --
+        # {a,b} reads back as an element -- for six saved bytes.
+        return encode(Element(IMPLICIT_TAG, [], [bytes(node)]), depth)
 
     tag = _escape(node.tag, b",{}")
     out = bytearray(b"{" + tag)
@@ -177,9 +200,9 @@ def encode(node: Node, depth: int = 0) -> bytes:
                     out += _encode_binary(payload, form)
             else:
                 out += encode(child, depth + 1)
-    elif node.tag != IMPLICIT_TAG:
-        # §4.3: an element with a tag always has a comma, so that {foo} stays
-        # available for the singleton.
+    else:
+        # §4.3: an element always has a comma, so that {foo} stays available
+        # to mean the singleton on the way in.
         out += b","
 
     return bytes(out + b"}")
@@ -203,7 +226,7 @@ class _Reader:
 
     def peek(self) -> bytes:
         if self.eof():
-            raise XjarchiveError("unexpected end of input")
+            raise TersemlError("unexpected end of input")
         return self.buf[self.i : self.i + 1]
 
     def take(self) -> bytes:
@@ -214,7 +237,7 @@ class _Reader:
     def expect(self, ch: bytes) -> None:
         got = self.take()
         if got != ch:
-            raise XjarchiveError(f"expected {ch!r} at offset {self.i - 1}, got {got!r}")
+            raise TersemlError(f"expected {ch!r} at offset {self.i - 1}, got {got!r}")
 
 
 # Every reserved byte, per grammar §2: a byte reserved in one position must be
@@ -223,24 +246,48 @@ class _Reader:
 _VALID_ESCAPES = _split(b"{}[],:\\")
 
 
+# One compiled scanner per stop set. Most content contains no structural
+# bytes at all, so the common case is a single search and a single slice
+# rather than a Python-level loop over every byte.
+_SCAN = {
+    b",{}": re.compile(rb"[,{}\\]"),
+    b":,]": re.compile(rb"[:,\]\\]"),
+    b",]": re.compile(rb"[,\]\\]"),
+    b"{}": re.compile(rb"[{}\\]"),
+}
+
+
 def _read_escaped(r: _Reader, stop: bytes) -> bytes:
     """Read until an unescaped byte in `stop`. Does not consume the stop byte."""
-    out = bytearray()
+    scan = _SCAN[stop]
+    buf = r.buf
+    start = r.i
+    m = scan.search(buf, start)
+    if m is None:
+        raise TersemlError("unterminated element")
+    if buf[m.start()] != 0x5C:  # backslash
+        r.i = m.start()
+        return buf[start : r.i]
+
+    # There is at least one escape, so assemble the runs between them.
+    parts = []
+    pos = start
     while True:
-        if r.eof():
-            raise XjarchiveError("unterminated element")
-        ch = r.peek()
-        if ch == b"\\":
-            r.take()
-            nxt = r.take()
-            if nxt not in _VALID_ESCAPES:
-                # §6: an unknown escape means a version mismatch, not a literal.
-                raise XjarchiveError(f"invalid escape \\{nxt.decode('latin-1')}")
-            out += nxt
-            continue
-        if ch in _split(stop):
-            return bytes(out)
-        out += r.take()
+        if m is None:
+            raise TersemlError("unterminated element")
+        j = m.start()
+        if buf[j] != 0x5C:
+            parts.append(buf[pos:j])
+            r.i = j
+            return b"".join(parts)
+        nxt = buf[j + 1 : j + 2]
+        if nxt not in _VALID_ESCAPES:
+            # §6: an unknown escape means a version mismatch, not a literal.
+            raise TersemlError(f"invalid escape \\{nxt.decode('latin-1', 'replace')}")
+        parts.append(buf[pos:j])
+        parts.append(nxt)
+        pos = j + 2
+        m = scan.search(buf, pos)
 
 
 def _read_binary(r: _Reader) -> bytes:
@@ -252,14 +299,14 @@ def _read_binary(r: _Reader) -> bytes:
         # length read from the file and trusted is how a decoder is made to
         # abort on a ten-byte input.
         if n > len(r.buf) - i:
-            raise XjarchiveError(f"binary run claims {n} bytes, {len(r.buf) - i} remain")
+            raise TersemlError(f"binary run claims {n} bytes, {len(r.buf) - i} remain")
         r.i = i + n
         return r.buf[i : i + n]
 
     out = bytearray()
     while True:
         if r.eof():
-            raise XjarchiveError("unterminated binary run")
+            raise TersemlError("unterminated binary run")
         ch = r.take()
         if ch == b"\x00":
             return bytes(out)
@@ -270,14 +317,14 @@ def _read_binary(r: _Reader) -> bytes:
             elif nxt == b"\\":
                 out += b"\\"
             else:
-                raise XjarchiveError(f"invalid escape in binary run: \\{nxt.decode('latin-1')}")
+                raise TersemlError(f"invalid escape in binary run: \\{nxt.decode('latin-1')}")
             continue
         out += ch
 
 
 def _decode_element(r: _Reader, depth: int) -> Element:
     if depth > MAX_DEPTH:
-        raise XjarchiveError(f"nesting deeper than {MAX_DEPTH}")
+        raise TersemlError(f"nesting deeper than {MAX_DEPTH}")
     r.expect(b"{")
 
     head = _read_escaped(r, b",{}")
@@ -290,7 +337,7 @@ def _decode_element(r: _Reader, depth: int) -> Element:
 
     if ch == b"{":
         # A tag immediately followed by a child, with no comma, is not legal.
-        raise XjarchiveError("element with children must have a comma after the tag")
+        raise TersemlError("element with children must have a comma after the tag")
 
     r.expect(b",")
     el = Element(head)
@@ -302,7 +349,7 @@ def _decode_element(r: _Reader, depth: int) -> Element:
             while True:
                 key = _read_escaped(r, b":,]")
                 if r.peek() != b":":
-                    raise XjarchiveError("attribute pair without ':'")
+                    raise TersemlError("attribute pair without ':'")
                 r.take()
                 val = _read_escaped(r, b",]")
                 el.attrs.append((key, val))
@@ -319,32 +366,38 @@ def _decode_element(r: _Reader, depth: int) -> Element:
             r.take()
             return el
 
-    # Content: text and child elements, in order.
+    # Content: text and child elements, in order. Indexing the buffer
+    # directly here rather than going through the reader's methods: this loop
+    # runs once per child and the call overhead dominated everything else.
+    buf = r.buf
+    n = len(buf)
+    append = el.children.append
     while True:
-        if r.eof():
-            raise XjarchiveError("unterminated element")
-        ch = r.peek()
-        if ch == b"}":
-            r.take()
+        i = r.i
+        if i >= n:
+            raise TersemlError("unterminated element")
+        ch = buf[i]
+        if ch == 0x7D:  # }
+            r.i = i + 1
             return el
-        if ch == b"{":
-            el.children.append(_decode_element(r, depth + 1))
+        if ch == 0x7B:  # {
+            append(_decode_element(r, depth + 1))
             continue
-        if ch == b"\\" and r.buf[r.i + 1 : r.i + 2] in (b"b", b"B"):
+        if ch == 0x5C and buf[i + 1 : i + 2] in (b"b", b"B"):
             # §5.1. A letter after the escape byte introduces a command; the
             # reserved bytes are all punctuation, so the two cannot collide.
-            el.children.append(_read_binary(r))
+            append(_read_binary(r))
             continue
         text = _read_escaped(r, b"{}")
         if text:
-            el.children.append(text)
+            append(text)
 
 
 def decode(buf: bytes) -> Element:
     r = _Reader(buf)
     el = _decode_element(r, 0)
     if not r.eof():
-        raise XjarchiveError(f"trailing bytes at offset {r.i}")
+        raise TersemlError(f"trailing bytes at offset {r.i}")
     return el
 
 

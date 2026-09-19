@@ -70,7 +70,21 @@ add_test(NAME v2_prototype_roundtrip
          COMMAND v2_prototype "${CMAKE_SOURCE_DIR}/tests/data/common_words_10k.txt")
 set_tests_properties(v2_prototype_roundtrip PROPERTIES LABELS "v2")
 
-# xjarchive reference grammar tests (Python). Skipped when pytest is absent
+# terseml C implementation. It is a standalone library -- no triepack
+# dependency -- checked against the same vectors.json corpus the Python and
+# JavaScript suites read, so three implementations agree with one file rather
+# than with each other.
+add_executable(test_terseml_c "${CMAKE_SOURCE_DIR}/terseml/test_terseml.c"
+                              "${CMAKE_SOURCE_DIR}/terseml/terseml.c")
+target_include_directories(test_terseml_c PRIVATE "${CMAKE_SOURCE_DIR}/terseml")
+add_test(NAME terseml_c COMMAND test_terseml_c)
+set_tests_properties(terseml_c PROPERTIES LABELS "terseml")
+
+add_executable(tsml "${CMAKE_SOURCE_DIR}/terseml/tsml_cli.c"
+                    "${CMAKE_SOURCE_DIR}/terseml/terseml.c")
+target_include_directories(tsml PRIVATE "${CMAKE_SOURCE_DIR}/terseml")
+
+# terseml reference grammar tests (Python). Skipped when pytest is absent
 # rather than failing a C-only build.
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
@@ -81,12 +95,13 @@ if(Python3_Interpreter_FOUND)
                     RESULT_VARIABLE TP_PYTEST_MISSING
                     OUTPUT_QUIET ERROR_QUIET)
     if(TP_PYTEST_MISSING EQUAL 0)
-        add_test(NAME xjarchive_grammar
+        add_test(NAME terseml_grammar
                  COMMAND ${Python3_EXECUTABLE} -m pytest -q
-                         "${CMAKE_SOURCE_DIR}/xjarchive/test_xjarchive.py")
-        set_tests_properties(xjarchive_grammar PROPERTIES LABELS "xjarchive")
+                         "${CMAKE_SOURCE_DIR}/terseml/test_terseml.py"
+                         "${CMAKE_SOURCE_DIR}/terseml/test_xml_bridge.py")
+        set_tests_properties(terseml_grammar PROPERTIES LABELS "terseml")
     else()
-        message(STATUS "xjarchive grammar tests skipped: ${Python3_EXECUTABLE} has no pytest")
+        message(STATUS "terseml grammar tests skipped: ${Python3_EXECUTABLE} has no pytest")
     endif()
 endif()
 

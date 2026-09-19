@@ -25,6 +25,9 @@
 #     bindings/java/.../TriePack.java       bindings/kotlin/.../TriePack.kt
 #   docs/_config.yml                        version shown in the site header
 #   README.md                               title line
+#   terseml/terseml.{h,py,js}               TSML_VERSION / __version__ / VERSION
+#     terseml is a subproject, not a component. It tracks this version while it
+#     lives here; spinning it out means deleting those three entries.
 #
 # Derived automatically, so not listed above and never edited by hand:
 #   CMakeLists.txt        reads triepack-version.txt directly
@@ -181,6 +184,21 @@ update_file "bindings/java TriePack.java VERSION" \
 update_file "bindings/kotlin TriePack.kt VERSION" \
     "bindings/kotlin/src/main/kotlin/com/deftio/triepack/TriePack.kt" \
     "s|(const val VERSION = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+# --------------------------------------------------------------------------
+# terseml -- a subproject in this repository, not a TriePack component. It
+# tracks this version for now because one number across one repository is less
+# confusing than two; when it is spun out it will version independently and
+# these three lines come out of this script.
+# --------------------------------------------------------------------------
+update_file "terseml/terseml.h TSML_VERSION" "terseml/terseml.h" \
+    "s|(#define TSML_VERSION \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+update_file "terseml/terseml.py __version__" "terseml/terseml.py" \
+    "s|^(__version__ = \")${SEMVER}(\")|\${1}${VERSION}\${2}|"
+
+update_file "terseml/terseml.js VERSION" "terseml/terseml.js" \
+    "s|(const VERSION = ')${SEMVER}(')|\${1}${VERSION}\${2}|"
 
 # --------------------------------------------------------------------------
 # Docs site and README

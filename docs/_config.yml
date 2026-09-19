@@ -1,5 +1,5 @@
 title: TriePack
-version: "1.3.2"
+version: "2.0.0"
 description: Compressed trie-based dictionary format for fast, compact key-value storage
 theme: minima
 baseurl: "/triepack"
@@ -17,6 +17,9 @@ header_pages:
   - guide/building.md
   - builds.md
   - releases.md
+
+# terseml is documented on the site but is not a TriePack feature, so it is
+# deliberately absent from header_pages: reachable by link, not in the nav.
 
 exclude:
   - build/

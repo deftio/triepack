@@ -1,12 +1,12 @@
 'use strict';
 /**
- * xjarchive -- reference encoder and decoder (JavaScript).
+ * terseml -- reference encoder and decoder (JavaScript).
  *
  * Implements GRAMMAR.md exactly. Where this code and the grammar disagree,
  * the grammar is right and this is a bug.
  *
  * A node is either an Element, or a Uint8Array of text/binary. Everything is
- * bytes: a xjarchive document is a byte string and the decoder must not assume
+ * bytes: a terseml document is a byte string and the decoder must not assume
  * UTF-8, because an encoding that only works for text is one that silently
  * corrupts binary.
  *
@@ -18,11 +18,15 @@
  * Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
  */
 
+// terseml tracks the TriePack release version for now; see terseml.h for why,
+// and expect the two to diverge once this is spun out.
+const VERSION = '2.0.0';
+
 const IMPLICIT_TAG = Buffer.from('#text');
 const MAX_DEPTH = 256;
 const VARINT_MAX_GROUPS = 10;
 
-class XjarchiveError extends Error {}
+class TersemlError extends Error {}
 
 class Element {
     constructor(tag, attrs = [], children = []) {
@@ -68,8 +72,8 @@ function readVarint(buf, i) {
     let shift = 1;
     let groups = 0;
     for (;;) {
-        if (i >= buf.length) throw new XjarchiveError('truncated varint');
-        if (++groups > VARINT_MAX_GROUPS) throw new XjarchiveError('varint longer than 10 groups');
+        if (i >= buf.length) throw new TersemlError('truncated varint');
+        if (++groups > VARINT_MAX_GROUPS) throw new TersemlError('varint longer than 10 groups');
         const b = buf[i++];
         n += (b & 0x7f) * shift;
         shift *= 128;
@@ -145,14 +149,13 @@ const R_VAL = [0x2c, 0x5d];
 const R_TEXT = [0x7b, 0x7d];
 
 function encode(node, depth = 0) {
-    if (depth > MAX_DEPTH) throw new XjarchiveError(`nesting deeper than ${MAX_DEPTH}`);
+    if (depth > MAX_DEPTH) throw new TersemlError(`nesting deeper than ${MAX_DEPTH}`);
 
     if (!(node instanceof Element)) {
-        return Buffer.concat([
-            Buffer.from('{'),
-            escapeBytes(node, R_TEXT, 0x5b),
-            Buffer.from('}'),
-        ]);
+        // §7 rule 7: bare text is written with the implicit tag spelled out.
+        // The short form {foo} would make a comma in the content structural --
+        // {a,b} reads back as an element -- for six saved bytes.
+        return encode(new Element(IMPLICIT_TAG, [], [node]), depth);
     }
 
     const parts = [Buffer.from('{'), escapeBytes(node.tag, R_TAG)];
@@ -185,7 +188,9 @@ function encode(node, depth = 0) {
                 );
             }
         });
-    } else if (!node.tag.equals(IMPLICIT_TAG)) {
+    } else {
+        // §4.3: an element always has a comma, so that {foo} stays available
+        // to mean the singleton on the way in.
         parts.push(Buffer.from(','));
     }
 
@@ -210,7 +215,7 @@ class Reader {
         return this.i >= this.buf.length;
     }
     peek() {
-        if (this.eof()) throw new XjarchiveError('unexpected end of input');
+        if (this.eof()) throw new TersemlError('unexpected end of input');
         return this.buf[this.i];
     }
     take() {
@@ -220,20 +225,20 @@ class Reader {
     }
     expect(byte) {
         const got = this.take();
-        if (got !== byte) throw new XjarchiveError(`expected ${byte} at ${this.i - 1}, got ${got}`);
+        if (got !== byte) throw new TersemlError(`expected ${byte} at ${this.i - 1}, got ${got}`);
     }
 }
 
 function readEscaped(r, stop) {
     const out = [];
     for (;;) {
-        if (r.eof()) throw new XjarchiveError('unterminated element');
+        if (r.eof()) throw new TersemlError('unterminated element');
         const ch = r.peek();
         if (ch === BSLASH) {
             r.take();
             const nxt = r.take();
             if (!isSet(VALID_ESCAPES, nxt)) {
-                throw new XjarchiveError(`invalid escape \\${String.fromCharCode(nxt)}`);
+                throw new TersemlError(`invalid escape \\${String.fromCharCode(nxt)}`);
             }
             out.push(nxt);
             continue;
@@ -252,7 +257,7 @@ function readBinary(r) {
         const [n, i] = readVarint(r.buf, r.i);
         // §6: validate the length against what remains BEFORE allocating.
         if (n > r.buf.length - i) {
-            throw new XjarchiveError(`binary run claims ${n} bytes, ${r.buf.length - i} remain`);
+            throw new TersemlError(`binary run claims ${n} bytes, ${r.buf.length - i} remain`);
         }
         r.i = i + n;
         return r.buf.subarray(i, i + n);
@@ -260,14 +265,14 @@ function readBinary(r) {
 
     const out = [];
     for (;;) {
-        if (r.eof()) throw new XjarchiveError('unterminated binary run');
+        if (r.eof()) throw new TersemlError('unterminated binary run');
         const ch = r.take();
         if (ch === NUL) return Buffer.from(out);
         if (ch === BSLASH) {
             const nxt = r.take();
             if (nxt === 0x30) out.push(NUL);
             else if (nxt === BSLASH) out.push(BSLASH);
-            else throw new XjarchiveError(`invalid escape in binary run: \\${String.fromCharCode(nxt)}`);
+            else throw new TersemlError(`invalid escape in binary run: \\${String.fromCharCode(nxt)}`);
             continue;
         }
         out.push(ch);
@@ -275,7 +280,7 @@ function readBinary(r) {
 }
 
 function decodeElement(r, depth) {
-    if (depth > MAX_DEPTH) throw new XjarchiveError(`nesting deeper than ${MAX_DEPTH}`);
+    if (depth > MAX_DEPTH) throw new TersemlError(`nesting deeper than ${MAX_DEPTH}`);
     r.expect(0x7b); // {
 
     const head = readEscaped(r, [0x2c, 0x7b, 0x7d]);
@@ -286,7 +291,7 @@ function decodeElement(r, depth) {
         return new Element(IMPLICIT_TAG, [], head.length ? [head] : []);
     }
     if (ch === 0x7b) {
-        throw new XjarchiveError('element with children must have a comma after the tag');
+        throw new TersemlError('element with children must have a comma after the tag');
     }
 
     r.expect(0x2c); // ,
@@ -297,7 +302,7 @@ function decodeElement(r, depth) {
         if (r.peek() !== 0x5d) {
             for (;;) {
                 const key = readEscaped(r, [0x3a, 0x2c, 0x5d]);
-                if (r.peek() !== 0x3a) throw new XjarchiveError("attribute pair without ':'");
+                if (r.peek() !== 0x3a) throw new TersemlError("attribute pair without ':'");
                 r.take();
                 const val = readEscaped(r, [0x2c, 0x5d]);
                 el.attrs.push([key, val]);
@@ -318,7 +323,7 @@ function decodeElement(r, depth) {
     }
 
     for (;;) {
-        if (r.eof()) throw new XjarchiveError('unterminated element');
+        if (r.eof()) throw new TersemlError('unterminated element');
         const c = r.peek();
         if (c === 0x7d) {
             r.take();
@@ -342,7 +347,7 @@ function decodeElement(r, depth) {
 function decode(buf) {
     const r = new Reader(Buffer.from(buf));
     const el = decodeElement(r, 0);
-    if (!r.eof()) throw new XjarchiveError(`trailing bytes at offset ${r.i}`);
+    if (!r.eof()) throw new TersemlError(`trailing bytes at offset ${r.i}`);
     return el;
 }
 
@@ -355,7 +360,8 @@ function decodeDocument(buf) {
 
 module.exports = {
     Element,
-    XjarchiveError,
+    TersemlError,
+    VERSION,
     IMPLICIT_TAG,
     MAX_DEPTH,
     encode,

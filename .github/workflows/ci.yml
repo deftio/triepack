@@ -47,7 +47,7 @@ jobs:
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
 
-      # The xjarchive grammar tests are Python; without pytest the CMake guard
+      # The terseml grammar tests are Python; without pytest the CMake guard
       # skips them, which would silently drop them from CI.
       - name: Install pytest for the grammar tests
         run: python3 -m pip install --quiet --break-system-packages pytest
@@ -143,6 +143,34 @@ jobs:
         run: |
           if ! git diff --exit-code -- tests/conformance tests/fixtures; then
             echo "::error::tests/conformance is stale — run the generators (see tests/conformance/README.md) and commit the result"
+            exit 1
+          fi
+
+  terseml:
+    name: terseml (C, C++, Python, JavaScript)
+    runs-on: ubuntu-latest
+
+    # terseml is a standalone subproject -- it does not link triepack. Three
+    # implementations are only worth having if they agree, so all three run
+    # against the one generated corpus in the same job.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pytest
+        run: python3 -m pip install --quiet --break-system-packages pytest
+
+      - name: C, sanitized C, C++, Python, JavaScript
+        run: make -C terseml check
+
+      # vectors.json and vectors.h are generated from terseml.py. If the
+      # encoder changes and the corpus does not, the C and JavaScript suites
+      # keep testing the old bytes and pass while disagreeing.
+      - name: The generated corpus is in sync
+        run: |
+          make -C terseml vectors
+          if ! git diff --exit-code -- terseml/vectors.json terseml/vectors.h; then
+            echo "::error::terseml vectors are stale — run 'make -C terseml vectors' and commit the result"
             exit 1
           fi
 

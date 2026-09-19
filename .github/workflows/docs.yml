@@ -54,8 +54,12 @@ jobs:
           lcov --capture --directory . --output-file lcov_raw.info \
             --rc branch_coverage=1 \
             --ignore-errors empty,empty,unused,unused
+          # Same scope as coverage.yml -- the library, not terseml or tools.
+          # This one also feeds the badge on the site, so a drift here
+          # publishes a number that disagrees with the gate.
           lcov --remove lcov_raw.info \
             '*/tests/*' '*/_deps/*' '/usr/*' '*/examples/*' \
+            '*/terseml/*' '*/tools/*' \
             --output-file lcov.info \
             --rc branch_coverage=1 \
             --ignore-errors empty,empty,unused,unused,inconsistent

@@ -95,10 +95,15 @@ fi
 # ---------------------------------------------------------------------------
 if [[ "${TARGET}" == "swift" || "${TARGET}" == "all" ]]; then
     step "Swift on Linux"
+    # The container mounts the repository, so it writes the same
+    # bindings/swift/.build the host uses. Leaving Linux artifacts there makes
+    # the next `swift test` on macOS fail with "command ... not registered",
+    # which looks like a broken binding and is not one. Build somewhere else.
     "${RUNTIME}" run --rm -v "${PROJECT_ROOT}":/src -w /src/bindings/swift swift:5.10-jammy bash -c '
         set -eo pipefail
         swift --version 2>&1 | head -1 | sed "s/^/  /"
-        swift test 2>&1 | grep -E "Executed [0-9]+ tests" | tail -1 | sed "s/^/  /"
+        swift test --scratch-path /tmp/swift-build 2>&1 \
+            | grep -E "Executed [0-9]+ tests" | tail -1 | sed "s/^/  /"
     ' || die "the Swift Linux job failed"
     ok "Swift on Linux"
 fi
@@ -144,7 +149,9 @@ if [[ "${TARGET}" == "coverage" || "${TARGET}" == "all" ]]; then
         cd /tmp/ci-cov
         FLAGS="--rc branch_coverage=1 --ignore-errors empty,unused,inconsistent,mismatch"
         lcov --capture --directory . --output-file raw.info $FLAGS > /dev/null 2>&1
-        lcov --remove raw.info "*/tests/*" "*/_deps/*" "/usr/*" "*/examples/*"              --output-file lcov.info $FLAGS > /dev/null 2>&1
+        # Same scope as coverage.yml: the library, not terseml or tools.
+        lcov --remove raw.info "*/tests/*" "*/_deps/*" "/usr/*" "*/examples/*" \
+             "*/terseml/*" "*/tools/*" --output-file lcov.info $FLAGS > /dev/null 2>&1
         SUMMARY=$(lcov --summary lcov.info $FLAGS 2>&1)
         LINES=$(echo "$SUMMARY" | awk "/lines\.*:/ {gsub(\"%\",\"\",\$2); print \$2}")
         BRANCHES=$(echo "$SUMMARY" | awk "/branches\.*:/ {gsub(\"%\",\"\",\$2); print \$2}")

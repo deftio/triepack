@@ -18,9 +18,9 @@ the two cannot drift.
 else is edited by hand:
 
 ```bash
-vi triepack-version.txt             # 1.3.1 -> 1.4.0
+vi triepack-version.txt             # 2.0.0 -> 2.1.0
 ./scripts/sync_version.sh           # propagate to every manifest and binding
-vi CHANGELOG.md                     # write the [1.4.0] section
+vi CHANGELOG.md                     # write the [2.1.0] section
 ./scripts/sync_changelog.sh         # regenerate the releases page
 ```
 

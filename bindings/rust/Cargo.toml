@@ -2,7 +2,7 @@
 
 [package]
 name = "triepack"
-version = "1.3.2"
+version = "2.0.0"
 edition = "2021"
 description = "Native Rust implementation of the TriePack .trp binary format"
 license = "BSD-2-Clause"

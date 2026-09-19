@@ -1,6 +1,6 @@
 {
   "name": "triepack",
-  "version": "1.3.2",
+  "version": "2.0.0",
   "description": "Compressed trie dictionary format (.trp) — compact binary key-value storage with fast lookups and prefix search. Native JavaScript implementation, no dependencies.",
   "keywords": [
     "trie",

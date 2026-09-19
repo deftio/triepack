@@ -4,8 +4,12 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.1.x   | Yes       |
-| < 1.1   | No        |
+| 2.0.x   | Yes       |
+| 1.3.x   | Yes       |
+| < 1.3   | No        |
+
+2.0.0 reads and writes the same on-disk format as 1.3.x, so a fix to the
+decoder applies to both.
 
 Fixes land on `main` and ship in the next release.
 
@@ -46,6 +50,16 @@ an attacker who can supply a whole buffer can supply a matching checksum. Treat
 CRC-32 as corruption detection, never as authentication. Any input from an
 untrusted source should be opened with the full validating path
 (`tp_dict_open`, not `tp_dict_open_unchecked`).
+
+## terseml
+
+[`terseml/`](terseml/) is a subproject in this repository, not part of the
+TriePack library, and is not published to any registry. It parses untrusted
+bytes too, so the same interests apply — particularly a declared `\B` run
+length that is not validated against the remaining input before allocating,
+which is the shape that produced a real denial of service in this codebase.
+
+Report terseml issues through the same private path.
 
 ## Out of scope
 

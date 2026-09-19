@@ -13,6 +13,84 @@ What changed in each version. Downloads are on the
 the full history lives in
 [CHANGELOG.md](https://github.com/deftio/triepack/blob/main/CHANGELOG.md).
 
+## v2.0.0 — 2026-09-19
+
+**This is a library major version, not the format cutover.** Checked against
+the v1.3.2 tag rather than assumed: all 57 checked-in fixtures (7 test, 50
+conformance) are byte-identical, `TP_FORMAT_VERSION_MAJOR`/`MINOR` are still
+1/0, and `triepack.h`, `triepack_common.h` and `triepack_json.h` are
+unchanged to the byte. 1.x readers read 2.0.0 files and 2.0.0 reads 1.x
+files; the on-disk format version moves independently of the release
+version. Two headers are added (`v2_bitvec.h`, `v2_tails.h`) and none
+changed. Format v2 — the LOUDS trie that lifts the 249-symbol
+alphabet limit and makes value lookup O(1) — is specified and prototyped here
+but is **not reachable from the public API**. See
+[the v2 spec](https://github.com/deftio/triepack/blob/main/docs/internals/format-spec-v2.md).
+
+The major bump marks the scope of what landed rather than a break in it: the
+v2 groundwork, a documentation audit that found a substantial gap between
+what this project claimed and what it implemented, and a subproject that now
+shares the repository. **No public C API was removed.** The enum values and
+struct fields that name unimplemented features still exist and still return
+`TP_ERR_UNSUPPORTED`; removing them remains a future break.
+
+### Added
+- **Format v2 groundwork.** `include/triepack/v2_bitvec.h` and
+  `v2_tails.h` with implementations in `src/v2/`: a LOUDS bit vector with
+  rank/select over 2048-bit superblocks and 256-bit blocks, and a
+  suffix-merged tail pool. `tools/v2_prototype.c` serialises a real corpus
+  through the proposed format and verifies every key back out of its own
+  bytes, so it is a conformance check of the format rather than an estimate.
+  **None of this is reachable from the public API yet** — v1 is still the
+  only format the library reads or writes. See
+  [the v2 spec](https://github.com/deftio/triepack/blob/main/docs/internals/format-spec-v2.md) and
+  [implementation plan](https://github.com/deftio/triepack/blob/main/docs/internals/v2-implementation-plan.md).
+- **`docs/triepack-northstar.md`** — what TriePack optimises, what it
+  declines, and the rules a format change has to obey.
+- **`docs/status.md`** — an audit of the gap between what this project
+  documents and what it implements. It exists because that gap was large and
+  undocumented: six encoder option fields of which one was read, two
+  checksum algorithms that do not exist, a suffix table that is fourteen
+  lines ending in `/* TODO */`.
+- **`tests/test_robustness.c` and `tests/test_scale.c`** — corrupted input and
+  large dictionaries. Measuring lookup at scale is what exposed how steep the
+  O(n) value scan is, which is the motivating number for v2.
+- **`terseml/`** — a sibling subproject, not a TriePack feature: a positional
+  encoding for tag / attribute / content trees (`.tsml`) with a formal
+  grammar and independent implementations in C, Python and JavaScript, all
+  checked against one generated conformance corpus. It links nothing from
+  TriePack, TriePack links nothing from it, and it is **not published to any
+  registry**. Documented at [docs/pages/terseml.md](https://github.com/deftio/triepack/blob/main/docs/pages/terseml.md).
+- **`CONTRIBUTING.md`** — the build, test and conformance workflow, written
+  around this repository rather than adapted from another one.
+
+### Changed
+- The encoder **rejects** options naming unimplemented features with
+  `TP_ERR_UNSUPPORTED` instead of accepting and silently ignoring them, and
+  refuses inputs that would overflow the v1 512 MB ceiling rather than
+  producing a corrupt file.
+- `SECURITY.md` supported-version table updated to 1.3.x, with terseml's
+  scope named.
+- `README.md`: corrected a version string and a coverage claim that had never
+  been measured, repointed a broken `CONTRIBUTING.md` link, and moved the
+  suffix-table and Huffman roadmap items to format v2, where they actually
+  live.
+
+### Fixed
+- A memory leak in the JSON decoder's error path: `extract_entries` freed the
+  entry array without freeing the keys each entry owned. A test had exercised
+  it for a long time with nothing watching; the new LeakSanitizer job is what
+  saw it.
+- `tp_bs_reader_create_copy` used `malloc` where the documentation promised a
+  zeroed buffer.
+- **Denial of service in the Rust, Python and JavaScript bindings**: each
+  allocated a length read from the input before checking the input had that
+  many bytes. A corrupt length aborted the process in Rust and raised the
+  wrong error in the other two.
+- `scripts/test-ci-linux.sh` piped `ctest` into `tail`, so the exit status
+  came from `tail` and a failing test suite reported success. All four
+  container scripts now set `-eo pipefail`.
+
 ## v1.3.2 — 2026-09-16
 
 ### Added

@@ -316,7 +316,8 @@ with the full 1 GB set nightly or on demand.
   nothing is deployed, and carrying v1 forward doubles the parity tax
   permanently.
 - **Delete the API surface that names things that do not exist.** 1.3.2 made
-  these refuse rather than silently ignore; 2.0 removes them, which is an API
+  these refuse rather than silently ignore. 2.0.0 did not remove them — it was
+  a version bump over this groundwork, not a break. Removal is an API
   break and therefore belongs here:
   - `tp_addr_mode` — collapse to whatever v2 actually uses
   - `tp_checksum_type` — `SHA256` and `XXHASH64` have no implementation

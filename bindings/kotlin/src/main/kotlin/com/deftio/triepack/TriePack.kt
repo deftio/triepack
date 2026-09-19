@@ -10,7 +10,7 @@
 
 package com.deftio.triepack
 
-const val VERSION = "1.3.2"
+const val VERSION = "2.0.0"
 
 /**
  * Version of the on-disk .trp format this implementation writes. Distinct

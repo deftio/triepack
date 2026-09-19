@@ -1,4 +1,4 @@
-# xjarchive — Grammar
+# terseml — Grammar
 
 <!-- Copyright (c) 2026 M. A. Chatterjee -->
 
@@ -31,8 +31,10 @@ Position carries the same information:
 ```
 
 The saving is proportional to how much of a document is field names, which
-varies enormously — 26.6% of a product catalog, 2.7% of Wikipedia XML. See
-[Comparisons](../docs/comparisons.md).
+varies enormously — 26.6% of a product catalog, 2.7% of Wikipedia XML.
+`bench_corpus.py` measures both; [README.md](README.md) has the tables.
+(`../docs/comparisons.md` is about TriePack, a different format in the same
+repository, and says nothing about this one.)
 
 ## 2. Grammar
 
@@ -74,7 +76,7 @@ binescape   = "\" ( "0" / "\" )        ; \0 is a literal NUL byte
 | `binchar` | any byte except NUL and `\` |
 | `varint` | LEB128: seven payload bits per byte, least significant group first, high bit set on all but the last; at most 10 groups |
 
-Bytes, not characters: a xjarchive document is a byte string and a decoder
+Bytes, not characters: a terseml document is a byte string and a decoder
 must not assume UTF-8. This matters for the same reason it matters in
 [format v2 §7](../docs/internals/format-spec-v2.md) — an encoding that only works for text is
 an encoding that silently corrupts binary.
@@ -119,7 +121,7 @@ singleton — content `foo` with the implicit tag. An element tagged `foo` with
 empty content is `{foo,}`.**
 
 The implicit tag is a parameter of the document, not of the grammar; a
-profile using xjarchive states it (`#text` is the obvious choice).
+profile using terseml states it (`#text` is the obvious choice).
 
 ## 5. What must be escaped, and what must not
 
@@ -141,6 +143,10 @@ one that escapes less is wrong in a way that corrupts.
 | attribute key | `:` `,` `]` `\` | `{` `}` `[` |
 | attribute value | `,` `]` `\` | `:` `{` `}` `[` |
 | text content | `{` `}` `\`, and `[` **only as the first byte** | `,` `:` `]`, and `[` elsewhere |
+
+There is no row for the singleton `{foo}` because an encoder never writes one
+(§7 rule 7). A decoder reading one treats a `,` in it as structural, which is
+exactly why encoders do not produce it.
 
 Worked examples — all of these round-trip:
 
@@ -264,6 +270,18 @@ the same bytes everywhere:
    from the next on the wire, so `["a", "b"]` and `["ab"]` are necessarily the
    same bytes. An encoder given adjacent text nodes concatenates them; a
    decoder always produces at most one text node between any two elements.
+   For the same reason an **empty** text child is dropped: `{p,}` is an
+   element with no children, not one holding a zero-length string.
+7. **The singleton form is accepted but never emitted.** `{foo}` means what
+   §4.3 says it means; an encoder holding that tree writes `{#text,foo}`.
+
+Rule 7 is the cost of rule 4. Inside `{foo}` there is no content slot yet, so
+a comma in the content *is* structural there and nowhere else — `{a,b}` is
+tag `a`, not the text `a,b`. Keeping the short form would mean a fifth column
+in the §5 table and a fifth escaping context in every implementation, all to
+save the six bytes of `#text,` on a construct that a real document reaches
+only at its root. A differential test between two implementations found this:
+one wrote `{a,b}` for the text `a,b` and the other read it back as an element.
 
 Rule 5 is a consequence of the format rather than a preference — it was found
 by a randomised round-trip, not by inspection. Stating it makes the decoder's
@@ -279,12 +297,13 @@ escaping commas and brackets that never needed it cost **888,576 bytes**,
 
 [JsonML](http://www.jsonml.org/) expresses the same idea in valid JSON:
 `["tag", {attributes}, child, ...]`. It needs no custom parser, which is a
-real advantage. xjarchive trades that for the bytes JSON spends on quotes:
-measured on 16 MB of Wikipedia XML, **xjarchive 0.967 of the original against
-JsonML's 0.998** — though once gzipped the two converge (0.366 vs 0.367).
+real advantage. terseml trades that for the bytes JSON spends on quotes:
+measured on 16 MB of Wikipedia XML, **terseml 0.979 of the original against
+JsonML's 1.004** — though once gzipped the two converge (0.368 vs 0.370).
+Reproduce with `python3 bench_corpus.py path/to/enwik9`.
 
 Choose JsonML when the document will be handled by generic JSON tooling.
-Choose xjarchive when it is going into a format that will re-encode it anyway.
+Choose terseml when it is going into a format that will re-encode it anyway.
 
 ## 9. Markup normalisation (optional profile)
 
@@ -316,12 +335,25 @@ Huffman.
 
 ## 10. Conformance
 
-A reference encoder and decoder live in `xjarchive/xjarchive.py`, with the test
-suite in `xjarchive/test_xjarchive.py`. The tests are written from this document,
-not from the implementation, so the grammar is the authority
-([North Star §4.2](../docs/triepack-northstar.md)).
+Three independent implementations live beside this document — `terseml.c`,
+`terseml.py` and `terseml.js` — none of them a binding over another. Their
+tests are written from this document rather than from any implementation, so
+the grammar is the authority ([North Star
+§4.2](../docs/triepack-northstar.md)). `make check` runs all of them.
 
 They cover: every row of the §5 table, every rejection in §6, the canonical
 form of §7, and a randomised round-trip over trees built from adversarial
 byte strings — every reserved byte, in every position, including empty tags,
 empty content and deep nesting.
+
+`vectors.json` and `vectors.h` are the shared corpus, generated together by
+`make_vectors.py` so that no implementation can pass by testing a different
+file. Each encodes every tree to exactly the listed bytes and decodes those
+bytes back to the tree.
+
+**Three implementations is the point, not redundancy.** Two of this
+document's contradictions were found by a randomised round-trip, and the
+third only by running one implementation's bytes through another's parser —
+it had survived 3,000 random trees in *each*, because each decoded its own
+output the way it had encoded it. An ambiguity that every implementation
+resolves the same way by accident is invisible until one of them does not.

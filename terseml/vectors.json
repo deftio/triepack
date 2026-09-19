@@ -1,5 +1,5 @@
 {
- "note": "Shared conformance vectors for xjarchive. See GRAMMAR.md.",
+ "note": "Shared conformance vectors for terseml. See GRAMMAR.md.",
  "cases": [
   {
    "name": "text-plain",

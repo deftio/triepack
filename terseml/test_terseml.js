@@ -1,6 +1,6 @@
 'use strict';
 /**
- * xjarchive conformance tests (JavaScript).
+ * terseml conformance tests (JavaScript).
  *
  * Two things are checked. The shared vectors in vectors.json, which the
  * Python implementation produced and this one must reproduce byte for byte --
@@ -8,14 +8,14 @@
  * And a randomised round-trip, which is what finds the case nobody thought
  * of.
  *
- * No test framework: node test_xjarchive.js
+ * No test framework: node test_terseml.js
  *
  * Copyright (c) 2026 M. A. Chatterjee, BSD-2-Clause.
  */
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const T = require('./xjarchive');
+const T = require('./terseml');
 
 let pass = 0;
 function check(name, fn) {
@@ -75,7 +75,7 @@ for (const [bad, why] of [
     ['{', 'bare brace'],
 ]) {
     check(`reject: ${why}`, () => {
-        assert.throws(() => T.decode(Buffer.from(bad, 'binary')), T.XjarchiveError);
+        assert.throws(() => T.decode(Buffer.from(bad, 'binary')), T.TersemlError);
     });
 }
 
@@ -83,11 +83,11 @@ check('reject: \\B length past end of input', () => {
     // \B with a varint length far larger than what follows -- the shape that
     // must be checked before allocating.
     const wire = Buffer.concat([Buffer.from('{d,\\B'), Buffer.from([0xff, 0xff, 0x7f]), Buffer.from('ab}')]);
-    assert.throws(() => T.decode(wire), T.XjarchiveError);
+    assert.throws(() => T.decode(wire), T.TersemlError);
 });
 
 check('reject: unterminated \\b run', () => {
-    assert.throws(() => T.decode(Buffer.from('{d,\\babc')), T.XjarchiveError);
+    assert.throws(() => T.decode(Buffer.from('{d,\\babc')), T.TersemlError);
 });
 
 // --- randomised round-trip ----------------------------------------------
@@ -150,9 +150,47 @@ check('truncation at every offset is rejected', () => {
         [Buffer.from('text'), new T.Element(Buffer.from('b'), [], [Buffer.from('deep')])]);
     const wire = T.encode(el);
     for (let cut = 1; cut < wire.length; cut++) {
-        assert.throws(() => T.decode(wire.subarray(0, cut)), T.XjarchiveError,
+        assert.throws(() => T.decode(wire.subarray(0, cut)), T.TersemlError,
             `truncation at ${cut} decoded as whole`);
     }
+});
+
+check('\u00a77 rule 7: the singleton is accepted, never emitted', () => {
+    // Inside {foo} there is no content slot yet, so a comma there is
+    // structural. An encoder emitting the short form wrote {a,b} for the text
+    // "a,b" and another implementation read it back as an element tagged "a".
+    assert.ok(T.encode(Buffer.from('foo')).equals(Buffer.from('{#text,foo}')));
+    assert.ok(T.encode(new T.Element(T.IMPLICIT_TAG, [], [Buffer.from('foo')]))
+        .equals(Buffer.from('{#text,foo}')));
+
+    for (const payload of ['a,b', '', '[k:v]', '{x}', ',', ',,,']) {
+        const wire = T.encode(Buffer.from(payload));
+        const back = T.decode(wire);
+        const kids = back.children;
+        assert.ok(kids.length === 0 || kids[0].equals(Buffer.from(payload)),
+            `lost ${JSON.stringify(payload)}`);
+        assert.ok(T.encode(back).equals(wire), `not canonical: ${payload}`);
+    }
+
+    // The short form still decodes -- it is input, not output.
+    assert.ok(T.decode(Buffer.from('{foo}')).children[0].equals(Buffer.from('foo')));
+    assert.ok(T.encode(T.decode(Buffer.from('{foo}'))).equals(Buffer.from('{#text,foo}')));
+});
+
+check('version tracks triepack', () => {
+    // A constant nobody checks is a constant that goes stale, and three
+    // implementations each carrying their own copy is three chances.
+    const fs = require('fs'), path = require('path');
+    const here = __dirname;
+    const expected = fs.readFileSync(
+        path.join(here, '..', 'triepack-version.txt'), 'utf8').trim();
+    assert.strictEqual(T.VERSION, expected,
+        `terseml.js says ${T.VERSION}, triepack-version.txt says ${expected}` +
+        ' -- run ./scripts/sync_version.sh');
+    assert.ok(fs.readFileSync(path.join(here, 'terseml.h'), 'utf8')
+        .includes(`#define TSML_VERSION "${expected}"`), 'terseml.h is stale');
+    assert.ok(fs.readFileSync(path.join(here, 'terseml.py'), 'utf8')
+        .includes(`__version__ = "${expected}"`), 'terseml.py is stale');
 });
 
 console.log(`${pass} checks passed`);

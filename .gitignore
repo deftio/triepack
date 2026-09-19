@@ -74,3 +74,15 @@ bindings/*/build/
 
 # extra stuff
 data/
+
+# terseml standalone Makefile outputs
+terseml/tsml
+terseml/test_terseml_c
+terseml/test_terseml_cxx
+terseml/test_terseml_asan
+terseml/terseml.o
+terseml/*.dSYM/
+
+# clangd index and local sweep builds
+.cache/
+build-sweep/

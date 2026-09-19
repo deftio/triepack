@@ -16,27 +16,33 @@ Sizes will vary slightly by platform and compiler.
 
 | Library                | Size   | Description                                |
 |------------------------|--------|--------------------------------------------|
-| `libtriepack_bitstream.a` | 22 KB  | Arbitrary-width bit field I/O              |
-| `libtriepack_core.a`      | 23 KB  | Trie encoder/decoder, CRC-32, typed values |
+| `libtriepack_bitstream.a` | 23 KB  | Arbitrary-width bit field I/O              |
+| `libtriepack_core.a`      | 26 KB  | Trie encoder/decoder, CRC-32, typed values |
 | `libtriepack_json.a`      | 23 KB  | JSON encode/decode and DOM access          |
-| `libtriepack_wrapper.a`   | 18 KB  | C++ RAII wrappers                          |
-| **Total (all 4)**          | **86 KB** | Complete library stack                  |
+| `libtriepack_wrapper.a`   | 37 KB  | C++ RAII wrappers                          |
+| `libtriepack_v2.a`        | 9 KB   | Format v2 bit vector and tail pool — **not reachable from the public API** |
+| **Total (all 5)**          | **117 KB** | Complete library stack                 |
 
-The `trp` CLI tool (statically linked) is **59 KB**.
+The `trp` CLI tool (statically linked) is **64 KB**.
 
 ## Source Code
 
 | Component          | Language | Lines  | Files |
 |--------------------|----------|--------|-------|
-| Bitstream          | C        | 990    | 7     |
-| Core (trie codec)  | C        | 1,760  | 8     |
-| JSON               | C        | 1,528  | 5     |
-| Public headers     | C        | 694    | 6     |
-| C++ wrapper        | C++      | 653    | 6     |
-| **C/C++ total**    |          | **5,625** |    |
-| JavaScript binding | JS       | 1,076  | 7     |
-| Python binding     | Python   | 890    | 7     |
-| **Grand total**    |          | **7,591** |    |
+| Bitstream          | C        | 1,028  | 6     |
+| Core (trie codec)  | C        | 2,264  | 7     |
+| JSON               | C        | 1,586  | 4     |
+| Format v2 libraries | C       | 380    | 2     |
+| Public headers     | C        | 952    | 7     |
+| C++ wrapper        | C++      | 1,113  | 6     |
+| **C/C++ total**    |          | **7,323** |    |
+| JavaScript binding | JS       | 1,152  | 7     |
+| Python binding     | Python   | 940    | 7     |
+| **Grand total**    |          | **9,415** |    |
+
+Not counted above: [`terseml/`](pages/terseml.md), 3,442 lines across C,
+Python and JavaScript. It is a separate subproject and links nothing from
+TriePack.
 
 ## Example Program Sizes
 
@@ -44,13 +50,13 @@ All examples link statically against the TriePack libraries.
 
 | Example                | Size   | Libraries Used                  |
 |------------------------|--------|---------------------------------|
-| `basic_encode_decode`  | 34 KB  | core, bitstream                 |
-| `rom_lookup`           | 34 KB  | core, bitstream                 |
-| `prefix_search`        | 34 KB  | core, bitstream                 |
-| `compaction_benchmark` | 42 KB  | core, bitstream                 |
-| `cpp_usage`            | 40 KB  | wrapper, core, bitstream        |
-| `json_roundtrip`       | 51 KB  | json, core, bitstream           |
-| `json_complex`         | 51 KB  | json, core, bitstream           |
+| `basic_encode_decode`  | 39 KB  | core, bitstream                 |
+| `rom_lookup`           | 39 KB  | core, bitstream                 |
+| `prefix_search`        | 39 KB  | core, bitstream                 |
+| `compaction_benchmark` | 47 KB  | core, bitstream                 |
+| `cpp_usage`            | 59 KB  | wrapper, core, bitstream        |
+| `json_roundtrip`       | 56 KB  | json, core, bitstream           |
+| `json_complex`         | 56 KB  | json, core, bitstream           |
 
 ## Cross-Language Fixture Files
 

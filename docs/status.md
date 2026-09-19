@@ -8,7 +8,7 @@ title: Status
 <!-- Copyright (c) 2026 M. A. Chatterjee -->
 
 An audit of the gap between what TriePack documents and what it implements,
-as of 1.3.2.
+as of 2.0.0.
 
 This document exists because that gap was large and undocumented. The
 architecture page describes a two-trie design, three addressing modes and
@@ -21,6 +21,10 @@ a system that was never built.
 Nothing here is a plan. [The North Star](triepack-northstar.md) says where
 this is going and [the v2 spec](internals/format-spec-v2.md) says how. This
 page is only concerned with what is true today.
+
+It covers the TriePack library only. [`terseml/`](pages/terseml.md) is a
+separate subproject that happens to live in the same repository; it links
+nothing from TriePack, is not published anywhere, and is not audited here.
 
 ## 1. Core: implemented and tested
 
@@ -56,8 +60,11 @@ Each of these is reachable from a public header or a published document.
 
 As of 1.3.2 the encoder **rejects** options naming unimplemented features
 (`TP_ERR_UNSUPPORTED`) instead of accepting and ignoring them. The enum
-values and struct fields remain until 2.0 removes them, because deleting
-them is an API break.
+values and struct fields are still there. 2.0.0 did **not** remove them —
+that release was a version bump over the v2 groundwork, not an API break, and
+57 checked-in fixtures are byte-identical to 1.3.2's. Deleting them is still
+the right end state and still a break, so it waits for a major that actually
+means to be one.
 
 ## 3. Known defects
 

@@ -9,9 +9,11 @@ title: Testing
 
 TriePack has comprehensive test suites across C, C++, Python, JavaScript, Go,
 Rust, Swift, Kotlin, and Java, with cross-language fixture validation ensuring
-binary compatibility. Python and JavaScript are at **100% line coverage**; C/C++
-is at **99.5% lines and 100% functions**, with the remainder being guards that
-only a corrupt dictionary reaches. CI enforces a floor on both.
+binary compatibility. Python and JavaScript are at **100% line coverage**; the
+C library is at **98.9% lines and 90.6% branches**, the remainder being guards
+that only a corrupt dictionary reaches. CI enforces floors of 97% lines and
+80% branches; every number on this page comes from
+`./scripts/test-ci-linux.sh coverage`.
 
 ## Running C/C++ Tests
 
@@ -47,28 +49,58 @@ npm test
 
 ## Test Summary
 
-| Suite | Test Programs / Files | Total Tests | Line Coverage |
-|-------|----------------------|-------------|---------------|
-| C Bitstream | 6 | 210 | 100% |
-| C Core | 8 | 192 | 97-100% |
-| C JSON | 4 | 122 | 99-100% |
-| C Cross-Language | 2 | 9 | — |
-| C++ Wrappers | 3 | 54 | 99.6-100% |
-| Examples (smoke) | 7 | 7 | — |
-| **C/C++ Total** | **30** | **594** | **99.5%** |
-| Python | 7 | 225 | 100% |
-| JavaScript | 7 | 235 | 100% |
+| Suite | Test Programs / Files | Total Tests | Coverage |
+|-------|----------------------|-------------|----------|
+| C Bitstream | 6 | 210 | |
+| C Core | 8 | 192 | |
+| C JSON | 4 | 122 | |
+| C Cross-Language | 2 | 9 | |
+| C++ Wrappers | 3 | 54 | |
+| Examples (smoke) | 7 | 7 | |
+| **C/C++ Total** | **30** | **594** | **98.9% lines, 90.6% branches** |
+| Python | 7 | 226 | 100% lines |
+| JavaScript | 7 | 236 | 100% lines and branches |
 | Go | 3 | 166 | — |
 | Rust | 3 | 84 | — |
 | Swift | 2 | 36 | — |
 | Kotlin | 3 | 54 | — |
 | Java | 3 | 161 | — |
-| **Grand Total** | **58** | **1,601** | — |
+| **Grand Total** | **58** | **1,603** | — |
+
+`ctest` runs 38 test programs, which includes the examples as smoke tests and
+the terseml conformance binary described below.
 
 Counts include the cross-language conformance suite, which contributes cases
 to every row. The C "Cross-Language" figure is small because
 `test_conformance.c` runs the whole corpus inside two Unity tests rather than
 one per case.
+
+The C/C++ figure is the whole library measured together — `lcov` reports one
+total, not a believable per-file split, so the per-suite column is left empty
+rather than filled with numbers nobody measured. Reproduce it with
+`./scripts/test-ci-linux.sh coverage`.
+
+**What the coverage gate covers.** The floor is about the library:
+`src/`, `wrapper/` and `include/`. Tests, examples, `tools/` and `terseml/`
+are excluded. That exclusion is load-bearing rather than cosmetic — when
+`tools/v2_prototype.c` and `terseml/` were inside the scope the measured
+total read 94.6% and failed a 97% floor, on code the floor was never meant to
+describe.
+
+## terseml
+
+[`terseml/`](https://github.com/deftio/triepack/tree/main/terseml) is a
+separate subproject in this repository, not part of the library. `ctest` runs
+its C conformance binary so the repository build stays honest, but its full
+suite has its own entry point:
+
+```bash
+make -C terseml check     # C, the same under ASan+UBSan, C++ link, Python, JavaScript
+```
+
+It is excluded from the triepack coverage floor, and it has its own
+three-implementation conformance discipline. See
+[the terseml page](../pages/terseml.md).
 
 ## C/C++ Test Organization
 
@@ -373,9 +405,9 @@ lcov --capture --directory build --gcov-tool /tmp/llvm-gcov.sh \
 
 | Language | Measured | Lines | Branches |
 |----------|----------|-------|----------|
-| C/C++ | 3,099 lines, 255 functions | 99.5% (100% of functions) | 85.1% |
-| Python | 601 statements | 100% | — |
-| JavaScript | 7 modules | 100% | 97.3% |
+| C/C++ | 3,102 lines, 1,872 branches | 98.9% | 90.6% |
+| Python | 600 statements | 100% | — |
+| JavaScript | 7 modules | 100% | 100% |
 | Go | — | not measured | — |
 | Rust | — | not measured | — |
 | Swift | — | not measured | — |
@@ -389,11 +421,27 @@ usually means a path stopped being exercised, not that the code got simpler.
 
 ### What is not covered, and why
 
-The fifteen uncovered C lines are all guards that need a dictionary corrupted
-in one specific way — a SKIP symbol that is not a SKIP, a varint that runs off
-the end mid-descent. The corruption sweeps in `test_core_iterate.c` and
-`test_json_decode.c` flip every bit of the body in turn and reach most of
-them, but single-bit flips cannot construct every shape.
+Thirty-five lines, and they are not evenly spread:
+
+| file | uncovered |
+|---|---:|
+| `src/v2/v2_tails.c` | 12 |
+| `src/v2/v2_bitvec.c` | 9 |
+| `src/core/decoder.c` | 8 |
+| `wrapper/src/triepack_wrapper.cpp` | 4 |
+| `src/core/encoder.c` | 2 |
+
+The v1 ones are guards that need a dictionary corrupted in one specific way —
+a SKIP symbol that is not a SKIP, a varint that runs off the end mid-descent.
+The corruption sweeps in `test_core_iterate.c` and `test_json_decode.c` flip
+every bit of the body in turn and reach most of them, but single-bit flips
+cannot construct every shape.
+
+The twenty-one in `src/v2/` are a different thing and should not be read as
+the same: those libraries are new, not reachable from the public API, and
+their tests were written alongside them rather than against a format anyone
+depends on yet. They are the weakest coverage in the tree and the honest
+place to look first.
 
 Two kinds of line are excluded from measurement outright:
 

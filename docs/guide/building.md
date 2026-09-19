@@ -33,6 +33,7 @@ ctest --test-dir build
 | `BUILD_JSON`      | `ON`    | Build the triepack_json library          |
 | `BUILD_DOCS`      | `OFF`   | Generate Doxygen HTML documentation      |
 | `ENABLE_COVERAGE` | `OFF`   | Instrument for code coverage reporting   |
+| `ENABLE_SANITIZERS` | `OFF` | AddressSanitizer + UndefinedBehaviorSanitizer; refuses to combine with `ENABLE_COVERAGE` |
 
 Pass options with `-D`:
 

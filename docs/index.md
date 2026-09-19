@@ -378,7 +378,7 @@ and reconstructs them on decode.
 
 - [Status](status.md) -- what is built, what is design intent, and the known defects
 - [Comparisons](comparisons.md) -- measured against BSON, MessagePack, gzip, and the trie libraries
-- [xjarchive](https://github.com/deftio/triepack/tree/main/xjarchive) -- a sibling subproject: positional tag/attribute/content encoding (`.xja`) with a formal grammar
+- [terseml](terseml.md) -- a sibling subproject, not a TriePack feature: positional tag/attribute/content encoding (`.tsml`) with a formal grammar
 
 - [North Star](triepack-northstar.md) -- what TriePack optimises, what it declines, and the rules a format change must obey
 - [Format Specification v2](internals/format-spec-v2.md) -- proposed successor format: no alphabet limit, suffix sharing, 1 GB+ inputs
@@ -397,6 +397,8 @@ and reconstructs them on decode.
 - [Releases](releases.md) -- release history and downloads
 - [Release Process](guide/release-process.md) -- versioning policy and release checklist
 - [Code Coverage](coverage/) -- line and branch coverage report
+- [Contributing](https://github.com/deftio/triepack/blob/main/CONTRIBUTING.md) -- build, test and conformance workflow
+- [Security Policy](https://github.com/deftio/triepack/blob/main/SECURITY.md) -- private disclosure and scope
 
 ## License
 
