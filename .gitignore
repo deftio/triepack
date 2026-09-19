@@ -71,3 +71,6 @@ build-release/
 # Gradle
 .gradle/
 bindings/*/build/
+
+# extra stuff
+data/

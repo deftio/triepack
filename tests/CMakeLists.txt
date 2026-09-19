@@ -47,6 +47,49 @@ triepack_add_c_test(test_core_integrity    test_core_integrity.c    triepack_cor
 triepack_add_c_test(test_core_iterate      test_core_iterate.c      triepack_core)
 triepack_add_c_test(test_guards           test_guards.c            triepack_core)
 
+# Format v2 groundwork, written test-first from the specification.
+triepack_add_c_test(test_v2_bitvec        test_v2_bitvec.c         triepack_v2)
+triepack_add_c_test(test_v2_louds         test_v2_louds.c          triepack_v2)
+triepack_add_c_test(test_v2_tails         test_v2_tails.c          triepack_v2)
+
+# Robustness against whatever real-world file is sitting in data/ (gitignored,
+# so absent in CI -- the test passes when there is nothing to read).
+triepack_add_c_test(test_robustness       test_robustness.c        triepack_core)
+target_compile_definitions(test_robustness PRIVATE DATA_DIR="${CMAKE_SOURCE_DIR}/data")
+set_tests_properties(test_robustness PROPERTIES LABELS "robustness" TIMEOUT 1800)
+
+# Large-dictionary tests. The default tier is a few megabytes and runs with
+# everything else; TRIEPACK_SCALE_MB raises it. Labelled so CI can select it.
+triepack_add_c_test(test_scale            test_scale.c             triepack_core)
+set_tests_properties(test_scale PROPERTIES LABELS "scale" TIMEOUT 1800)
+
+# The v2 prototype verifies every key through its own serialised bytes and
+# exits non-zero on any mismatch, so running it is a real conformance check
+# of the proposed format against a real corpus.
+add_test(NAME v2_prototype_roundtrip
+         COMMAND v2_prototype "${CMAKE_SOURCE_DIR}/tests/data/common_words_10k.txt")
+set_tests_properties(v2_prototype_roundtrip PROPERTIES LABELS "v2")
+
+# xjarchive reference grammar tests (Python). Skipped when pytest is absent
+# rather than failing a C-only build.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    # Finding an interpreter is not enough: CMake may pick a different Python
+    # from the one on PATH, and that one may not have pytest. Check for the
+    # module, not the language, or the test fails where it meant to skip.
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "import pytest"
+                    RESULT_VARIABLE TP_PYTEST_MISSING
+                    OUTPUT_QUIET ERROR_QUIET)
+    if(TP_PYTEST_MISSING EQUAL 0)
+        add_test(NAME xjarchive_grammar
+                 COMMAND ${Python3_EXECUTABLE} -m pytest -q
+                         "${CMAKE_SOURCE_DIR}/xjarchive/test_xjarchive.py")
+        set_tests_properties(xjarchive_grammar PROPERTIES LABELS "xjarchive")
+    else()
+        message(STATUS "xjarchive grammar tests skipped: ${Python3_EXECUTABLE} has no pytest")
+    endif()
+endif()
+
 # Core internals test (needs access to src/core/ for core_internal.h)
 triepack_add_c_test(test_core_internal     test_core_internal.c     triepack_core)
 target_include_directories(test_core_internal PRIVATE ${CMAKE_SOURCE_DIR}/src/core)

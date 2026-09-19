@@ -341,7 +341,9 @@ free(buf);
 
 **Embedded firmware** -- Bake a configuration dictionary or string table
 into flash. The decoder reads directly from the `const` buffer with no
-parsing step and no heap allocation beyond the ~100-byte control structure.
+parsing step, and lookup allocates nothing beyond the ~100-byte control
+structure that `tp_dict_open` creates. (Iteration does allocate -- see
+[Status](status.md).)
 
 **Spell-checking / word lists** -- Encode a dictionary of valid words as
 keys-only (no values). The trie provides O(word-length) membership testing
@@ -372,10 +374,20 @@ and reconstructs them on decode.
 - [Examples](guide/examples) -- six runnable example programs
 - [Building & Testing](guide/building) -- build options, cross-compilation, test suite
 
+### Direction
+
+- [Status](status.md) -- what is built, what is design intent, and the known defects
+- [Comparisons](comparisons.md) -- measured against BSON, MessagePack, gzip, and the trie libraries
+- [xjarchive](https://github.com/deftio/triepack/tree/main/xjarchive) -- a sibling subproject: positional tag/attribute/content encoding (`.xja`) with a formal grammar
+
+- [North Star](triepack-northstar.md) -- what TriePack optimises, what it declines, and the rules a format change must obey
+- [Format Specification v2](internals/format-spec-v2.md) -- proposed successor format: no alphabet limit, suffix sharing, 1 GB+ inputs
+- [v2 Implementation Plan](internals/v2-implementation-plan.md) -- sequencing across ten implementations
+
 ### Internals
 
 - [Architecture](internals/architecture.md) -- library stack, encoding pipeline, two-trie design
-- [Binary Format Specification](internals/format-spec.md) -- byte-level `.trp` file format
+- [Binary Format Specification](internals/format-spec.md) -- byte-level `.trp` file format (v1, current)
 - [Bitstream Specification](internals/bitstream-spec.md) -- bit-level I/O, VarInt, UTF-8
 - [Technical Deep Dive](triepack-technical-doc.md) -- encoding pipeline, algorithms, ROM deployment
 

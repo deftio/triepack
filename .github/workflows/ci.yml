@@ -47,6 +47,11 @@ jobs:
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
 
+      # The xjarchive grammar tests are Python; without pytest the CMake guard
+      # skips them, which would silently drop them from CI.
+      - name: Install pytest for the grammar tests
+        run: python3 -m pip install --quiet --break-system-packages pytest
+
       - name: Configure
         run: cmake -B build -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
 

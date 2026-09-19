@@ -67,6 +67,7 @@ configure_file(
 # ── Libraries (dependency order) ─────────────────────────────────────────
 add_subdirectory(src/bitstream)
 add_subdirectory(src/core)
+add_subdirectory(src/v2)
 if(BUILD_JSON)
     add_subdirectory(src/json)
 endif()

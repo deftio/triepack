@@ -82,6 +82,27 @@ tp_result tp_encoder_create_ex(tp_encoder **out, const tp_encoder_options *opts)
     if (!out || !opts)
         return TP_ERR_INVALID_PARAM;
 
+    /* tp_encoder_options offers six knobs; this encoder implements one
+       (bits_per_symbol). The rest were accepted and silently ignored, so a
+       caller asking for SHA-256 got CRC-32 and a caller enabling the suffix
+       table got a plain trie, with no way to tell. Say so instead.
+
+       These are not permanent limits -- see docs/internals/format-spec-v2.md
+       -- but until they are real, asking for them is an error, not a
+       no-op. */
+    if (opts->trie_mode != TP_ADDR_BIT)
+        return TP_ERR_UNSUPPORTED;
+    if (opts->value_mode != TP_ADDR_BYTE)
+        return TP_ERR_UNSUPPORTED;
+    if (opts->checksum != TP_CHECKSUM_CRC32)
+        return TP_ERR_UNSUPPORTED;
+    if (opts->enable_suffix)
+        return TP_ERR_UNSUPPORTED;
+    if (opts->compact_mode)
+        return TP_ERR_UNSUPPORTED;
+    if (opts->bits_per_symbol > 15)
+        return TP_ERR_INVALID_PARAM;
+
     /* Allocation failure paths are excluded from coverage (LCOV_EXCL). */
     tp_encoder *enc = calloc(1, sizeof(*enc));
     if (!enc)                /* LCOV_EXCL_BR_LINE */
@@ -686,6 +707,18 @@ tp_result tp_encoder_build(tp_encoder *enc, uint8_t **buf, size_t *len)
 
     /* Total data bits */
     uint64_t total_data_bits = tp_bs_writer_position(w) - data_start;
+
+    /* The header stores these three as 32-bit *bit* counts, so the data
+       stream cannot exceed 2^32 bits (512 MB). Truncating them silently
+       would produce a file with a valid CRC over wrong offsets that decodes
+       to garbage -- the same failure the alphabet check exists to prevent.
+       Refuse to build it instead. Lifting this ceiling needs the wider
+       header of format v2. */
+    if (total_data_bits > UINT32_MAX || trie_data_offset > UINT32_MAX ||
+        value_store_offset > UINT32_MAX) {
+        tp_bs_writer_destroy(&w);
+        return TP_ERR_OVERFLOW;
+    }
 
     /* Align to byte boundary before CRC */
     rc = tp_bs_writer_align_to_byte(w);

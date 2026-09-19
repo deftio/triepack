@@ -878,13 +878,53 @@ void test_encoder_blob_deep_copy(void)
 
 void test_encoder_create_ex_valid(void)
 {
+    /* The defaults describe what this encoder actually does, so they work. */
     tp_encoder_options opts = tp_encoder_defaults();
-    opts.compact_mode = true;
-
     tp_encoder *enc = NULL;
     TEST_ASSERT_EQUAL(TP_OK, tp_encoder_create_ex(&enc, &opts));
     TEST_ASSERT_NOT_NULL(enc);
     tp_encoder_destroy(&enc);
+
+    /* bits_per_symbol is the one knob that is honoured. */
+    opts = tp_encoder_defaults();
+    opts.bits_per_symbol = 8;
+    TEST_ASSERT_EQUAL(TP_OK, tp_encoder_create_ex(&enc, &opts));
+    tp_encoder_destroy(&enc);
+}
+
+/* Every other field of tp_encoder_options names something this encoder does
+ * not implement. Accepting them silently meant a caller asking for SHA-256
+ * got CRC-32 with no way to find out; each is now refused. */
+void test_encoder_create_ex_refuses_what_it_cannot_do(void)
+{
+    tp_encoder *enc = NULL;
+    tp_encoder_options opts;
+
+    opts = tp_encoder_defaults();
+    opts.trie_mode = TP_ADDR_BYTE;
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_encoder_create_ex(&enc, &opts));
+
+    opts = tp_encoder_defaults();
+    opts.value_mode = TP_ADDR_SYMBOL_UTF8;
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_encoder_create_ex(&enc, &opts));
+
+    opts = tp_encoder_defaults();
+    opts.checksum = TP_CHECKSUM_SHA256;
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_encoder_create_ex(&enc, &opts));
+
+    opts = tp_encoder_defaults();
+    opts.enable_suffix = true;
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_encoder_create_ex(&enc, &opts));
+
+    opts = tp_encoder_defaults();
+    opts.compact_mode = true;
+    TEST_ASSERT_EQUAL(TP_ERR_UNSUPPORTED, tp_encoder_create_ex(&enc, &opts));
+
+    /* A width the format cannot express is a parameter error, not an
+       unimplemented feature. */
+    opts = tp_encoder_defaults();
+    opts.bits_per_symbol = 16;
+    TEST_ASSERT_EQUAL(TP_ERR_INVALID_PARAM, tp_encoder_create_ex(&enc, &opts));
 }
 
 /* ── Iterator next/reset (covers decoder.c lines 450, 468-472) ────── */
@@ -1347,6 +1387,7 @@ int main(void)
     RUN_TEST(test_duplicate_keys_last_wins);
     RUN_TEST(test_encoder_blob_deep_copy);
     RUN_TEST(test_encoder_create_ex_valid);
+    RUN_TEST(test_encoder_create_ex_refuses_what_it_cannot_do);
     /* Iterator done/reset */
     RUN_TEST(test_iter_next_returns_eof);
     RUN_TEST(test_iter_reset_and_next);

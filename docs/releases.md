@@ -26,6 +26,97 @@ the full history lives in
 - `scripts/test-ci-linux.sh` grew `sanitizers` and `coverage` targets, so both
   new CI jobs can be run locally. LeakSanitizer is Linux-only, which makes the
   container the only place the leak half runs at all.
+- **`tests/test_scale.c`** — large dictionaries, tiered by `TRIEPACK_SCALE_MB`
+  so the default run stays quick and CI can raise it. Covers round-trip,
+  ordered iteration and lookup latency at size, and asserts that passing the
+  v1 512 MB ceiling is a clean refusal rather than a corrupt file. Measuring
+  lookup at scale is what exposed how steep the O(n) value scan is: 328 µs/key
+  at 10k keys, 7,524 µs at 175k, 30,500 µs at 699k.
+- **`tools/v2_prototype.c`** — a working implementation of the proposed v2
+  core (radix trie, LOUDS with rank/select, suffix-merged tail pool, terminal
+  bitmap) that verifies every key through its own serialised bytes. Registered
+  as the `v2_prototype_roundtrip` test.
+
+  It falsified the spec on its first run: at 57,507 bytes it was 28% *worse*
+  than v1, because storing a `(pool offset, length)` pair per tail occurrence
+  spent 35,280 bytes pointing into a 2,064-byte pool. Indexing the distinct
+  tail instead, and coding labels at the alphabet width rather than a byte
+  each, brings it to **27,610 bytes — 39% smaller than v1** on the same
+  corpus, with all 10,000 keys verified. Both corrections are now in the spec.
+
+  With values implemented (§9: ordinal derived by rank over the terminal
+  bitmap, located through a sampled offset index) it closes v1's worst defect
+  outright. On the same corpus: **48,734 bytes against v1's 90,451 (−46%) and
+  2.06 µs/key against 328 µs (159× faster)**. The value fetch itself costs
+  0.04 µs. At 699k keys, where v1 takes 30,500 µs per lookup, v2 takes
+  **3.17 µs** — v1 grows 93× across that range, v2 grows 1.5×.
+
+  It also answers the Huffman question with data rather than assumption: a
+  second pass over the byte sections saves 7.6% on the word corpus, 29.0% on
+  path-like keys and 0.1% on random binary keys. It is therefore specified as
+  optional and per-section, with the encoder required to measure and keep the
+  smaller result.
+- **`src/v2/v2_bitvec.c`, `include/triepack/v2_bitvec.h`** — the first piece of
+  v2 built properly: the ranked bit vector and LOUDS navigation that the tree,
+  the terminal map and the tail map all stand on. Written test-first, with
+  `tests/test_v2_bitvec.c` and `tests/test_v2_louds.c` derived from the
+  specification rather than from the code, so the tests are the authority.
+
+  The discipline paid immediately. `test_rank_matches_brute_force_across_block_boundaries`
+  probes 255/256/257 and 2047/2048/2049, and found that where a superblock
+  boundary lands exactly at the end of the vector the final superblock and
+  block entries were written as separate "terminators" holding the same count
+  — `rank1(2048)` returned 1366 instead of 683. The prototype had the same
+  bug and never hit it, because no corpus happened to end on that boundary.
+- **`tools/compare_formats.py`** — one table covering every corpus and every
+  format: raw, triepack v1 and v2, v2 recompressed with gzip and with
+  byte-level Huffman, MessagePack, BSON and gzip, in bytes and as a ratio,
+  with key and value counts and a refusals section naming what each format
+  declined and why. `--full` adds the whole 1 GB enwik9.
+
+  It immediately exposed a real defect: **v2 was larger than v1 on path-like
+  keys** (361,567 against 306,178). Labels were alphabet-coded but the tail
+  pool was left as raw bytes, and both hold the same alphabet — on that corpus
+  the pool is 56% of the file, so 8 bits where 5 would do cost 85,141 bytes.
+  Coding the pool brings it to **276,426**, ahead of v1. Per-corpus tables had
+  never put those two numbers side by side.
+
+  Stacking a general compressor was measured rather than assumed: gzip on the
+  `.trp` beats gzip on the original **only for the word list** (15,863 against
+  27,973); everywhere else gzipping the original wins, because the trie has
+  already taken the redundancy LZ77 would have found. Byte-level Huffman never
+  beats gzip and barely beats the uncompressed file.
+- **`docs/comparisons.md`** — measured against BSON, MessagePack and gzip on
+  `benchmark_100k.json`, and against the trie libraries architecturally.
+  gzip wins outright at 13.13x for a document read whole, and the page says
+  so; where TriePack wins is repeated keys and random access. BSON spends
+  **31% of its bytes (45,476 of 144,545) on field names**, storing each in
+  full once per occurrence; v2 stores the whole flattened key set in 13,116
+  bytes — 9.87x against raw key text, 3.47x against BSON's names — because
+  5,974 tail occurrences collapse to 41 distinct tails.
+- **`tests/test_robustness.c`** — runs the library over whatever real file is
+  in the gitignored `data/`, currently `enwik9`. The assertion is that it must
+  not die: every outcome is acceptable except a crash, a hang or a silently
+  wrong answer, and refusing the input is a fine answer. Skips cleanly when
+  `data/` is empty, as in CI.
+- **`src/v2/v2_tails.c`** — the §8.1 suffix-merge algorithm, written
+  test-first. `tests/test_v2_tails.c` pins the spec's worked example byte for
+  byte and asserts the property byte-identity actually rests on: that output
+  does not depend on the order tails arrive in.
+- **`docs/status.md`** — an audit of the gap between what TriePack documents
+  and what it implements. The architecture page described a two-trie design,
+  three addressing modes and Huffman symbol selection, none of which exist;
+  two of three checksum algorithms in a public enum have no implementation.
+  Documented features that were never built are now listed as such, with the
+  known defects and hard limits beside them.
+- **Direction documents** — `docs/triepack-northstar.md` (goals, non-goals and
+  the rules a format change must obey), `docs/internals/format-spec-v2.md` (a
+  proposed successor format with no alphabet limit, suffix sharing, structural
+  value indexing and 64-bit addressing) and
+  `docs/internals/v2-implementation-plan.md` (sequencing across ten
+  implementations, with measured baselines to beat). `architecture.md`,
+  `triepack-technical-doc.md` and `index.md` now mark design intent as design
+  intent rather than asserting it in the present tense.
 - **`tests/test_core_iterate.c`** — iteration and prefix descent, the code
   issue #1 got wrong. Covers dictionaries with no value store, keys and
   prefixes longer than the iterator's 256-byte buffer, a prefix that is itself
@@ -50,6 +141,20 @@ the full history lives in
   reaches those keys.
 
 ### Fixed
+- **Encoder options that were accepted and ignored.** `tp_encoder_options`
+  has six fields; the encoder read one (`bits_per_symbol`) and silently
+  dropped the rest, so a caller requesting SHA-256 got CRC-32, and one
+  enabling the suffix table got a plain trie, with no way to find out. Each
+  unimplemented option now returns `TP_ERR_UNSUPPORTED`. A test had codified
+  the old behaviour as correct and has been rewritten. The fields and enum
+  values stay until 2.0, since removing them breaks the API.
+- **Silent corruption past 512 MB.** `trie_data_offset`, `value_store_offset`
+  and `total_data_bits` are computed as 64-bit quantities and stored as 32-bit
+  *bit* counts, so a data stream over 2^32 bits truncated them, wrote a valid
+  CRC over the wrong offsets, and produced a file that opened cleanly and
+  decoded to garbage — the same failure mode as the alphabet overflow, from
+  the same cause. The encoder now returns `TP_ERR_OVERFLOW` instead. Lifting
+  the ceiling (rather than reporting it) needs the wider header of format v2.
 - **Unbounded allocation from a corrupt length field (Rust, Python,
   JavaScript).** String and blob lengths are read from the file, and
   `read_bytes` allocated that many bytes before checking the stream had them.

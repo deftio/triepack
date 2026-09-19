@@ -19,6 +19,12 @@ install(TARGETS trp DESTINATION ${CMAKE_INSTALL_BINDIR})
 add_executable(run_benchmarks run_benchmarks.c)
 target_link_libraries(run_benchmarks PRIVATE triepack_json)
 
+# Format v2 measurement prototype. Standalone by design: it implements the
+# proposed format directly rather than through the v1 library, so its numbers
+# describe the format and not the current encoder. See
+# docs/internals/format-spec-v2.md and the Phase 2 gate in the v2 plan.
+add_executable(v2_prototype v2_prototype.c)
+
 # Custom target to generate test fixtures
 add_custom_target(fixtures
     COMMAND generate_fixtures "${CMAKE_SOURCE_DIR}/tests/fixtures"

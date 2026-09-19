@@ -333,7 +333,9 @@ For ASCII keys with digits and punctuation, `bps=7` is typical.
 
 ## 11. Addressing Modes
 
-The format supports three addressing modes (stored in header flags):
+The format was designed for three addressing modes. **Only bit addressing
+is implemented**, and the modes are not stored in header flags -- that
+claim was wrong. See [Status](status.md). The intended modes were:
 
 | Mode             | Description                                |
 |------------------|--------------------------------------------|
