@@ -203,7 +203,7 @@ directory, and there is none: a reader walks each section from its declared
 offset.
 
 Adding a future top-level section takes a minor version and one of the
-reserved bytes, per [North Star §4.7](../triepack-northstar.md).
+reserved bytes, per [North Star §6.9](../triepack-northstar.md).
 
 ## 5. The rank primitive
 
@@ -250,7 +250,7 @@ within the 256-bit block. O(log n) with **no additional stored structure**.
 This is a deliberate trade. A broadword select index would be O(1) and
 faster; it would also be ten subtly different implementations of the
 trickiest code in the format. Size is priority 1 and lookup speed is
-priority 4 — see [North Star §2](../triepack-northstar.md).
+priority 4 — see [North Star §5](../triepack-northstar.md).
 
 ## 6. Tree structure (LOUDS)
 
@@ -398,7 +398,7 @@ per occurrence.
 ### 8.1 Deduplication algorithm (normative)
 
 Byte-identity requires this be an algorithm, not an aspiration
-([North Star §4.2](../triepack-northstar.md)). The encoder **must** perform
+([North Star §6.2](../triepack-northstar.md)). The encoder **must** perform
 exactly these steps:
 
 1. Collect the set of **distinct** tails.
@@ -530,7 +530,7 @@ variable   payload
 
 Tags 8-15 are **invalid** and a reader must reject them. v1's `array` and
 `dict` tags are removed rather than reserved — per
-[North Star §4.7](../triepack-northstar.md), space is claimed when a feature
+[North Star §6.9](../triepack-northstar.md), space is claimed when a feature
 is built.
 
 **LEB128**, normatively: seven bits of payload per byte, least significant
@@ -851,7 +851,7 @@ are correct past 2³² bits; peak decoder RSS stays within a small constant of
 the mapped file; lookup latency does not degrade with dictionary size.
 
 **Encoder budget.** Global optimisation is legal
-([North Star §4.1](../triepack-northstar.md)) but not unbounded. The encoder
+([North Star §6.1](../triepack-northstar.md)) but not unbounded. The encoder
 must build a 1 GB dictionary in **≤ 8× input size** of RAM, which the tail
 deduplication of §8.1 must respect — the sort is over distinct tails, not
 over occurrences.

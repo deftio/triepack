@@ -132,7 +132,7 @@ Three causes, all structural rather than careless:
 **Reserving space for unbuilt features.** `SUFFIX` and `ESCAPE` took two of
 six control codes, and those two reservations are what capped the alphabet at
 249 rather than 251. The format paid for features it never got.
-[North Star §4.7](triepack-northstar.md) now forbids reserving what you are
+[North Star §6.9](triepack-northstar.md) now forbids reserving what you are
 not building.
 
 **Documenting intent as fact.** `architecture.md` describes the design as

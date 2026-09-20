@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 every link here must be absolute — a repository-relative one resolves from
 the wrong directory once it is copied.
 
+## [Unreleased]
+
+### Fixed
+- **`make-release.sh` could tag and publish from a commit the default branch
+  did not contain.** It checked whether the current branch was *named* `main`,
+  not whether `origin/main` had the commit, so a release cut from a local
+  `main` that was ahead of the remote skipped the PR-and-merge path entirely
+  and went straight to tagging. That is how v2.0.0 reached npm and PyPI while
+  `origin/main`, the README and the docs site still said 1.3.2. The script now
+  verifies the remote has the commit before tagging, and runs
+  `check_versions.sh --released` afterwards.
+- **`check_versions.sh --released`**, a new mode that inverts every check:
+  the tag must exist, the default branch must contain it, and every registry
+  must already be at the declared version. Use it to confirm a release landed
+  rather than assuming the absence of an error means success.
+- The container Swift job wrote `bindings/swift/.build` inside the mounted
+  repository, so Linux artifacts broke the next `swift test` on the host with
+  `command ... not registered` — which looks like a broken binding and is not
+  one. It builds into `/tmp` now.
+- `docs/comparisons.md` described keys with more than 249 distinct byte values
+  as compressing badly. They are **refused outright**; the 148% figure came
+  from the format v2 prototype, which has no alphabet limit.
+
+### Changed
+- **`docs/triepack-northstar.md` rewritten.** It now states its own provenance
+  (generated, 2026-09-18, not a pre-implementation design document), quotes the
+  author's stated intent verbatim as the specification of record, and marks
+  every rule `[decided]` or `[proposed]`. An earlier revision had been cited
+  back to the author as though it recorded decisions he had made. TLV framing
+  is now a requirement (§6.5).
+- **New: `docs/internals/what-is-built.md`** — what is actually implemented,
+  derived from the code and measured on this machine, with the file, line or
+  command behind every row. It quotes no other document.
+- **New: `docs/internals/format-spec-v2-draft2.md`** — a proposed decoder
+  grammar. Under review; supersedes nothing yet.
+
 ## [2.0.0] - 2026-09-19
 
 **This is a library major version, not the format cutover.** Checked against

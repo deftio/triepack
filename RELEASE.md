@@ -261,6 +261,12 @@ carries a "do not edit" header; CI fails if the two drift.
 - [ ] The bump has landed through review
 - [ ] `./scripts/make-release.sh --check` is green on every target
 - [ ] `./scripts/make-release.sh`
-- [ ] GitHub Release looks right
-- [ ] `npm view triepack version` matches
+- [ ] **`./scripts/check_versions.sh --released` is green** — tag exists, the
+      default branch contains it, and GitHub/npm/PyPI are all at this version
 - [ ] Docs site shows the new version in the header
+
+`--released` is the one that catches a partial release. v2.0.0 was tagged from
+a local `main` two commits ahead of the remote: the tag triggered publishing,
+so npm and PyPI went to 2.0.0 while `origin/main` — and therefore the README
+and the docs site — still said 1.3.2. `make-release.sh` now refuses to tag in
+that state and runs this check after tagging.

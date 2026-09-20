@@ -136,11 +136,11 @@ compression or speed.
 These have not been benchmarked head to head here, so the table states
 architectural expectations rather than measurements. Taking any of those
 crowns is explicitly a non-goal
-([North Star §3](triepack-northstar.md)).
+([North Star §7](triepack-northstar.md)).
 
 **What TriePack has that they do not** is a single artifact that ten
 independent native implementations produce and consume byte-for-byte
-identically, enforced on every build, in about 4,600 lines of C99 with no
+identically, enforced on every build, in about 5,048 lines of C99 with no
 dependencies and a read path that runs from ROM. `fst` is Rust. `marisa` is
 C++ with FFI wrappers, which are bindings rather than independent
 implementations — there is nothing for them to disagree about. TriePack has
@@ -156,10 +156,17 @@ Stated plainly, because a comparison page that only lists strengths is
 marketing:
 
 - **Compressing a document you read whole** — gzip wins by 13×.
+- **Keys drawn from more than 249 distinct byte values.** The shipped format
+  does not encode them at all — `tp_encoder_build` returns `TP_ERR_ALPHABET`.
+  Measured: 249 distinct byte values builds and every key reads back; 250 is
+  refused. Genuinely random binary keys span all 256 and are therefore
+  **rejected outright**, not merely compressed badly. Format v2 removes this
+  limit; the format 2.0.0 writes has it.
 - **Keys with no shared structure.** Compression tracks prefix and suffix
-  sharing and nothing else. Random binary keys measured at **148% of their
-  input** — larger than what went in. Synthetic keys with hash-derived middles
-  came out at 86–89%.
+  sharing and nothing else. Random binary keys — measured through the
+  **format v2 prototype**, since the shipped format refuses them — came out at
+  **148% of their input**, larger than what went in. Synthetic keys with
+  hash-derived middles came out at 86–89%.
 - **Anything mutable.** A `.trp` is built once. There is no insert.
 - **Fuzzy or approximate matching.** `tp_dict_find_fuzzy` returns
   `TP_ERR_UNSUPPORTED` and will until someone implements a Levenshtein

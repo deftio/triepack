@@ -344,8 +344,21 @@ ok "tag ${TAG} is free"
 # Running from a branch that still carries it is also fine: that branch is
 # taken through review first.
 if [[ "${CURRENT_BRANCH}" == "${DEFAULT_BRANCH}" ]]; then
+    # Being *on* the default branch is not the same as having landed on it.
+    # v2.0.0 was cut from a local main that was two commits ahead of origin:
+    # this check passed, the PR and merge were skipped, and the tag went out
+    # and published to npm and PyPI while origin/main still said 1.3.2.
+    # Pushing the tag is irreversible on a registry, so verify the remote
+    # actually has this commit before treating it as landed.
+    git fetch --quiet origin "${DEFAULT_BRANCH}" 2>/dev/null || true
+    if ! git merge-base --is-ancestor HEAD "origin/${DEFAULT_BRANCH}" 2>/dev/null; then
+        AHEAD=$(git rev-list --count "origin/${DEFAULT_BRANCH}..HEAD" 2>/dev/null || echo "?")
+        die "on ${DEFAULT_BRANCH}, but origin/${DEFAULT_BRANCH} does not have this commit (${AHEAD} ahead).
+  Tagging now would publish from a commit the default branch has never seen.
+  Push or land these commits first:  git push origin ${DEFAULT_BRANCH}"
+    fi
     NEEDS_PR=0
-    ok "on ${DEFAULT_BRANCH}; ${VERSION} is already landed"
+    ok "on ${DEFAULT_BRANCH}; ${VERSION} is landed and pushed"
 else
     NEEDS_PR=1
     ok "on ${CURRENT_BRANCH}, which still has to land"
@@ -432,6 +445,31 @@ confirm "Tag ${TAG} and push? This publishes the GitHub Release and npm package.
 
 run_git git tag -a "${TAG}" -m "triepack ${TAG}"
 run_git git push origin "${TAG}"
+
+# --------------------------------------------------------------------------
+# Verify the release actually landed everywhere, rather than assuming it did.
+# --------------------------------------------------------------------------
+step "Verifying ${TAG} landed everywhere"
+
+echo "  The registries publish from CI, so give the workflows a moment."
+echo "  This is the check that would have caught v2.0.0 going to npm and"
+echo "  PyPI while origin/${DEFAULT_BRANCH} still said 1.3.2."
+echo ""
+
+if [[ ${DRY_RUN} -eq 1 ]]; then
+    echo -e "  ${YELLOW}dry-run${NC} ./scripts/check_versions.sh --released"
+elif ./scripts/check_versions.sh --released; then
+    :
+else
+    echo -e "\n${YELLOW}${BOLD}The tag is pushed but the release is not consistent yet.${NC}"
+    echo "  If the registry rows are the only ones marked, CI is probably"
+    echo "  still running — re-check with:"
+    echo ""
+    echo "      ./scripts/check_versions.sh --released"
+    echo ""
+    echo "  If the branch row is marked, fix it now: the published packages"
+    echo "  were built from a commit the default branch does not contain."
+fi
 
 echo -e "\n${GREEN}${BOLD}Released ${TAG}.${NC}"
 echo "  The tag triggers .github/workflows/publish.yml, which re-runs the"
